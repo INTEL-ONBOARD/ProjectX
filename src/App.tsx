@@ -43,7 +43,7 @@ const Layout: React.FC<{
                 onProjectSelect={setActiveProject}
             />
             <motion.div
-                className="flex-1 flex flex-col min-w-0 overflow-hidden"
+                className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white"
                 layout
                 transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             >

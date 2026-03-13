@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Layout Preview</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #1a1825; font-family: 'Inter', -apple-system, sans-serif; padding: 24px; }
+
+h2 { color: #fff; font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.subtitle { color: #9990c8; font-size: 13px; margin-bottom: 20px; display: block; }
+
+.frame {
+  background: #F0EFF8;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #2a2640;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  margin-bottom: 28px;
+}
+.frame-chrome {
+  background: #fff;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-bottom: 1px solid #ede9fe;
+}
+.chrome-dot { width: 9px; height: 9px; border-radius: 50%; }
+.chrome-url { flex: 1; margin: 0 12px; background: #f5f3ff; border-radius: 6px; height: 18px; display: flex; align-items: center; padding: 0 8px; font-size: 9px; color: #888; }
+
+.app-shell { display: flex; height: 580px; }
+
+/* Sidebar */
+.sidebar {
+  width: 210px;
+  background: #fff;
+  border-right: 1px solid #ede9fe;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 12px;
+}
+.sb-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid #f0efff;
+}
+.sb-logo-icon { width: 28px; height: 28px; border-radius: 8px; background: #5030E5; display: flex; align-items: center; justify-content: center; }
+.sb-logo-icon div { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.9); }
+.sb-logo-name { font-weight: 800; font-size: 14px; color: #111; letter-spacing: -.3px; }
+
+.sb-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  padding: 12px 16px 6px;
+}
+.sb-nav { padding: 4px 10px; }
+.sb-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #888;
+  cursor: pointer;
+  position: relative;
+  margin-bottom: 1px;
+}
+.sb-item.active {
+  background: #f0edff;
+  color: #5030E5;
+  font-weight: 600;
+}
+.sb-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: #5030E5;
+  border-radius: 0 3px 3px 0;
+}
+.sb-icon { width: 16px; height: 16px; opacity: .6; font-size: 13px; display: flex; align-items: center; }
+.sb-item.active .sb-icon { opacity: 1; }
+.sb-badge { margin-left: auto; background: #5030E5; color: #fff; border-radius: 20px; font-size: 8px; font-weight: 700; padding: 1px 5px; }
+
+.sb-projects { padding: 4px 10px; flex: 1; }
+.sb-project-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 11px;
+  color: #666;
+  cursor: pointer;
+  margin-bottom: 1px;
+}
+.sb-project-item.active { background: #f7f5ff; color: #5030E5; font-weight: 600; }
+.proj-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.proj-count { margin-left: auto; font-size: 9px; color: #bbb; }
+
+.sb-footer {
+  margin: 8px 10px 0;
+  background: #faf9ff;
+  border: 1px solid #ede9fe;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.sb-user { display: flex; align-items: center; gap: 8px; }
+.sb-av { width: 28px; height: 28px; border-radius: 50%; background: #7AC555; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: 800; flex-shrink: 0; }
+.sb-user-name { font-size: 11px; font-weight: 700; color: #111; }
+.sb-user-role { font-size: 9px; color: #aaa; }
+
+/* Main content */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Top header */
+.top-header {
+  background: #fff;
+  border-bottom: 1px solid #ede9fe;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.search-box {
+  flex: 1;
+  max-width: 260px;
+  background: #f5f3ff;
+  border-radius: 8px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  font-size: 11px;
+  color: #aaa;
+}
+.header-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.notif-btn {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: #f5f3ff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  position: relative;
+  cursor: pointer;
+}
+.notif-dot { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: #D8727D; border: 1.5px solid #fff; }
+.header-user { display: flex; align-items: center; gap: 7px; }
+.header-av { width: 30px; height: 30px; border-radius: 50%; background: #7AC555; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 800; }
+.header-name { font-size: 12px; font-weight: 600; color: #111; }
+.header-sub { font-size: 10px; color: #aaa; }
+
+/* Page content scroll area */
+.page-scroll { flex: 1; overflow-y: auto; padding: 20px 28px; background: #F0EFF8; }
+
+/* Constrained container */
+.page-inner { max-width: 860px; }
+
+/* Page heading row */
+.page-heading { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+.page-title { font-size: 20px; font-weight: 800; color: #111; letter-spacing: -.4px; }
+.page-breadcrumb { font-size: 10px; color: #aaa; margin-top: 3px; }
+.btn-group { display: flex; gap: 7px; align-items: center; }
+.btn { display: flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.btn-primary { background: #5030E5; color: #fff; }
+.btn-outline { background: #fff; border: 1.5px solid #ede9fe; color: #555; }
+.btn-ghost { background: transparent; color: #888; font-size: 10px; }
+
+/* 4-metric strip */
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.metric-card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1.5px solid #ede9fe;
+  padding: 14px 16px;
+}
+.metric-card.accent {
+  background: linear-gradient(135deg, #5030E5 0%, #7c5cf6 100%);
+  border-color: transparent;
+}
+.mc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.mc-icon { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.mc-trend { font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
+.mc-trend.up { color: #68B266; }
+.mc-trend.down { color: #D8727D; }
+.metric-card.accent .mc-trend { color: rgba(255,255,255,.7); }
+.mc-val { font-size: 26px; font-weight: 800; color: #111; letter-spacing: -1px; line-height: 1; }
+.metric-card.accent .mc-val { color: #fff; }
+.mc-label { font-size: 10px; color: #999; margin-top: 3px; }
+.metric-card.accent .mc-label { color: rgba(255,255,255,.7); }
+.mc-bar { height: 3px; background: rgba(255,255,255,.2); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.mc-bar-fill { height: 100%; border-radius: 2px; background: rgba(255,255,255,.7); }
+
+/* Two-column layout */
+.two-col { display: grid; grid-template-columns: 1fr 280px; gap: 12px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+/* White card */
+.wcard {
+  background: #fff;
+  border-radius: 10px;
+  border: 1.5px solid #ede9fe;
+  overflow: hidden;
+}
+.wcard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid #f5f3ff;
+}
+.wcard-title { font-size: 12px; font-weight: 700; color: #111; }
+.wcard-link { font-size: 10px; color: #5030E5; font-weight: 600; cursor: pointer; }
+.wcard-body { padding: 12px 16px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; background: #f5f3ff; border-radius: 7px; padding: 3px; margin-bottom: 10px; }
+.tab { padding: 4px 10px; border-radius: 5px; font-size: 10px; font-weight: 600; color: #888; cursor: pointer; }
+.tab.on { background: #fff; color: #5030E5; box-shadow: 0 1px 4px rgba(80,48,229,.12); }
+
+/* Rich table */
+.rtable { width: 100%; border-collapse: collapse; }
+.rtable th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 9px;
+  font-weight: 700;
+  color: #bbb;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  background: #faf9ff;
+  border-bottom: 1px solid #ede9fe;
+}
+.rtable td { padding: 9px 12px; border-bottom: 1px solid #f5f3ff; vertical-align: middle; }
+.rtable tr:last-child td { border-bottom: none; }
+.rtable tr:hover td { background: #faf9ff; }
+
+/* Avatar */
+.av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 800; flex-shrink: 0; }
+.av-group { display: flex; }
+.av-group .av { border: 2px solid #fff; margin-left: -6px; }
+.av-group .av:first-child { margin-left: 0; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; font-weight: 700; padding: 3px 7px; border-radius: 20px; white-space: nowrap; }
+.b-high { background: #D8727D18; color: #D8727D; }
+.b-low { background: #DFA87418; color: #D58D49; }
+.b-done { background: #68B26618; color: #68B266; }
+.b-todo { background: #ede9fe; color: #5030E5; }
+.b-prog { background: #FFA50018; color: #FFA500; }
+.b-admin { background: #ede9fe; color: #5030E5; }
+.b-manager { background: #FFFBEB; color: #D97706; }
+.b-member { background: #f3f4f6; color: #6B7280; }
+
+/* Progress bar */
+.pbar { height: 5px; background: #f0efff; border-radius: 3px; overflow: hidden; }
+.pfill { height: 100%; border-radius: 3px; }
+
+/* Status dot */
+.sdot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* Mini sparkline placeholder */
+.sparkline { height: 28px; display: flex; align-items: flex-end; gap: 2px; }
+.spark-bar { border-radius: 2px 2px 0 0; flex: 1; }
+
+/* Side panels */
+.side-stack { display: flex; flex-direction: column; gap: 12px; }
+
+/* Stat rows in side panel */
+.stat-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f5f3ff; }
+.stat-row:last-child { border-bottom: none; }
+.stat-label { flex: 1; font-size: 11px; color: #555; }
+.stat-val { font-size: 11px; font-weight: 700; color: #111; }
+
+/* Timeline / activity */
+.activity-row { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f3ff; align-items: flex-start; }
+.activity-row:last-child { border-bottom: none; }
+.act-icon-wrap { width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+.act-text { font-size: 11px; color: #333; line-height: 1.4; }
+.act-time { font-size: 10px; color: #bbb; margin-top: 2px; }
+
+/* Mini donut placeholder */
+.donut-wrap { display: flex; align-items: center; gap: 12px; }
+.donut { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; }
+.donut-legend { flex: 1; }
+.legend-item { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; font-size: 10px; color: #555; }
+.legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.legend-val { margin-left: auto; font-weight: 700; color: #111; font-size: 10px; }
+
+/* Attendance dot */
+.att-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* Scrollbar */
+.page-scroll::-webkit-scrollbar { width: 4px; }
+.page-scroll::-webkit-scrollbar-track { background: transparent; }
+.page-scroll::-webkit-scrollbar-thumb { background: #d0ccf0; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<h2>Advanced Desktop UI — Tasks Page</h2>
+<span class="subtitle">Fixed max-width · 4-metric strip · rich table + side panels · no stretching</span>
+
+<div class="frame">
+  <div class="frame-chrome">
+    <div class="chrome-dot" style="background:#FF5F57"></div>
+    <div class="chrome-dot" style="background:#FFBD2E"></div>
+    <div class="chrome-dot" style="background:#28C840"></div>
+    <div class="chrome-url">localhost:5173 — Project M.</div>
+  </div>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sb-logo">
+        <div class="sb-logo-icon"><div></div></div>
+        <span class="sb-logo-name">Project M.</span>
+      </div>
+      <div class="sb-section-label">Menu</div>
+      <div class="sb-nav">
+        <div class="sb-item"><span class="sb-icon">⊞</span> Home</div>
+        <div class="sb-item"><span class="sb-icon">◫</span> Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">✉</span> Messages <span class="sb-badge">3</span></div>
+        <div class="sb-item active"><span class="sb-icon">✓</span> Tasks <span class="sb-badge" style="margin-left:auto">7</span></div>
+        <div class="sb-item"><span class="sb-icon">⊕</span> Teams</div>
+        <div class="sb-item"><span class="sb-icon">👤</span> Members</div>
+        <div class="sb-item"><span class="sb-icon">⏱</span> Attendance</div>
+        <div class="sb-item"><span class="sb-icon">↗</span> Reports</div>
+        <div class="sb-item"><span class="sb-icon">⬡</span> Organization</div>
+        <div class="sb-item"><span class="sb-icon">⚙</span> Settings</div>
+      </div>
+      <div class="sb-section-label">My Projects</div>
+      <div class="sb-projects">
+        <div class="sb-project-item active"><div class="proj-dot" style="background:#7AC555"></div> Mobile App <span class="proj-count">7</span></div>
+        <div class="sb-project-item"><div class="proj-dot" style="background:#FFA500"></div> Website Redesign <span class="proj-count">5</span></div>
+        <div class="sb-project-item"><div class="proj-dot" style="background:#E4CCFD"></div> Design System <span class="proj-count">3</span></div>
+        <div class="sb-project-item"><div class="proj-dot" style="background:#76A5EA"></div> Wireframes <span class="proj-count">4</span></div>
+      </div>
+      <div class="sb-footer">
+        <div class="sb-user">
+          <div class="sb-av">AA</div>
+          <div><div class="sb-user-name">Anima A.</div><div class="sb-user-role">Admin · Project Manager</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="top-header">
+        <div class="search-box">🔍 &nbsp;Search tasks, members...</div>
+        <div class="header-actions">
+          <div class="notif-btn">🔔<div class="notif-dot"></div></div>
+          <div class="header-user">
+            <div class="header-av">AA</div>
+            <div><div class="header-name">Anima Agrawal</div><div class="header-sub">Project Manager</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-scroll">
+        <div class="page-inner">
+          <!-- Heading -->
+          <div class="page-heading">
+            <div>
+              <div class="page-title">Tasks</div>
+              <div class="page-breadcrumb">Home / Tasks &nbsp;·&nbsp; 7 tasks across 4 projects</div>
+            </div>
+            <div class="btn-group">
+              <div class="btn btn-outline">⇣ Export</div>
+              <div class="btn btn-outline">⊟ Filter</div>
+              <div class="btn btn-primary">+ New Task</div>
+            </div>
+          </div>
+
+          <!-- Metrics -->
+          <div class="metrics">
+            <div class="metric-card accent">
+              <div class="mc-top">
+                <div class="mc-icon" style="background:rgba(255,255,255,.15);">✓</div>
+                <div class="mc-trend up">↑ 2</div>
+              </div>
+              <div class="mc-val">7</div>
+              <div class="mc-label">Total Tasks</div>
+              <div class="mc-bar"><div class="mc-bar-fill" style="width:100%"></div></div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-top">
+                <div class="mc-icon" style="background:#FFA50015;">⏳</div>
+                <div class="mc-trend" style="color:#FFA500">Active</div>
+              </div>
+              <div class="mc-val" style="color:#FFA500">2</div>
+              <div class="mc-label">In Progress</div>
+              <div class="pbar" style="margin-top:10px;"><div class="pfill" style="width:29%;background:#FFA500;"></div></div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-top">
+                <div class="mc-icon" style="background:#68B26615;">✔</div>
+                <div class="mc-trend up">↑ 1</div>
+              </div>
+              <div class="mc-val" style="color:#68B266">2</div>
+              <div class="mc-label">Completed</div>
+              <div class="pbar" style="margin-top:10px;"><div class="pfill" style="width:29%;background:#68B266;"></div></div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-top">
+                <div class="mc-icon" style="background:#D8727D15;">!</div>
+                <div class="mc-trend down">2 overdue</div>
+              </div>
+              <div class="mc-val" style="color:#D8727D">3</div>
+              <div class="mc-label">Pending</div>
+              <div class="pbar" style="margin-top:10px;"><div class="pfill" style="width:43%;background:#D8727D;"></div></div>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div class="two-col">
+            <!-- Main table card -->
+            <div class="wcard">
+              <div class="wcard-head">
+                <div class="wcard-title">All Tasks</div>
+                <div class="btn-group">
+                  <div class="wcard-link">Board view →</div>
+                </div>
+              </div>
+              <div style="padding:10px 16px 0;">
+                <div class="tabs">
+                  <div class="tab on">All &nbsp;<span style="background:#5030E5;color:#fff;border-radius:10px;padding:0 5px;font-size:8px;">7</span></div>
+                  <div class="tab">To Do &nbsp;<span style="color:#aaa;font-size:9px;">3</span></div>
+                  <div class="tab">In Progress &nbsp;<span style="color:#aaa;font-size:9px;">2</span></div>
+                  <div class="tab">Done &nbsp;<span style="color:#aaa;font-size:9px;">2</span></div>
+                </div>
+              </div>
+              <table class="rtable">
+                <thead>
+                  <tr>
+                    <th>Task</th>
+                    <th>Project</th>
+                    <th>Priority</th>
+                    <th>Assignees</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div style="font-weight:700;font-size:11px;color:#111;">Onboarding Illustrations</div>
+                      <div style="font-size:9px;color:#aaa;margin-top:2px;">2 comments · 3 files</div>
+                    </td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="proj-dot" style="background:#7AC555"></div><span style="font-size:10px;color:#555;">Mobile App</span></div></td>
+                    <td><span class="badge b-high">● High</span></td>
+                    <td>
+                      <div class="av-group">
+                        <div class="av" style="background:#7AC555;">AA</div>
+                        <div class="av" style="background:#FFA500;">RK</div>
+                      </div>
+                    </td>
+                    <td style="font-size:10px;color:#D8727D;font-weight:600;">Dec 18</td>
+                    <td><span class="badge b-prog">In Progress</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight:700;font-size:11px;color:#111;">Brainstorming</div>
+                      <div style="font-size:9px;color:#aaa;margin-top:2px;">3 comments · 2 files</div>
+                    </td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="proj-dot" style="background:#FFA500"></div><span style="font-size:10px;color:#555;">Website</span></div></td>
+                    <td><span class="badge b-low">● Low</span></td>
+                    <td><div class="av" style="background:#E4CCFD;color:#5030E5;">PS</div></td>
+                    <td style="font-size:10px;color:#aaa;">Dec 22</td>
+                    <td><span class="badge b-todo">To Do</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight:700;font-size:11px;color:#111;">Research</div>
+                      <div style="font-size:9px;color:#aaa;margin-top:2px;">1 comment · 1 file</div>
+                    </td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="proj-dot" style="background:#76A5EA"></div><span style="font-size:10px;color:#555;">Wireframes</span></div></td>
+                    <td><span class="badge b-high">● High</span></td>
+                    <td>
+                      <div class="av-group">
+                        <div class="av" style="background:#76A5EA;">AR</div>
+                        <div class="av" style="background:#30C5E5;">NS</div>
+                      </div>
+                    </td>
+                    <td style="font-size:10px;color:#D8727D;font-weight:600;">Dec 15</td>
+                    <td><span class="badge b-todo">To Do</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight:700;font-size:11px;color:#111;">Mobile App Design</div>
+                      <div style="font-size:9px;color:#aaa;margin-top:2px;">5 comments · 5 files</div>
+                    </td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="proj-dot" style="background:#7AC555"></div><span style="font-size:10px;color:#555;">Mobile App</span></div></td>
+                    <td><span class="badge b-done">● Done</span></td>
+                    <td>
+                      <div class="av-group">
+                        <div class="av" style="background:#7AC555;">AA</div>
+                        <div class="av" style="background:#E4CCFD;color:#5030E5;">PS</div>
+                        <div class="av" style="background:#ccc;color:#555;font-size:8px;">+2</div>
+                      </div>
+                    </td>
+                    <td style="font-size:10px;color:#68B266;font-weight:600;">Done</td>
+                    <td><span class="badge b-done">Done</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div style="font-weight:700;font-size:11px;color:#111;">Wireframes</div>
+                      <div style="font-size:9px;color:#aaa;margin-top:2px;">0 comments · 4 files</div>
+                    </td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="proj-dot" style="background:#76A5EA"></div><span style="font-size:10px;color:#555;">Wireframes</span></div></td>
+                    <td><span class="badge b-low">● Low</span></td>
+                    <td><div class="av" style="background:#FFA500;">RK</div></td>
+                    <td style="font-size:10px;color:#aaa;">Dec 28</td>
+                    <td><span class="badge b-todo">To Do</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Side panels -->
+            <div class="side-stack">
+              <!-- Sprint summary -->
+              <div class="wcard">
+                <div class="wcard-head"><div class="wcard-title">Sprint Summary</div><div class="wcard-link">Details</div></div>
+                <div class="wcard-body">
+                  <div style="margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:#888;margin-bottom:4px;"><span>Sprint Progress</span><span style="font-weight:700;color:#5030E5;">29%</span></div>
+                    <div class="pbar" style="height:7px;"><div class="pfill" style="width:29%;background:linear-gradient(90deg,#5030E5,#7c5cf6);"></div></div>
+                  </div>
+                  <div class="stat-row"><span class="stat-label">Start date</span><span class="stat-val">Dec 1, 2020</span></div>
+                  <div class="stat-row"><span class="stat-label">End date</span><span class="stat-val">Dec 31, 2020</span></div>
+                  <div class="stat-row"><span class="stat-label">Velocity</span><span class="stat-val" style="color:#5030E5;">2.3 tasks/day</span></div>
+                  <div class="stat-row"><span class="stat-label">Blockers</span><span class="stat-val" style="color:#D8727D;">2 overdue</span></div>
+                </div>
+              </div>
+
+              <!-- Priority breakdown -->
+              <div class="wcard">
+                <div class="wcard-head"><div class="wcard-title">Priority Breakdown</div></div>
+                <div class="wcard-body">
+                  <div class="donut-wrap" style="margin-bottom:12px;">
+                    <div class="donut" style="background:conic-gradient(#D8727D 0% 43%, #D58D49 43% 72%, #68B266 72% 100%);"></div>
+                    <div class="donut-legend">
+                      <div class="legend-item"><div class="legend-dot" style="background:#D8727D"></div>High<span class="legend-val">3</span></div>
+                      <div class="legend-item"><div class="legend-dot" style="background:#D58D49"></div>Low<span class="legend-val">2</span></div>
+                      <div class="legend-item"><div class="legend-dot" style="background:#68B266"></div>Done<span class="legend-val">2</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Top assignees -->
+              <div class="wcard">
+                <div class="wcard-head"><div class="wcard-title">Top Assignees</div></div>
+                <div class="wcard-body" style="padding-bottom:8px;">
+                  <div class="stat-row">
+                    <div class="av" style="background:#7AC555;">AA</div>
+                    <span class="stat-label" style="margin-left:6px;">Anima A.</span>
+                    <div class="pbar" style="width:60px;"><div class="pfill" style="width:80%;background:#5030E5;"></div></div>
+                    <span class="stat-val" style="font-size:10px;margin-left:6px;">4</span>
+                  </div>
+                  <div class="stat-row">
+                    <div class="av" style="background:#E4CCFD;color:#5030E5;">PS</div>
+                    <span class="stat-label" style="margin-left:6px;">Priya S.</span>
+                    <div class="pbar" style="width:60px;"><div class="pfill" style="width:60%;background:#E4CCFD;"></div></div>
+                    <span class="stat-val" style="font-size:10px;margin-left:6px;">3</span>
+                  </div>
+                  <div class="stat-row">
+                    <div class="av" style="background:#76A5EA;">AR</div>
+                    <span class="stat-label" style="margin-left:6px;">Arjun P.</span>
+                    <div class="pbar" style="width:60px;"><div class="pfill" style="width:40%;background:#76A5EA;"></div></div>
+                    <span class="stat-val" style="font-size:10px;margin-left:6px;">2</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /page-inner -->
+      </div><!-- /page-scroll -->
+    </div><!-- /main -->
+  </div><!-- /app-shell -->
+</div>
+
+<!-- Members page -->
+<h2 style="margin-top:8px;">Members Page</h2>
+<span class="subtitle">Full table with workload bars · role dist donut · location split · online status</span>
+
+<div class="frame">
+  <div class="frame-chrome">
+    <div class="chrome-dot" style="background:#FF5F57"></div><div class="chrome-dot" style="background:#FFBD2E"></div><div class="chrome-dot" style="background:#28C840"></div>
+    <div class="chrome-url">localhost:5173 — Members</div>
+  </div>
+  <div class="app-shell">
+    <div class="sidebar">
+      <div class="sb-logo"><div class="sb-logo-icon"><div></div></div><span class="sb-logo-name">Project M.</span></div>
+      <div class="sb-section-label">Menu</div>
+      <div class="sb-nav">
+        <div class="sb-item"><span class="sb-icon">⊞</span> Home</div>
+        <div class="sb-item"><span class="sb-icon">◫</span> Dashboard</div>
+        <div class="sb-item"><span class="sb-icon">✉</span> Messages</div>
+        <div class="sb-item"><span class="sb-icon">✓</span> Tasks</div>
+        <div class="sb-item"><span class="sb-icon">⊕</span> Teams</div>
+        <div class="sb-item active"><span class="sb-icon">👤</span> Members</div>
+        <div class="sb-item"><span class="sb-icon">⏱</span> Attendance</div>
+        <div class="sb-item"><span class="sb-icon">↗</span> Reports</div>
+        <div class="sb-item"><span class="sb-icon">⬡</span> Organization</div>
+        <div class="sb-item"><span class="sb-icon">⚙</span> Settings</div>
+      </div>
+      <div class="sb-section-label">My Projects</div>
+      <div class="sb-projects">
+        <div class="sb-project-item active"><div class="proj-dot" style="background:#7AC555"></div> Mobile App <span class="proj-count">7</span></div>
+        <div class="sb-project-item"><div class="proj-dot" style="background:#FFA500"></div> Website Redesign <span class="proj-count">5</span></div>
+        <div class="sb-project-item"><div class="proj-dot" style="background:#E4CCFD"></div> Design System <span class="proj-count">3</span></div>
+        <div class="sb-project-item"><div class="proj-dot" style="background:#76A5EA"></div> Wireframes <span class="proj-count">4</span></div>
+      </div>
+      <div class="sb-footer">
+        <div class="sb-user"><div class="sb-av">AA</div><div><div class="sb-user-name">Anima A.</div><div class="sb-user-role">Admin · Project Manager</div></div></div>
+      </div>
+    </div>
+    <div class="main">
+      <div class="top-header">
+        <div class="search-box">🔍 &nbsp;Search members...</div>
+        <div class="header-actions">
+          <div class="notif-btn">🔔<div class="notif-dot"></div></div>
+          <div class="header-user"><div class="header-av">AA</div><div><div class="header-name">Anima Agrawal</div><div class="header-sub">Project Manager</div></div></div>
+        </div>
+      </div>
+      <div class="page-scroll">
+        <div class="page-inner">
+          <div class="page-heading">
+            <div><div class="page-title">Members</div><div class="page-breadcrumb">Home / Members &nbsp;·&nbsp; 6 team members</div></div>
+            <div class="btn-group"><div class="btn btn-outline">⇣ Export</div><div class="btn btn-primary">+ Invite Member</div></div>
+          </div>
+          <div class="metrics">
+            <div class="metric-card accent">
+              <div class="mc-top"><div class="mc-icon" style="background:rgba(255,255,255,.15);">👥</div><div class="mc-trend up">↑ 1 new</div></div>
+              <div class="mc-val">6</div><div class="mc-label">Total Members</div>
+              <div class="mc-bar"><div class="mc-bar-fill" style="width:100%"></div></div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-top"><div class="mc-icon" style="background:#5030E515;">★</div></div>
+              <div class="mc-val" style="color:#5030E5">1</div><div class="mc-label">Admins</div>
+              <div class="pbar" style="margin-top:10px;"><div class="pfill" style="width:17%;background:#5030E5;"></div></div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-top"><div class="mc-icon" style="background:#D9770615;">◈</div></div>
+              <div class="mc-val" style="color:#D97706">1</div><div class="mc-label">Managers</div>
+              <div class="pbar" style="margin-top:10px;"><div class="pfill" style="width:17%;background:#D97706;"></div></div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-top"><div class="mc-icon" style="background:#68B26615;">○</div><div class="mc-trend up">5 online</div></div>
+              <div class="mc-val" style="color:#68B266">4</div><div class="mc-label">Members</div>
+              <div class="pbar" style="margin-top:10px;"><div class="pfill" style="width:67%;background:#68B266;"></div></div>
+            </div>
+          </div>
+          <div class="two-col">
+            <div class="wcard">
+              <div class="wcard-head"><div class="wcard-title">Team Directory</div><div class="wcard-link">Export CSV</div></div>
+              <table class="rtable">
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Role</th>
+                    <th>Location</th>
+                    <th>Workload</th>
+                    <th>Tasks</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><div style="display:flex;align-items:center;gap:8px;"><div class="av" style="background:#7AC555;width:30px;height:30px;font-size:10px;">AA</div><div><div style="font-weight:700;font-size:11px;color:#111;">Anima Agrawal</div><div style="font-size:9px;color:#aaa;">Project Manager</div></div></div></td>
+                    <td><span class="badge b-admin">Admin</span></td>
+                    <td style="font-size:11px;color:#555;">🏙 Bangalore</td>
+                    <td style="width:80px;"><div class="pbar" style="height:6px;"><div class="pfill" style="width:100%;background:#5030E5;"></div></div><div style="font-size:9px;color:#aaa;margin-top:3px;">5 / 5</div></td>
+                    <td style="font-size:11px;font-weight:700;color:#111;">4</td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="sdot" style="background:#68B266;"></div><span style="font-size:10px;color:#68B266;">Online</span></div></td>
+                  </tr>
+                  <tr>
+                    <td><div style="display:flex;align-items:center;gap:8px;"><div class="av" style="background:#FFA500;width:30px;height:30px;font-size:10px;">RK</div><div><div style="font-weight:700;font-size:11px;color:#111;">Rohan Kumar</div><div style="font-size:9px;color:#aaa;">Frontend Developer</div></div></div></td>
+                    <td><span class="badge b-manager">Manager</span></td>
+                    <td style="font-size:11px;color:#555;">🌆 Mumbai</td>
+                    <td style="width:80px;"><div class="pbar" style="height:6px;"><div class="pfill" style="width:60%;background:#FFA500;"></div></div><div style="font-size:9px;color:#aaa;margin-top:3px;">3 / 5</div></td>
+                    <td style="font-size:11px;font-weight:700;color:#111;">3</td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="sdot" style="background:#68B266;"></div><span style="font-size:10px;color:#68B266;">Online</span></div></td>
+                  </tr>
+                  <tr>
+                    <td><div style="display:flex;align-items:center;gap:8px;"><div class="av" style="background:#E4CCFD;color:#5030E5;width:30px;height:30px;font-size:10px;">PS</div><div><div style="font-weight:700;font-size:11px;color:#111;">Priya Singh</div><div style="font-size:9px;color:#aaa;">UI Designer</div></div></div></td>
+                    <td><span class="badge b-member">Member</span></td>
+                    <td style="font-size:11px;color:#555;">🌍 Remote</td>
+                    <td style="width:80px;"><div class="pbar" style="height:6px;"><div class="pfill" style="width:40%;background:#E4CCFD;"></div></div><div style="font-size:9px;color:#aaa;margin-top:3px;">2 / 5</div></td>
+                    <td style="font-size:11px;font-weight:700;color:#111;">3</td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="sdot" style="background:#FFA500;"></div><span style="font-size:10px;color:#FFA500;">Away</span></div></td>
+                  </tr>
+                  <tr>
+                    <td><div style="display:flex;align-items:center;gap:8px;"><div class="av" style="background:#76A5EA;width:30px;height:30px;font-size:10px;">AR</div><div><div style="font-weight:700;font-size:11px;color:#111;">Arjun Patel</div><div style="font-size:9px;color:#aaa;">Backend Developer</div></div></div></td>
+                    <td><span class="badge b-member">Member</span></td>
+                    <td style="font-size:11px;color:#555;">🌍 Remote</td>
+                    <td style="width:80px;"><div class="pbar" style="height:6px;"><div class="pfill" style="width:20%;background:#76A5EA;"></div></div><div style="font-size:9px;color:#aaa;margin-top:3px;">1 / 5</div></td>
+                    <td style="font-size:11px;font-weight:700;color:#111;">2</td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="sdot" style="background:#68B266;"></div><span style="font-size:10px;color:#68B266;">Online</span></div></td>
+                  </tr>
+                  <tr>
+                    <td><div style="display:flex;align-items:center;gap:8px;"><div class="av" style="background:#30C5E5;width:30px;height:30px;font-size:10px;">NS</div><div><div style="font-weight:700;font-size:11px;color:#111;">Neha Sharma</div><div style="font-size:9px;color:#aaa;">QA Engineer</div></div></div></td>
+                    <td><span class="badge b-member">Member</span></td>
+                    <td style="font-size:11px;color:#555;">🏙 Bangalore</td>
+                    <td style="width:80px;"><div class="pbar" style="height:6px;"><div class="pfill" style="width:80%;background:#30C5E5;"></div></div><div style="font-size:9px;color:#aaa;margin-top:3px;">4 / 5</div></td>
+                    <td style="font-size:11px;font-weight:700;color:#111;">2</td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="sdot" style="background:#68B266;"></div><span style="font-size:10px;color:#68B266;">Online</span></div></td>
+                  </tr>
+                  <tr>
+                    <td><div style="display:flex;align-items:center;gap:8px;"><div class="av" style="background:#D58D49;width:30px;height:30px;font-size:10px;">VR</div><div><div style="font-weight:700;font-size:11px;color:#111;">Vikram Rao</div><div style="font-size:9px;color:#aaa;">DevOps Engineer</div></div></div></td>
+                    <td><span class="badge b-member">Member</span></td>
+                    <td style="font-size:11px;color:#555;">🌍 Remote</td>
+                    <td style="width:80px;"><div class="pbar" style="height:6px;"><div class="pfill" style="width:0%;background:#D58D49;"></div></div><div style="font-size:9px;color:#aaa;margin-top:3px;">0 / 5</div></td>
+                    <td style="font-size:11px;font-weight:700;color:#111;">0</td>
+                    <td><div style="display:flex;align-items:center;gap:5px;"><div class="sdot" style="background:#ccc;"></div><span style="font-size:10px;color:#aaa;">Offline</span></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="side-stack">
+              <div class="wcard">
+                <div class="wcard-head"><div class="wcard-title">Role Distribution</div></div>
+                <div class="wcard-body">
+                  <div class="donut-wrap">
+                    <div class="donut" style="background:conic-gradient(#5030E5 0% 17%, #D97706 17% 33%, #68B266 33% 100%);"></div>
+                    <div class="donut-legend">
+                      <div class="legend-item"><div class="legend-dot" style="background:#5030E5"></div>Admin<span class="legend-val">1</span></div>
+                      <div class="legend-item"><div class="legend-dot" style="background:#D97706"></div>Manager<span class="legend-val">1</span></div>
+                      <div class="legend-item"><div class="legend-dot" style="background:#68B266"></div>Member<span class="legend-val">4</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="wcard">
+                <div class="wcard-head"><div class="wcard-title">Location Split</div></div>
+                <div class="wcard-body">
+                  <div class="stat-row"><div style="font-size:14px;">🏙</div><span class="stat-label">Bangalore</span><div class="pbar" style="width:50px;"><div class="pfill" style="width:33%;background:#5030E5;"></div></div><span class="stat-val" style="font-size:10px;margin-left:6px;">2</span></div>
+                  <div class="stat-row"><div style="font-size:14px;">🌆</div><span class="stat-label">Mumbai</span><div class="pbar" style="width:50px;"><div class="pfill" style="width:17%;background:#FFA500;"></div></div><span class="stat-val" style="font-size:10px;margin-left:6px;">1</span></div>
+                  <div class="stat-row"><div style="font-size:14px;">🌍</div><span class="stat-label">Remote</span><div class="pbar" style="width:50px;"><div class="pfill" style="width:50%;background:#68B266;"></div></div><span class="stat-val" style="font-size:10px;margin-left:6px;">3</span></div>
+                </div>
+              </div>
+              <div class="wcard">
+                <div class="wcard-head"><div class="wcard-title">Availability</div></div>
+                <div class="wcard-body">
+                  <div class="stat-row"><div class="sdot" style="background:#68B266;"></div><span class="stat-label">Online</span><span class="stat-val" style="color:#68B266;">4</span></div>
+                  <div class="stat-row"><div class="sdot" style="background:#FFA500;"></div><span class="stat-label">Away</span><span class="stat-val" style="color:#FFA500;">1</span></div>
+                  <div class="stat-row"><div class="sdot" style="background:#ccc;"></div><span class="stat-label">Offline</span><span class="stat-val" style="color:#aaa;">1</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

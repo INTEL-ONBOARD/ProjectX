@@ -1,0 +1,138 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: #ffffff;
+    color: #111827;
+}
+
+body[data-theme='dark'] {
+    background: #111827;
+    color: #f3f4f6;
+}
+
+body[data-theme='dark'] #root {
+    filter: saturate(0.96) brightness(0.96);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+}
+
+/* Hide scrollbar for cleaner look, show on hover */
+.overflow-y-auto::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb {
+    background: transparent;
+}
+
+.overflow-y-auto:hover::-webkit-scrollbar-thumb,
+.overflow-x-auto:hover::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+}
+
+/* Smooth transitions for all interactive elements */
+button,
+a,
+input {
+    transition: all 0.2s ease;
+}
+
+/* Focus styles */
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid #5030e5;
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* Disable text select on UI elements */
+button,
+nav,
+aside {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* macOS titlebar drag area */
+.titlebar-drag {
+    -webkit-app-region: drag;
+}
+
+.titlebar-no-drag {
+    -webkit-app-region: no-drag;
+}
+
+/* Card glass effect for special cards */
+.glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* Smooth page transitions */
+@layer utilities {
+    .animate-stagger-1 {
+        animation-delay: 0.05s;
+    }
+
+    .animate-stagger-2 {
+        animation-delay: 0.1s;
+    }
+
+    .animate-stagger-3 {
+        animation-delay: 0.15s;
+    }
+
+    .animate-stagger-4 {
+        animation-delay: 0.2s;
+    }
+
+    .animate-stagger-5 {
+        animation-delay: 0.25s;
+    }
+}
+
+/* Line clamp utility */
+.line-clamp-2 {
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

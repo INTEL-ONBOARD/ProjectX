@@ -97,62 +97,62 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
 
     const toggleBtns: { label: string; status: 'present' | 'absent' | 'wfh'; active: string; inactive: string }[] = [
         {
-            label: 'Present',
+            label: 'Clock In',
             status: 'present',
             active: 'bg-[#68B266] text-white border-[#68B266]',
             inactive: 'border-[#68B266] text-[#68B266] hover:bg-[#68B26610]',
         },
         {
-            label: 'Absent',
+            label: 'Break',
+            status: 'wfh',
+            active: 'bg-[#FFA500] text-white border-[#FFA500]',
+            inactive: 'border-[#FFA500] text-[#FFA500] hover:bg-[#FFA50010]',
+        },
+        {
+            label: 'Clock Out',
             status: 'absent',
             active: 'bg-[#D8727D] text-white border-[#D8727D]',
             inactive: 'border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D10]',
-        },
-        {
-            label: 'WFH',
-            status: 'wfh',
-            active: 'bg-[#30C5E5] text-white border-[#30C5E5]',
-            inactive: 'border-[#30C5E5] text-[#30C5E5] hover:bg-[#30C5E510]',
         },
     ];
 
     return (
         <motion.div
-            className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-lg border border-surface-200 z-50 overflow-hidden"
+            className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-lg border border-surface-200 z-50 overflow-hidden"
             initial={{ opacity: 0, y: -8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.15 }}
         >
             {/* Month navigation */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-surface-100">
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-surface-100">
                 <button
                     onClick={prevMonth}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-surface-100 transition-colors"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-surface-100 transition-colors"
                 >
-                    <ChevronLeft size={16} />
+                    <ChevronLeft size={14} />
                 </button>
-                <span className="text-sm font-semibold text-gray-800">
+                <span className="text-xs font-semibold text-gray-800">
                     {MONTH_NAMES[viewMonth]} {viewYear}
                 </span>
                 <button
                     onClick={nextMonth}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-surface-100 transition-colors"
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-surface-100 transition-colors"
                 >
-                    <ChevronRight size={16} />
+                    <ChevronRight size={14} />
                 </button>
             </div>
 
             {/* Day-of-week headers */}
-            <div className="grid grid-cols-7 px-3 pt-3 pb-1">
+            <div className="grid grid-cols-7 px-2 pt-2 pb-0.5">
                 {DAY_NAMES.map(d => (
-                    <div key={d} className="text-center text-[10px] font-bold text-gray-400 uppercase">{d}</div>
+                    <div key={d} className="text-center text-[9px] font-bold text-gray-400 uppercase">{d}</div>
                 ))}
             </div>
 
-            {/* Date grid */}
-            <div className="grid grid-cols-7 px-3 pb-3 gap-y-1">
-                {cells.map(({ date, isCurrentMonth }) => {
+            {/* Date grid — only 5 rows (35 cells) */}
+            <div className="grid grid-cols-7 px-2 pb-2 gap-y-0.5">
+                {cells.slice(0, 35).map(({ date, isCurrentMonth }) => {
                     const dateStr = toISODate(date);
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedDate;
@@ -161,7 +161,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                             key={dateStr}
                             onClick={() => setSelectedDate(dateStr)}
                             className={`
-                                w-8 h-8 mx-auto rounded-lg text-xs font-medium transition-colors
+                                w-7 h-7 mx-auto rounded-md text-[11px] font-medium transition-colors
                                 ${isSelected ? 'bg-primary-500 text-white' : ''}
                                 ${!isSelected && isToday ? 'ring-2 ring-primary-300 text-primary-600' : ''}
                                 ${!isSelected && !isToday && isCurrentMonth ? 'text-gray-700 hover:bg-surface-100' : ''}
@@ -175,20 +175,20 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
             </div>
 
             {/* Divider */}
-            <div className="h-px bg-surface-100 mx-4" />
+            <div className="h-px bg-surface-100 mx-3" />
 
-            {/* Attendance section */}
-            <div className="px-4 py-3">
-                <p className="text-xs text-gray-500 mb-2">
-                    Mark attendance for <span className="font-semibold text-gray-700">{formatLabel(selectedDate)}</span>
+            {/* Clock actions */}
+            <div className="px-3 py-2.5">
+                <p className="text-[10px] text-gray-400 mb-2">
+                    Log time for <span className="font-semibold text-gray-600">{formatLabel(selectedDate)}</span>
                 </p>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                     {toggleBtns.map(btn => (
                         <button
                             key={btn.status}
                             onClick={() => markAttendance(btn.status)}
                             className={`
-                                flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors
+                                flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors
                                 ${currentStatus === btn.status ? btn.active : btn.inactive}
                             `}
                         >

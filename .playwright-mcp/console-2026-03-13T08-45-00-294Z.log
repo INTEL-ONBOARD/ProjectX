@@ -1,0 +1,302 @@
+[ 4435138ms] ReferenceError: projects is not defined
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395935196:41:26)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[ 4435144ms] ReferenceError: projects is not defined
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395935196:41:26)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[ 4435147ms] [ERROR] The above error occurred in the <Layout> component:
+
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395935196:35:3)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:6355:26)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7222:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7152:13)
+    at HashRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:10401:3)
+    at App
+    at AppProvider (http://localhost:5173/src/context/AppContext.tsx?t=1773342513635:33:31)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14079
+[ 4435148ms] ReferenceError: projects is not defined
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395935196:41:26)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19806:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19169:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18786:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18932:28)
+[ 4441167ms] Error: useProjects must be used within ProjectProvider
+    at useProjects (http://localhost:5173/src/context/ProjectContext.tsx:24:19)
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395941378:42:24)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14974:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15962:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+[ 4441168ms] Error: useProjects must be used within ProjectProvider
+    at useProjects (http://localhost:5173/src/context/ProjectContext.tsx:24:19)
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395941378:42:24)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14974:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15962:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+[ 4441167ms] [ERROR] The above error occurred in the <Layout> component:
+
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395941378:36:3)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:6355:26)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7222:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7152:13)
+    at HashRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:10401:3)
+    at App
+    at AppProvider (http://localhost:5173/src/context/AppContext.tsx?t=1773342513635:33:31)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14079
+[ 4441168ms] Error: useProjects must be used within ProjectProvider
+    at useProjects (http://localhost:5173/src/context/ProjectContext.tsx:24:19)
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395941378:42:24)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14974:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15962:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19806:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19169:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18786:28)
+[ 4444846ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/App.tsx?t=1773395945112:0
+[ 4444847ms] [ERROR] [vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[ 4455099ms] ReferenceError: projects is not defined
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773395955288:265:84)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[ 4455099ms] ReferenceError: projects is not defined
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773395955288:265:84)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[ 4455101ms] [ERROR] The above error occurred in the <Sidebar> component:
+
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773395955288:48:3)
+    at div
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395949152:36:3)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:6355:26)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7222:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7152:13)
+    at HashRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:10401:3)
+    at ProjectProvider (http://localhost:5173/src/context/ProjectContext.tsx:28:35)
+    at App
+    at AppProvider (http://localhost:5173/src/context/AppContext.tsx?t=1773342513635:33:31)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14079
+[ 4455102ms] ReferenceError: projects is not defined
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773395955288:265:84)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19806:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19169:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18786:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18932:28)
+[ 4461868ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773395962148:0
+[ 4461868ms] [ERROR] [vite] Failed to reload /src/components/layout/Sidebar.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[ 4473477ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773395973757:0
+[ 4473477ms] [ERROR] [vite] Failed to reload /src/components/layout/Sidebar.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[ 4500419ms] ReferenceError: todoTasks is not defined
+    at TasksPage (http://localhost:5173/src/pages/TasksPage.tsx?t=1773396000590:78:20)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[ 4500420ms] ReferenceError: todoTasks is not defined
+    at TasksPage (http://localhost:5173/src/pages/TasksPage.tsx?t=1773396000590:78:20)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[ 4500422ms] [ERROR] The above error occurred in the <TasksPage> component:
+
+    at TasksPage (http://localhost:5173/src/pages/TasksPage.tsx?t=1773396000590:68:20)
+    at div
+    at MotionDOMComponent (http://localhost:5173/node_modules/.vite/deps/framer-motion.js?v=322e318d:8807:40)
+    at div
+    at Layout (http://localhost:5173/src/App.tsx?t=1773395949152:36:3)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:6355:26)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7222:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7152:13)
+    at HashRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:10401:3)
+    at ProjectProvider (http://localhost:5173/src/context/ProjectContext.tsx:28:35)
+    at App
+    at AppProvider (http://localhost:5173/src/context/AppContext.tsx?t=1773342513635:33:31)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14079
+[ 4500424ms] ReferenceError: todoTasks is not defined
+    at TasksPage (http://localhost:5173/src/pages/TasksPage.tsx?t=1773396000590:78:20)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19806:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19169:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18786:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18932:28)
+[ 4873438ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/MessagesPage.tsx?t=1773396373689:0
+[ 4873439ms] [ERROR] [vite] Failed to reload /src/pages/MessagesPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[ 4888265ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/MessagesPage.tsx?t=1773396373689:0
+[ 4904853ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/MessagesPage.tsx?t=1773396404913:0
+[ 5084374ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/MessagesPage.tsx?t=1773396584630:0
+[ 5084375ms] [ERROR] [vite] Failed to reload /src/pages/MessagesPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[10635745ms] ReferenceError: Lightbulb is not defined
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773402135830:397:54)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[10635764ms] ReferenceError: Lightbulb is not defined
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773402135830:397:54)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+[10635631ms] [ERROR] The above error occurred in the <Sidebar> component:
+
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773402135830:49:3)
+    at div
+    at Layout (http://localhost:5173/src/App.tsx?t=1773402016631:37:3)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:6355:26)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7222:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7152:13)
+    at HashRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:10401:3)
+    at ProjectProvider (http://localhost:5173/src/context/ProjectContext.tsx:28:35)
+    at App
+    at AppProvider (http://localhost:5173/src/context/AppContext.tsx?t=1773396388020:72:31)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14079
+[10635767ms] ReferenceError: Lightbulb is not defined
+    at Sidebar (http://localhost:5173/src/components/layout/Sidebar.tsx?t=1773402135830:397:54)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at updateFunctionComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14630:28)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15972:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19806:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19169:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18786:28)
+    at performSyncWorkOnRoot (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18932:28)
+[11731003ms] Error: useProjects must be used within ProjectProvider
+    at useProjects (http://localhost:5173/src/context/ProjectContext.tsx:24:19)
+    at Layout (http://localhost:5173/src/App.tsx?t=1773403176296:43:24)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14974:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15962:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+[11731021ms] Error: useProjects must be used within ProjectProvider
+    at useProjects (http://localhost:5173/src/context/ProjectContext.tsx:24:19)
+    at Layout (http://localhost:5173/src/App.tsx?t=1773403176296:43:24)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14974:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15962:22)
+    at HTMLUnknownElement.callCallback2 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3680:22)
+    at Object.invokeGuardedCallbackDev (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3705:24)
+    at invokeGuardedCallback (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:3739:39)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19818:15)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+[11730990ms] [ERROR] The above error occurred in the <Layout> component:
+
+    at Layout (http://localhost:5173/src/App.tsx?t=1773403176296:37:3)
+    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:6355:26)
+    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7222:3)
+    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:7152:13)
+    at HashRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=322e318d:10401:3)
+    at ProjectProvider (http://localhost:5173/src/context/ProjectContext.tsx?t=1773403231145:28:35)
+    at App
+    at AppProvider (http://localhost:5173/src/context/AppContext.tsx?t=1773396388020:72:31)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries. @ http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14079
+[11731025ms] Error: useProjects must be used within ProjectProvider
+    at useProjects (http://localhost:5173/src/context/ProjectContext.tsx:24:19)
+    at Layout (http://localhost:5173/src/App.tsx?t=1773403176296:43:24)
+    at renderWithHooks (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:11596:26)
+    at mountIndeterminateComponent (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:14974:21)
+    at beginWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:15962:22)
+    at beginWork$1 (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19806:22)
+    at performUnitOfWork (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19251:20)
+    at workLoopSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19190:13)
+    at renderRootSync (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:19169:15)
+    at recoverFromConcurrentError (http://localhost:5173/node_modules/.vite/deps/chunk-UVXKGGW7.js?v=322e318d:18786:28)
+[12051788ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/TasksPage.tsx?t=1773403552056:0
+[12051788ms] [ERROR] [vite] Failed to reload /src/pages/TasksPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[12089136ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/MembersPage.tsx?t=1773403589412:0
+[12089136ms] [ERROR] [vite] Failed to reload /src/pages/MembersPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[12128293ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/TeamsPage.tsx?t=1773403628558:0
+[12128293ms] [ERROR] [vite] Failed to reload /src/pages/TeamsPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881
+[12171402ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/src/pages/AttendancePage.tsx?t=1773403671669:0
+[12171402ms] [ERROR] [vite] Failed to reload /src/pages/AttendancePage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above) @ http://localhost:5173/@vite/client:881

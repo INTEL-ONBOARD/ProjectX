@@ -1,0 +1,28 @@
+[   16618ms] [WARNING] The resource https://images.stripeassets.com/fzn2n1nzq965/5DrmXrFYpKk43Kj0I1MXQr/287b3c2a13ae8d4d7d0bf8305037de4e/palette.png?fm=webp&q=95 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://stripe.com/:0
+[  117127ms] [ERROR] Connecting to 'https://collector-pxm6kav5mu.perimeterx.net/api/v1/collector' violates the following Content Security Policy directive: "connect-src 'self' https://px-cdn.net https://*.px-cdn.net https://px-cloud.net https://*.px-cloud.net https://pxchk.net https://*.pxchk.net https://px-client.net https://*.px-client.net https://errors.stripe.com". The action has been blocked. @ https://b.stripecdn.com/stripethirdparty-srv/assets/v32.1/vendors~AddressAutocomplete~AffirmInContext~AfterpayInContext~AmazonPayButton~ApplePay~Arkose~Arkose~daedefc0.dbeca930e1d74334cc68.bundle.js:15
+[  239442ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/1010/store/?sentry_key=55f46479a5294df49627a0e0373f09ce&sentry_version=7:0
+[  239443ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/1010/store/?sentry_key=55f46479a5294df49627a0e0373f09ce&sentry_version=7:0
+[  239443ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/1010/store/?sentry_key=55f46479a5294df49627a0e0373f09ce&sentry_version=7:0
+[  239443ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/1010/store/?sentry_key=55f46479a5294df49627a0e0373f09ce&sentry_version=7:0
+[  239443ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/1010/store/?sentry_key=55f46479a5294df49627a0e0373f09ce&sentry_version=7:0
+[  239446ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/1010/store/?sentry_key=55f46479a5294df49627a0e0373f09ce&sentry_version=7:0
+[  240002ms] [ERROR] Framing 'https://stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://app.contentful.com". The request has been blocked.
+ @ :0
+[  240252ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The request has been blocked.
+ @ :0
+[  240252ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following report-only Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The violation has been logged, but no further action has been taken.
+ @ :0
+[  240567ms] [ERROR] Framing 'https://marketplace.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0
+[  304521ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The request has been blocked.
+ @ :0
+[  304521ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following report-only Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The violation has been logged, but no further action has been taken.
+ @ :0
+[  304572ms] [ERROR] Framing 'https://stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://app.contentful.com". The request has been blocked.
+ @ :0
+[  304834ms] [ERROR] Framing 'https://marketplace.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0
+[  304887ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://dashboard.stripe.com/v1/profiles?expand%5B%5D=verification&include_only%5B%5D=id%2Cusername%2Cdisplay_name%2Cdescription%2Curl%2Cemail%2Cphone%2Clivemode%2Cvisibility%2Cobject%2Caddress.line1%2Caddress.line2%2Caddress.city%2Caddress.state%2Caddress.postal_code%2Caddress.country%2Cbranding.icon.original%2Cbranding.logo.original%2Cbranding.primary_color%2Cbranding.secondary_color%2Cverification.is_verified:0
+[  324025ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://dashboard.stripe.com/v1/profiles?expand%5B%5D=verification&include_only%5B%5D=id%2Cusername%2Cdisplay_name%2Cdescription%2Curl%2Cemail%2Cphone%2Clivemode%2Cvisibility%2Cobject%2Caddress.line1%2Caddress.line2%2Caddress.city%2Caddress.state%2Caddress.postal_code%2Caddress.country%2Cbranding.icon.original%2Cbranding.logo.original%2Cbranding.primary_color%2Cbranding.secondary_color%2Cverification.is_verified:0
+[  328989ms] [ERROR] Access to fetch at 'https://r.stripe.com/0' from origin 'https://dashboard.stripe.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://dashboard.stripe.com/conversations/acct_1TAQd7DagGXhJ539/widget?audience=stripe&entrypoint=dashboard&requires_session=1&expected_merchant=acct_1TAQd7DagGXhJ539&expected_user=usr_U8i2XwjG2zkGEw&referrerLocale=en-GB&livemode=false&view_mode=minimal:0
+[  328989ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://r.stripe.com/0:0
