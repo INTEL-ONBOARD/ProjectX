@@ -41,7 +41,7 @@ const Layout: React.FC<{ children: React.ReactNode; showProjectHeader?: boolean 
                 transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             >
                 <Header />
-                {showProjectHeader && <ProjectHeader projectId={activeProject} />}
+                {showProjectHeader && <ProjectHeader />}
                 {children}
             </motion.div>
         </div>
