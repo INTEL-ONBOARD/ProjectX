@@ -5,9 +5,12 @@ import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { teamMembers, memberColors } from '../data/mockData';
 import { AppContext, AttendanceRecord } from '../context/AppContext';
+import { useMembersContext } from '../context/MembersContext';
+import { downloadCsv } from '../utils/exportCsv';
 
 const AttendancePage: React.FC = () => {
     const { attendanceRecords } = useContext(AppContext);
+    const { members } = useMembersContext();
 
     const WEEK_DATES = ['2020-12-01', '2020-12-02', '2020-12-03', '2020-12-04', '2020-12-05'];
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -55,20 +58,29 @@ const AttendancePage: React.FC = () => {
         { label: 'Days Tracked', value: '5', trend: 'Mon–Fri', trendUp: true, color: '#30C5E5', accent: false, icon: Calendar, barPct: 100 },
     ];
 
+    const handleExport = () => {
+        const header = ['Member', 'Date', 'Status'];
+        const rows = attendanceRecords.map(r => {
+            const memberName = members.find(m => m.id === r.userId)?.name ?? r.userId;
+            return [memberName, r.date, r.status];
+        });
+        downloadCsv('attendance.csv', [header, ...rows]);
+    };
+
     return (
   <motion.div
-    className="flex-1 overflow-y-auto px-8 pb-8 bg-white"
+    className="flex-1 flex flex-col overflow-hidden px-8 bg-white"
     initial={{ opacity: 0 }} animate={{ opacity: 1 }}
     transition={{ duration: 0.3, delay: 0.1 }}
   >
-    <div className="w-full">
-      <div className="pt-8 pb-5">
+    <div className="flex flex-col h-full">
+      <div className="pt-8 pb-5 shrink-0">
         <PageHeader
           eyebrow="Home / Attendance"
           title="Attendance"
           description="Weekly overview"
           actions={
-            <motion.button className="flex items-center gap-2 bg-white text-gray-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-surface-100 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <motion.button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-surface-100 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Download size={16} /> Export
             </motion.button>
           }
@@ -76,13 +88,13 @@ const AttendancePage: React.FC = () => {
       </div>
 
       {/* 4-metric strip */}
-      <div className="grid grid-cols-4 gap-5 mb-6">
+      <div className="grid grid-cols-4 gap-5 mb-4 shrink-0">
         {metrics.map((m, i) => {
           const Icon = m.icon;
           return (
             <motion.div
               key={m.label}
-              className={`rounded-2xl p-5 shadow-card ${m.accent ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white' : 'bg-white'}`}
+              className={`rounded-2xl p-5 ${m.accent ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white' : 'bg-white border border-surface-200'}`}
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: i * 0.08, ease: [0.4, 0, 0.2, 1] }}
             >
@@ -103,13 +115,14 @@ const AttendancePage: React.FC = () => {
       </div>
 
       {/* Two-column body */}
-      <div className="grid grid-cols-[1fr_300px] gap-5">
+      <div className="grid grid-cols-[1fr_300px] gap-5 flex-1 min-h-0 pb-6">
         {/* Main: Attendance table */}
-        <div className="bg-white rounded-2xl shadow-card overflow-hidden">
+        <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col min-h-0">
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
             <h2 className="font-bold text-gray-900 text-sm">Weekly Attendance</h2>
             <span className="text-xs text-gray-400">Dec 1–5, 2020</span>
           </div>
+          <div className="flex-1 overflow-y-auto min-h-0">
           <table className="w-full">
             <thead>
               <tr className="border-b border-surface-100">
@@ -159,12 +172,13 @@ const AttendancePage: React.FC = () => {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Side panels */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
           {/* Attendance Summary */}
-          <motion.div className="bg-white rounded-2xl shadow-card p-4"
+          <motion.div className="bg-white rounded-2xl border border-surface-200 p-4"
             initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.35, delay: 0, ease: [0.4, 0, 0.2, 1] }}>
             <h3 className="font-bold text-gray-900 text-sm mb-3">Attendance Summary</h3>
@@ -177,7 +191,7 @@ const AttendancePage: React.FC = () => {
           </motion.div>
 
           {/* Daily Breakdown */}
-          <motion.div className="bg-white rounded-2xl shadow-card p-4"
+          <motion.div className="bg-white rounded-2xl border border-surface-200 p-4"
             initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.35, delay: 0.08, ease: [0.4, 0, 0.2, 1] }}>
             <h3 className="font-bold text-gray-900 text-sm mb-3">Daily Breakdown</h3>
