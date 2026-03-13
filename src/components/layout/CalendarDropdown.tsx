@@ -53,9 +53,11 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
 
     // Hooks MUST come before any conditional return (Rules of Hooks)
     const today = new Date();
-    const [viewYear, setViewYear] = useState(today.getFullYear());
-    const [viewMonth, setViewMonth] = useState(today.getMonth());
-    const [selectedDate, setSelectedDate] = useState(toISODate(today));
+    // Default to the reference week (Dec 2020) so changes immediately reflect on AttendancePage
+    const REF_DATE = new Date(2020, 11, 3); // Dec 3, 2020
+    const [viewYear, setViewYear] = useState(REF_DATE.getFullYear());
+    const [viewMonth, setViewMonth] = useState(REF_DATE.getMonth());
+    const [selectedDate, setSelectedDate] = useState(toISODate(REF_DATE));
 
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
