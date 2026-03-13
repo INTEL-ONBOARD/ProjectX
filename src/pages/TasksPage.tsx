@@ -120,7 +120,7 @@ const TasksPage: React.FC = () => {
       assignees: editAssignees,
       dueDate: editDueDate || undefined,
     };
-    updateTask(selectedTask.id, changes);
+    updateTask(selectedTask.id, changes).catch(console.error);
     setSelectedTask(prev => prev ? { ...prev, ...changes } : prev);
     setEditMode(false);
   };
@@ -432,7 +432,7 @@ const TasksPage: React.FC = () => {
                               <button
                                 key={s}
                                 onClick={() => {
-                                  updateTask(selectedTask.id, { status: s });
+                                  updateTask(selectedTask.id, { status: s }).catch(console.error);
                                   setSelectedTask(prev => prev ? { ...prev, status: s } : prev);
                                   setShowStatusDrop(false);
                                 }}
@@ -588,7 +588,7 @@ const TasksPage: React.FC = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
-                              deleteTask(selectedTask.id);
+                              deleteTask(selectedTask.id).catch(console.error);
                               setSelectedTask(null);
                               setConfirmDelete(false);
                             }}
@@ -625,7 +625,7 @@ const TasksPage: React.FC = () => {
         {showTaskForm && (
           <TaskFormModal
             onClose={() => setShowTaskForm(false)}
-            onSubmit={task => createTask(task)}
+            onSubmit={task => createTask(task).catch(console.error)}
             defaultStatus="todo"
           />
         )}

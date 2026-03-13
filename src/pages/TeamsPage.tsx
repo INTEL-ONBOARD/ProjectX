@@ -484,7 +484,7 @@ const TeamsPage: React.FC = () => {
     }));
 
   const handleDeleteProject = (id: string) => {
-    deleteProject(id);
+    deleteProject(id).catch(console.error);
     setLocalRichData(prev => {
       const next = { ...prev };
       delete next[id];
@@ -729,8 +729,8 @@ const TeamsPage: React.FC = () => {
           <NewProjectModal
             onClose={() => setShowProjectModal(false)}
             onSubmit={(name, color) => {
-              if (editingProject) updateProject(editingProject.id, { name, color });
-              else createProject(name, color);
+              if (editingProject) updateProject(editingProject.id, { name, color }).catch(console.error);
+              else createProject(name, color).catch(console.error);
             }}
             initial={editingProject ? { name: editingProject.name, color: editingProject.color } : undefined}
           />

@@ -5,7 +5,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import { downloadCsv } from '../utils/exportCsv';
-import { MOCK_TODAY } from '../data/mockData';
+const TODAY = new Date().toISOString().split('T')[0];
 
 const ReportsPage: React.FC = () => {
   const { projects: ctxProjects, allTasks: ctxAllTasks } = useProjects();
@@ -17,7 +17,7 @@ const ReportsPage: React.FC = () => {
   const todoTasks = allTasks.filter(t => t.status === 'todo');
   const inProgressTasks = allTasks.filter(t => t.status === 'in-progress');
   const completionRate = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
-  const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < MOCK_TODAY && t.status !== 'done').length;
+  const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY && t.status !== 'done').length;
 
   const bars = [
     { label: 'To Do', count: todoTasks.length, color: '#5030E5' },

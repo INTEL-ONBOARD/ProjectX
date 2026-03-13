@@ -4,7 +4,8 @@ import { MoreHorizontal, MessageSquare, Paperclip, Edit3, Trash2, ArrowRight } f
 import { Task, TaskStatus } from '../../types';
 import { useMembersContext } from '../../context/MembersContext';
 import { AvatarGroup } from '../ui/Avatar';
-import { memberColors, MOCK_TODAY } from '../../data/mockData';
+import { memberColors } from '../../data/mockData';
+const TODAY = new Date().toISOString().split('T')[0];
 
 const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
   low: { bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]', label: 'Low' },

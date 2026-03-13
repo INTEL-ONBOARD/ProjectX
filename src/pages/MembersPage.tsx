@@ -193,8 +193,8 @@ const MembersPage: React.FC = () => {
                               <button
                                 className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors"
                                 onClick={() => {
-                                  removeMember(member.id);
-                                  scrubAssignee(member.id);
+                                  removeMember(member.id).catch(console.error);
+                                  scrubAssignee(member.id).catch(console.error);
                                   setConfirmRemoveId(null);
                                 }}
                               >
@@ -336,7 +336,7 @@ const MembersPage: React.FC = () => {
         {showInvite && (
           <InviteMemberModal
             onClose={() => setShowInvite(false)}
-            onSubmit={member => addMember(member)}
+            onSubmit={member => addMember(member).catch(console.error)}
           />
         )}
       </AnimatePresence>

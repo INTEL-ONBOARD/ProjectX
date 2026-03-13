@@ -10,10 +10,9 @@ import { useMembersContext } from '../../context/MembersContext';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import KanbanColumn from './KanbanColumn';
 import TaskFormModal from '../modals/TaskFormModal';
-import { MOCK_TODAY } from '../../data/mockData';
-
-const WEEK_START = '2020-12-14';
-const WEEK_END   = '2020-12-20';
+const TODAY = new Date().toISOString().split('T')[0];
+const WEEK_START = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })();
+const WEEK_END   = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().split('T')[0]; })();
 
 const statusStyles: Record<TaskStatus, { bg: string; text: string; label: string }> = {
   'todo':        { bg: 'bg-primary-50',     text: 'text-primary-600',  label: 'To Do' },
@@ -93,14 +92,14 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
       priority: editPriority,
       assignees: editAssignees,
       dueDate: editDueDate || undefined,
-    });
+    }).catch(console.error);
     setSelectedTask(prev => prev ? { ...prev, title: editTitle, description: editDesc, priority: editPriority, assignees: editAssignees, dueDate: editDueDate || undefined } : prev);
     setEditMode(false);
   };
 
   const handleDelete = () => {
     if (!selectedTask) return;
-    deleteTask(selectedTask.id);
+    deleteTask(selectedTask.id).catch(console.error);
     setSelectedTask(null);
     setConfirmDelete(false);
   };
@@ -116,7 +115,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
     if (!file || !selectedTask) return;
     const url = URL.createObjectURL(file);
     setDetailImage(url);
-    updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] });
+    updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
   };
 
   const applyFilters = (tasks: Task[]): Task[] => {
@@ -124,9 +123,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
     return tasks.filter(t => {
       if (filters.priority !== 'all' && t.priority !== filters.priority) return false;
       if (filters.assignees.length > 0 && !filters.assignees.some(id => t.assignees.includes(id))) return false;
-      if (filters.dueDateFilter === 'today' && t.dueDate !== MOCK_TODAY) return false;
+      if (filters.dueDateFilter === 'today' && t.dueDate !== TODAY) return false;
       if (filters.dueDateFilter === 'week' && (!t.dueDate || t.dueDate < WEEK_START || t.dueDate > WEEK_END)) return false;
-      if (filters.dueDateFilter === 'overdue' && (t.dueDate === undefined || t.dueDate >= MOCK_TODAY || t.status === 'done')) return false;
+      if (filters.dueDateFilter === 'overdue' && (t.dueDate === undefined || t.dueDate >= TODAY || t.status === 'done')) return false;
       return true;
     });
   };
@@ -160,7 +159,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
               index={index}
               onTaskClick={openTask}
               onAddTask={(status) => { setFormDefaultStatus(status); setShowTaskForm(true); }}
-              onMoveTask={(taskId, newStatus) => moveTask(taskId, newStatus)}
+              onMoveTask={(taskId, newStatus) => moveTask(taskId, newStatus).catch(console.error)}
             />
           ))}
         </div>
@@ -171,7 +170,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
         {showTaskForm && (
           <TaskFormModal
             onClose={() => setShowTaskForm(false)}
-            onSubmit={task => createTask(task)}
+            onSubmit={task => createTask(task).catch(console.error)}
             defaultStatus={formDefaultStatus}
           />
         )}
@@ -256,7 +255,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
                             return (
                               <button key={s}
                                 onClick={() => {
-                                  moveTask(selectedTask.id, s);
+                                  moveTask(selectedTask.id, s).catch(console.error);
                                   setSelectedTask(prev => prev ? { ...prev, status: s } : prev);
                                   setShowStatusDrop(false);
                                 }}
