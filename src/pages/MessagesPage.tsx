@@ -1,0 +1,570 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Send, Search, Phone, Video, MoreVertical, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import PageHeader from '../components/ui/PageHeader';
+import { Avatar } from '../components/ui/Avatar';
+import { teamMembers, memberColors, currentUser } from '../data/mockData';
+import { useMembersContext } from '../context/MembersContext';
+
+const designations: Record<string, string> = {
+  u1: 'Project Manager', u2: 'Frontend Developer', u3: 'UI Designer',
+  u4: 'Backend Developer', u5: 'QA Engineer', u6: 'DevOps Engineer',
+};
+const onlineStatus: Record<string, 'online' | 'away' | 'offline'> = {
+  u1: 'online', u2: 'online', u3: 'away', u4: 'online', u5: 'offline', u6: 'away',
+};
+const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
+const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
+
+type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: string[] };
+
+const initialChats: Record<string, Msg[]> = {
+  u2: [
+    { id: 'c1', from: 'u2', text: 'Hey, can you review the PR I just pushed?', time: '10:32 AM', read: true },
+    { id: 'c2', from: 'u1', text: 'Sure! Give me 10 minutes.', time: '10:35 AM', read: true },
+    { id: 'c3', from: 'u2', text: 'No rush, just the auth middleware changes.', time: '10:36 AM', read: true },
+    { id: 'c4', from: 'u1', text: 'Looks good overall. Left one comment on line 42.', time: '10:48 AM', read: true },
+    { id: 'c5', from: 'u2', text: 'Can you review the PR?', time: '10:50 AM', read: false },
+  ],
+  u3: [
+    { id: 'd1', from: 'u3', text: 'The design looks great! Really love the new color palette.', time: '9:15 AM', read: true },
+    { id: 'd2', from: 'u1', text: 'Thanks Priya! The team put in a lot of work.', time: '9:20 AM', read: true },
+    { id: 'd3', from: 'u3', text: 'Should we schedule a review session this week?', time: '9:22 AM', read: true },
+  ],
+  u4: [
+    { id: 'e1', from: 'u4', text: 'Meeting at 3pm?', time: '8:00 AM', read: false },
+    { id: 'e2', from: 'u1', text: 'Yes, I\'ll set up the call link.', time: '8:05 AM', read: true },
+  ],
+  u5: [
+    { id: 'f1', from: 'u5', text: 'Pushed the latest build to staging.', time: 'Yesterday', read: true },
+    { id: 'f2', from: 'u1', text: 'Great, I\'ll run the smoke tests.', time: 'Yesterday', read: true },
+  ],
+  u6: [
+    { id: 'g1', from: 'u6', text: 'Check the new wireframes I uploaded.', time: 'Mon', read: true },
+  ],
+};
+
+const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
+
+const MessagesPage: React.FC = () => {
+  const conversations = teamMembers.filter(m => m.id !== currentUser.id);
+  const [activeId, setActiveId] = useState('u2');
+  const [chats, setChats] = useState(initialChats);
+  const [input, setInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [showContextMenu, setShowContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [starredIds, setStarredIds] = useState<string[]>([]);
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
+  const [openedIds, setOpenedIds] = useState<Set<string>>(new Set(['u2']));
+  const [msgFilter, setMsgFilter] = useState<'all' | 'unread' | 'pinned'>('all');
+  const [showCallBanner, setShowCallBanner] = useState(false);
+  const [showNewConvo, setShowNewConvo] = useState(false);
+  const [callType, setCallType] = useState<'phone' | 'video' | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const attachRef = useRef<HTMLInputElement>(null);
+
+  const location = useLocation();
+  const { members, getMemberColor } = useMembersContext();
+
+  useEffect(() => {
+    const memberId = (location.state as any)?.memberId;
+    if (memberId) {
+      setActiveId(memberId);
+      setChats(prev => ({ [memberId]: [], ...prev }));
+    }
+  }, []);
+
+  const activeMember = teamMembers.find(m => m.id === activeId)!;
+  const activeColor = memberColors[teamMembers.findIndex(m => m.id === activeId)] ?? memberColors[0];
+  const activeChats = chats[activeId] ?? [];
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeChats.length, activeId]);
+
+  // Mark as read when switching conversation
+  useEffect(() => {
+    setChats(prev => ({
+      ...prev,
+      [activeId]: (prev[activeId] ?? []).map(m => ({ ...m, read: true })),
+    }));
+  }, [activeId]);
+
+  const totalUnread = conversations.reduce((sum, m) => {
+    const msgs = chats[m.id] ?? [];
+    return sum + msgs.filter(msg => !msg.read && msg.from !== currentUser.id).length;
+  }, 0);
+
+  const sendMessage = () => {
+    const text = input.trim();
+    if (!text) return;
+    const newMsg: Msg = {
+      id: `m${Date.now()}`,
+      from: currentUser.id,
+      text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      read: false,
+    };
+    setChats(prev => ({ ...prev, [activeId]: [...(prev[activeId] ?? []), newMsg] }));
+    setInput('');
+    inputRef.current?.focus();
+  };
+
+  const addReaction = (msgId: string, emoji: string) => {
+    setChats(prev => ({
+      ...prev,
+      [activeId]: prev[activeId].map(m =>
+        m.id === msgId ? { ...m, reactions: [...(m.reactions ?? []).filter(e => e !== emoji), emoji] } : m
+      ),
+    }));
+    setShowEmojiPicker(null);
+  };
+
+  const deleteMessage = (msgId: string) => {
+    setChats(prev => ({ ...prev, [activeId]: prev[activeId].filter(m => m.id !== msgId) }));
+    setShowContextMenu(null);
+  };
+
+  const filteredConvos = conversations.filter(m => {
+    if (archivedIds.has(m.id)) return false;
+    if (!m.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (msgFilter === 'pinned') return pinnedIds.includes(m.id);
+    if (msgFilter === 'unread') return !openedIds.has(m.id);
+    return true;
+  });
+
+  const getLastMsg = (userId: string) => {
+    const msgs = chats[userId] ?? [];
+    return msgs[msgs.length - 1];
+  };
+
+  const getUnread = (userId: string) => {
+    return (chats[userId] ?? []).filter(m => !m.read && m.from !== currentUser.id).length;
+  };
+
+  return (
+    <motion.div
+      className="flex-1 flex flex-col overflow-hidden px-8 pb-6 bg-white"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+      onClick={() => { setShowContextMenu(null); setShowEmojiPicker(null); }}
+    >
+      <div className="pt-8 pb-5 shrink-0">
+        <PageHeader
+          eyebrow="Home / Messages"
+          title="Messages"
+          description={totalUnread > 0 ? `${totalUnread} unread messages` : 'Team conversations'}
+          actions={
+            <motion.button
+              onClick={() => window.alert('New conversation feature requires a contact directory.')}
+              className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors"
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            >
+              <Plus size={16} /> New Message
+            </motion.button>
+          }
+        />
+      </div>
+
+      {/* Incoming call banner */}
+      <AnimatePresence>
+        {showCallBanner && (
+          <motion.div
+            className="mb-4 bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl px-5 py-3 flex items-center gap-3 shrink-0"
+            initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
+          >
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+              {callType === 'video' ? <Video size={16} className="text-white" /> : <Phone size={16} className="text-white" />}
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-semibold text-sm">Calling {activeMember.name} via {callType === 'video' ? 'Video' : 'Phone'}…</div>
+              <div className="text-white/70 text-xs">{callType === 'video' ? 'Video' : 'Voice'} call · Ringing…</div>
+            </div>
+            <button onClick={() => setShowCallBanner(false)} className="bg-[#D8727D] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#c25f6b] transition-colors">Decline</button>
+            <button onClick={() => { setShowCallBanner(false); window.alert('Joining call… (requires WebRTC backend)'); }} className="bg-[#68B266] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#55a053] transition-colors">Accept</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main chat layout — single unified card */}
+      <div className="flex flex-1 min-h-0 bg-white border border-surface-200 rounded-2xl overflow-hidden">
+
+        {/* Left sidebar */}
+        <div
+          className="w-72 shrink-0 border-r border-surface-100 flex flex-col"
+        >
+          {/* Search */}
+          <div className="p-3 border-b border-surface-100">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex-1 flex items-center gap-2 bg-surface-100 rounded-xl px-3 py-2">
+                <Search size={14} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search conversations…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                />
+                {search && <button onClick={() => setSearch('')}><X size={12} className="text-gray-400" /></button>}
+              </div>
+              <button
+                onClick={() => setShowNewConvo(v => !v)}
+                className="w-8 h-8 rounded-xl bg-primary-500 flex items-center justify-center text-white hover:bg-primary-600 transition-colors shrink-0"
+                title="New conversation"
+              >
+                <Plus size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-1 px-3 py-2 border-b border-surface-100">
+            {(['all', 'unread', 'pinned'] as const).map(f => (
+              <button key={f} onClick={() => setMsgFilter(f)} className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors capitalize ${msgFilter === f ? 'bg-primary-50 text-primary-600' : 'text-gray-400 hover:bg-surface-100'}`}>{f.charAt(0).toUpperCase() + f.slice(1)}</button>
+            ))}
+          </div>
+
+          {/* Conversation list */}
+          <div className="flex-1 overflow-y-auto relative">
+            <AnimatePresence>
+              {showNewConvo && (
+                <motion.div
+                  className="absolute inset-0 bg-white z-10 flex flex-col overflow-y-auto"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                >
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-100 shrink-0">
+                    <button onClick={() => setShowNewConvo(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                    <span className="font-semibold text-sm text-gray-900">New Conversation</span>
+                  </div>
+                  {members.filter(m => !Object.keys(chats).includes(m.id)).map(m => (
+                    <button key={m.id} onClick={() => {
+                      setChats(prev => ({ ...prev, [m.id]: [] }));
+                      setActiveId(m.id);
+                      setShowNewConvo(false);
+                    }} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-50 transition-colors">
+                      <Avatar name={m.name} color={getMemberColor(m.id)} size="md" />
+                      <div className="text-left">
+                        <div className="text-sm font-semibold text-gray-900">{m.name}</div>
+                        <div className="text-xs text-gray-400">{m.designation ?? ''}</div>
+                      </div>
+                    </button>
+                  ))}
+                  {members.filter(m => !Object.keys(chats).includes(m.id)).length === 0 && (
+                    <div className="px-4 py-6 text-xs text-gray-400 text-center">All members already have conversations.</div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            {filteredConvos.map((member, i) => {
+              const color = memberColors[teamMembers.findIndex(m => m.id === member.id)] ?? memberColors[0];
+              const lastMsg = getLastMsg(member.id);
+              const unread = getUnread(member.id);
+              const isActive = member.id === activeId;
+              const isPinned = pinnedIds.includes(member.id);
+              const isStarred = starredIds.includes(member.id);
+              const status = onlineStatus[member.id] ?? 'offline';
+              return (
+                <motion.button
+                  key={member.id}
+                  className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${isActive ? 'bg-primary-50 border-r-2 border-primary-500' : 'hover:bg-surface-50'}`}
+                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  onClick={() => { setActiveId(member.id); setOpenedIds(p => new Set([...p, member.id])); }}
+                >
+                  <div className="relative shrink-0">
+                    <Avatar name={member.name} color={color} size="md" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[status] }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className={`text-sm font-semibold truncate ${isActive ? 'text-primary-700' : 'text-gray-900'}`}>{member.name}</span>
+                      {isPinned && <Pin size={10} className="text-gray-400 shrink-0" />}
+                      {isStarred && <Star size={10} className="text-[#FFA500] shrink-0" fill="#FFA500" />}
+                    </div>
+                    <div className={`text-xs truncate ${unread > 0 ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
+                      {lastMsg?.from === currentUser.id ? '✓ ' : ''}{lastMsg?.text ?? 'No messages yet'}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[10px] text-gray-400">{lastMsg?.time}</span>
+                    {unread > 0 && (
+                      <span className="min-w-[18px] h-[18px] rounded-full bg-primary-500 text-white text-[9px] font-bold flex items-center justify-center px-1">{unread}</span>
+                    )}
+                  </div>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Chat area */}
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          {/* Chat header */}
+          <div className="flex items-center gap-3 px-5 py-3.5 border-b border-surface-100 shrink-0">
+            <div className="relative">
+              <Avatar name={activeMember.name} color={activeColor} size="md" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[onlineStatus[activeId] ?? 'offline'] }} />
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-sm text-gray-900">{activeMember.name}</div>
+              <div className="text-xs text-gray-400">{designations[activeId]} · <span style={{ color: statusColor[onlineStatus[activeId] ?? 'offline'] }}>{statusLabel[onlineStatus[activeId] ?? 'offline']}</span></div>
+            </div>
+            {/* Action icons */}
+            <div className="flex items-center gap-1">
+              <motion.button
+                onClick={e => { e.stopPropagation(); setCallType('phone'); setShowCallBanner(true); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 hover:text-primary-500 transition-colors"
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
+                title="Voice call"
+              >
+                <Phone size={16} />
+              </motion.button>
+              <motion.button
+                onClick={e => { e.stopPropagation(); setCallType('video'); setShowCallBanner(true); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 hover:text-primary-500 transition-colors"
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
+                title="Video call"
+              >
+                <Video size={16} />
+              </motion.button>
+              <motion.button
+                onClick={e => { e.stopPropagation(); setPinnedIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); }}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${pinnedIds.includes(activeId) ? 'text-primary-500 bg-primary-50' : 'text-gray-400 hover:bg-surface-100'}`}
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
+                title="Pin conversation"
+              >
+                <Pin size={16} />
+              </motion.button>
+              <motion.button
+                onClick={e => { e.stopPropagation(); setStarredIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); }}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${starredIds.includes(activeId) ? 'text-[#FFA500] bg-[#FFA50015]' : 'text-gray-400 hover:bg-surface-100'}`}
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
+                title="Star conversation"
+              >
+                <Star size={16} fill={starredIds.includes(activeId) ? '#FFA500' : 'none'} />
+              </motion.button>
+              <motion.button
+                onClick={e => { e.stopPropagation(); window.alert('Conversation options coming soon.'); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 transition-colors"
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
+              >
+                <MoreVertical size={16} />
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
+            {activeChats.map((msg, i) => {
+              const isOwn = msg.from === currentUser.id;
+              const sender = teamMembers.find(m => m.id === msg.from)!;
+              const senderColor = memberColors[teamMembers.findIndex(m => m.id === msg.from)] ?? memberColors[0];
+              const showAvatar = !isOwn && (i === 0 || activeChats[i - 1]?.from !== msg.from);
+              return (
+                <motion.div
+                  key={msg.id}
+                  className={`flex items-end gap-2 group ${isOwn ? 'flex-row-reverse' : ''}`}
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: i * 0.04, ease: [0.4, 0, 0.2, 1] }}
+                >
+                  {/* Avatar placeholder to keep alignment */}
+                  <div className="w-7 shrink-0">
+                    {showAvatar && !isOwn && <Avatar name={sender.name} color={senderColor} size="sm" />}
+                  </div>
+
+                  <div className={`max-w-[62%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {showAvatar && !isOwn && (
+                      <span className="text-[10px] text-gray-400 font-semibold mb-1 ml-1">{sender.name.split(' ')[0]}</span>
+                    )}
+                    <div className="relative">
+                      <div
+                        className={`px-4 py-2.5 text-sm rounded-2xl cursor-pointer select-text ${
+                          isOwn
+                            ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-br-sm'
+                            : 'bg-surface-100 text-gray-800 rounded-bl-sm hover:bg-surface-200'
+                        } transition-colors`}
+                        onContextMenu={e => { e.preventDefault(); setShowContextMenu({ id: msg.id, x: e.clientX, y: e.clientY }); }}
+                      >
+                        {msg.text}
+                      </div>
+                      {/* Reaction button */}
+                      <button
+                        className={`absolute -top-2 ${isOwn ? 'left-0 -translate-x-full ml-[-4px]' : 'right-0 translate-x-full mr-[-4px]'} opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded-full bg-white border border-surface-200 flex items-center justify-center text-xs`}
+                        onClick={e => { e.stopPropagation(); setShowEmojiPicker(p => p === msg.id ? null : msg.id); }}
+                      >
+                        <Smile size={13} className="text-gray-500" />
+                      </button>
+                      {/* Emoji picker */}
+                      <AnimatePresence>
+                        {showEmojiPicker === msg.id && (
+                          <motion.div
+                            className={`absolute bottom-full mb-1 ${isOwn ? 'right-0' : 'left-0'} bg-white rounded-xl shadow-card-hover border border-surface-100 flex gap-1 px-2 py-1.5 z-10`}
+                            initial={{ opacity: 0, scale: 0.9, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 4 }}
+                            transition={{ duration: 0.15 }}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {emojis.map(e => (
+                              <button key={e} onClick={() => addReaction(msg.id, e)} className="text-base hover:scale-125 transition-transform">{e}</button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    {/* Reactions display */}
+                    {(msg.reactions ?? []).length > 0 && (
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {msg.reactions!.map((r, ri) => (
+                          <span key={ri} className="text-xs bg-white border border-surface-200 rounded-full px-1.5 py-0.5 shadow-sm">{r}</span>
+                        ))}
+                      </div>
+                    )}
+                    <div className={`flex items-center gap-1 text-[10px] text-gray-400 mt-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                      <span>{msg.time}</span>
+                      {isOwn && (
+                        msg.read
+                          ? <CheckCheck size={12} className="text-primary-400" />
+                          : <Check size={12} className="text-gray-300" />
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input bar */}
+          <div className="px-5 py-3 border-t border-surface-100 shrink-0">
+            <div className="flex items-center gap-2 bg-surface-50 rounded-2xl px-4 py-2.5 border border-surface-200 focus-within:border-primary-300 transition-colors">
+              <button onClick={() => attachRef.current?.click()} className="text-gray-400 hover:text-primary-500 transition-colors shrink-0">
+                <Paperclip size={16} />
+              </button>
+              <input ref={attachRef} type="file" className="hidden" onChange={e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                setChats(prev => ({
+                  ...prev,
+                  [activeId]: [...(prev[activeId] ?? []), {
+                    id: String(Date.now()),
+                    from: 'me',
+                    text: `📎 ${file.name}`,
+                    time: now,
+                    read: true,
+                  }],
+                }));
+                e.target.value = '';
+              }} />
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder={`Message ${activeMember.name.split(' ')[0]}…`}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
+              />
+              <button onClick={() => window.alert('Emoji picker for compose area coming soon.')} className="text-gray-400 hover:text-primary-500 transition-colors shrink-0">
+                <Smile size={16} />
+              </button>
+              <motion.button
+                onClick={sendMessage}
+                disabled={!input.trim()}
+                className="w-8 h-8 rounded-xl bg-primary-500 flex items-center justify-center text-white shrink-0 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-600 transition-colors"
+                whileHover={{ scale: input.trim() ? 1.08 : 1 }}
+                whileTap={{ scale: input.trim() ? 0.94 : 1 }}
+              >
+                <Send size={14} />
+              </motion.button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right info panel */}
+        <div className="w-56 shrink-0 border-l border-surface-100 flex flex-col overflow-y-auto">
+          {/* Profile section */}
+          <div className="p-4 flex flex-col items-center text-center border-b border-surface-100">
+            <div className="relative mb-3">
+              <Avatar name={activeMember.name} color={activeColor} size="xl" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[onlineStatus[activeId] ?? 'offline'] }} />
+            </div>
+            <div className="font-bold text-gray-900 text-sm">{activeMember.name}</div>
+            <div className="text-xs text-gray-400 mt-0.5">{designations[activeId]}</div>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor[onlineStatus[activeId] ?? 'offline'] + '20', color: statusColor[onlineStatus[activeId] ?? 'offline'] }}>
+              {statusLabel[onlineStatus[activeId] ?? 'offline']}
+            </span>
+          </div>
+
+          {/* Quick actions */}
+          <div className="p-4 border-b border-surface-100">
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</div>
+            {[
+              { icon: Phone, label: 'Voice Call', action: () => { setCallType('phone'); setShowCallBanner(true); } },
+              { icon: Video, label: 'Video Call', action: () => { setCallType('video'); setShowCallBanner(true); } },
+              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => new Set([...p, activeId])); const next = conversations.find(m => !archivedIds.has(m.id) && m.id !== activeId); if (next) setActiveId(next.id); } },
+              { icon: Trash2, label: 'Clear Chat', action: () => setChats(p => ({ ...p, [activeId]: [] })) },
+            ].map(({ icon: Icon, label, action }) => (
+              <button
+                key={label}
+                onClick={action}
+                className="w-full flex items-center gap-2.5 py-2 text-xs text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-lg px-2 transition-colors"
+              >
+                <Icon size={13} />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Shared stats */}
+          <div className="p-4">
+            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Conversation</div>
+            {[
+              ['Messages', activeChats.length],
+              ['Files shared', '0'],
+              ['Links shared', '0'],
+            ].map(([label, val]) => (
+              <div key={String(label)} className="flex justify-between text-xs py-1.5 border-b border-surface-100 last:border-0">
+                <span className="text-gray-400">{label}</span>
+                <span className="font-bold text-gray-900">{val}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right-click context menu */}
+      <AnimatePresence>
+        {showContextMenu && (
+          <motion.div
+            className="fixed bg-white rounded-xl shadow-card-hover border border-surface-100 py-1 z-50 w-40"
+            style={{ top: showContextMenu.y, left: showContextMenu.x }}
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {[
+              { label: 'React', icon: Smile, action: () => { setShowEmojiPicker(showContextMenu.id); setShowContextMenu(null); } },
+              { label: 'Delete', icon: Trash2, action: () => deleteMessage(showContextMenu.id), danger: true },
+            ].map(({ label, icon: Icon, action, danger }) => (
+              <button
+                key={label}
+                onClick={action}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${danger ? 'text-[#D8727D] hover:bg-[#D8727D0A]' : 'text-gray-700 hover:bg-surface-50'}`}
+              >
+                <Icon size={13} />
+                {label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+export default MessagesPage;
