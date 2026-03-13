@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useContext } from 'react';
 import { motion } from 'framer-motion';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
@@ -15,7 +15,8 @@ import MessagesPage from './pages/MessagesPage';
 import TasksPage from './pages/TasksPage';
 import MembersPage from './pages/MembersPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, AppContext } from './context/AppContext';
+import { MembersProvider } from './context/MembersContext';
 import BugReportModal from './components/ui/BugReportModal';
 
 // Layout wrapper
@@ -23,9 +24,8 @@ const Layout: React.FC<{ children: React.ReactNode; showProjectHeader?: boolean 
     children,
     showProjectHeader = false,
 }) => {
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const { projects, activeProject, setActiveProject } = useProjects();
-    const currentProject = projects.find((p) => p.id === activeProject);
+    const { sidebarCollapsed, setSidebarCollapsed } = useContext(AppContext);
+    const { activeProject, setActiveProject } = useProjects();
 
     return (
         <div className="flex h-screen w-screen overflow-hidden bg-white">
@@ -41,7 +41,7 @@ const Layout: React.FC<{ children: React.ReactNode; showProjectHeader?: boolean 
                 transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             >
                 <Header />
-                {showProjectHeader && <ProjectHeader projectName={currentProject?.name ?? 'Mobile App'} projectId={activeProject} />}
+                {showProjectHeader && <ProjectHeader projectId={activeProject} />}
                 {children}
             </motion.div>
         </div>
@@ -51,6 +51,7 @@ const Layout: React.FC<{ children: React.ReactNode; showProjectHeader?: boolean 
 const App: React.FC = () => {
     return (
         <AppProvider>
+        <MembersProvider>
         <ProjectProvider>
         <HashRouter>
             <Routes>
@@ -138,6 +139,7 @@ const App: React.FC = () => {
         </HashRouter>
         <BugReportModal />
         </ProjectProvider>
+        </MembersProvider>
         </AppProvider>
     );
 };
