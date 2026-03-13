@@ -4,7 +4,7 @@ import { Plus, Send, Search, Phone, Video, MoreVertical, Paperclip, Smile, Check
 import { useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { teamMembers, memberColors, currentUser } from '../data/mockData';
+import { currentUser } from '../data/mockData';
 import { useMembersContext } from '../context/MembersContext';
 
 const designations: Record<string, string> = {
@@ -48,7 +48,6 @@ const initialChats: Record<string, Msg[]> = {
 const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
 const MessagesPage: React.FC = () => {
-  const conversations = teamMembers.filter(m => m.id !== currentUser.id);
   const [activeId, setActiveId] = useState('u2');
   const [chats, setChats] = useState(initialChats);
   const [input, setInput] = useState('');
@@ -69,6 +68,7 @@ const MessagesPage: React.FC = () => {
 
   const location = useLocation();
   const { members, getMemberColor } = useMembersContext();
+  const conversations = members.filter(m => m.id !== currentUser.id);
 
   useEffect(() => {
     const memberId = (location.state as any)?.memberId;
@@ -78,8 +78,8 @@ const MessagesPage: React.FC = () => {
     }
   }, []);
 
-  const activeMember = teamMembers.find(m => m.id === activeId)!;
-  const activeColor = memberColors[teamMembers.findIndex(m => m.id === activeId)] ?? memberColors[0];
+  const activeMember = members.find(m => m.id === activeId) ?? members[0]!;
+  const activeColor = getMemberColor(activeId);
   const activeChats = chats[activeId] ?? [];
 
   // Auto-scroll to bottom
@@ -261,7 +261,7 @@ const MessagesPage: React.FC = () => {
               )}
             </AnimatePresence>
             {filteredConvos.map((member, i) => {
-              const color = memberColors[teamMembers.findIndex(m => m.id === member.id)] ?? memberColors[0];
+              const color = getMemberColor(member.id);
               const lastMsg = getLastMsg(member.id);
               const unread = getUnread(member.id);
               const isActive = member.id === activeId;
@@ -362,8 +362,8 @@ const MessagesPage: React.FC = () => {
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
             {activeChats.map((msg, i) => {
               const isOwn = msg.from === currentUser.id;
-              const sender = teamMembers.find(m => m.id === msg.from)!;
-              const senderColor = memberColors[teamMembers.findIndex(m => m.id === msg.from)] ?? memberColors[0];
+              const sender = members.find(m => m.id === msg.from) ?? { name: 'Unknown' };
+              const senderColor = getMemberColor(msg.from);
               const showAvatar = !isOwn && (i === 0 || activeChats[i - 1]?.from !== msg.from);
               return (
                 <motion.div
@@ -452,7 +452,7 @@ const MessagesPage: React.FC = () => {
                   ...prev,
                   [activeId]: [...(prev[activeId] ?? []), {
                     id: String(Date.now()),
-                    from: 'me',
+                    from: currentUser.id,
                     text: `📎 ${file.name}`,
                     time: now,
                     read: true,
@@ -506,7 +506,7 @@ const MessagesPage: React.FC = () => {
             {[
               { icon: Phone, label: 'Voice Call', action: () => { setCallType('phone'); setShowCallBanner(true); } },
               { icon: Video, label: 'Video Call', action: () => { setCallType('video'); setShowCallBanner(true); } },
-              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => new Set([...p, activeId])); const next = conversations.find(m => !archivedIds.has(m.id) && m.id !== activeId); if (next) setActiveId(next.id); } },
+              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); return next; }); } },
               { icon: Trash2, label: 'Clear Chat', action: () => setChats(p => ({ ...p, [activeId]: [] })) },
             ].map(({ icon: Icon, label, action }) => (
               <button
@@ -525,8 +525,8 @@ const MessagesPage: React.FC = () => {
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Conversation</div>
             {[
               ['Messages', activeChats.length],
-              ['Files shared', '0'],
-              ['Links shared', '0'],
+              ['Files shared', activeChats.filter(m => m.text.startsWith('📎')).length],
+              ['Links shared', activeChats.filter(m => /https?:\/\//.test(m.text)).length],
             ].map(([label, val]) => (
               <div key={String(label)} className="flex justify-between text-xs py-1.5 border-b border-surface-100 last:border-0">
                 <span className="text-gray-400">{label}</span>

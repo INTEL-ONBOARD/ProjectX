@@ -1,8 +1,313 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import dotenv from 'dotenv';
+import mongoose, { Schema, Document } from 'mongoose';
+
+// Load .env from app root (works in both dev and prod)
+dotenv.config({ path: path.join(app.getAppPath(), '.env') });
+// Also try adjacent to the binary during dev
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// ─── Mongoose Schemas ──────────────────────────────────────────────────────────
+
+interface IUser extends Document {
+    appId: string;
+    name: string;
+    avatar: string;
+    email: string;
+    location: string;
+    role: 'admin' | 'manager' | 'member';
+    designation: string;
+    status: 'active' | 'inactive';
+}
+
+const UserSchema = new Schema<IUser>({
+    appId: { type: String, required: true, unique: true },
+    name: String,
+    avatar: { type: String, default: '' },
+    email: String,
+    location: String,
+    role: { type: String, enum: ['admin', 'manager', 'member'], default: 'member' },
+    designation: String,
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+});
+
+interface ITask extends Document {
+    appId: string;
+    title: string;
+    description: string;
+    priority: 'low' | 'high' | 'completed';
+    status: 'todo' | 'in-progress' | 'done';
+    assignees: string[];
+    comments: number;
+    files: number;
+    images: string[];
+    dueDate: string;
+    projectId: string;
+}
+
+const TaskSchema = new Schema<ITask>({
+    appId: { type: String, required: true, unique: true },
+    title: { type: String, required: true },
+    description: { type: String, default: '' },
+    priority: { type: String, enum: ['low', 'high', 'completed'], default: 'low' },
+    status: { type: String, enum: ['todo', 'in-progress', 'done'], default: 'todo' },
+    assignees: [String],
+    comments: { type: Number, default: 0 },
+    files: { type: Number, default: 0 },
+    images: [String],
+    dueDate: String,
+    projectId: String,
+});
+
+interface IProject extends Document {
+    appId: string;
+    name: string;
+    color: string;
+}
+
+const ProjectSchema = new Schema<IProject>({
+    appId: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    color: { type: String, default: '#7AC555' },
+});
+
+interface IAttendance extends Document {
+    recordId: string; // userId-date
+    userId: string;
+    date: string;
+    checkIn?: string;
+    checkOut?: string;
+    status: 'present' | 'absent' | 'half-day' | 'on-leave' | 'holiday' | 'wfh';
+    notes?: string;
+}
+
+const AttendanceSchema = new Schema<IAttendance>({
+    recordId: { type: String, required: true, unique: true },
+    userId: { type: String, required: true },
+    date: { type: String, required: true },
+    checkIn: String,
+    checkOut: String,
+    status: { type: String, enum: ['present', 'absent', 'half-day', 'on-leave', 'holiday', 'wfh'], default: 'present' },
+    notes: String,
+});
+
+const UserModel = mongoose.model<IUser>('User', UserSchema);
+const TaskModel = mongoose.model<ITask>('Task', TaskSchema);
+const ProjectModel = mongoose.model<IProject>('Project', ProjectSchema);
+const AttendanceModel = mongoose.model<IAttendance>('Attendance', AttendanceSchema);
+
+// ─── Seed Data ─────────────────────────────────────────────────────────────────
+
+async function seedIfEmpty() {
+    const userCount = await UserModel.countDocuments();
+    if (userCount === 0) {
+        await UserModel.insertMany([
+            { appId: 'u1', name: 'Anima Agrawal', avatar: '', email: 'anima@techcorp.com', role: 'admin', location: 'U.P, India', designation: 'Project Manager', status: 'active' },
+            { appId: 'u2', name: 'Rohan Kumar', avatar: '', email: 'rohan@techcorp.com', role: 'manager', designation: 'Frontend Developer', status: 'active' },
+            { appId: 'u3', name: 'Priya Singh', avatar: '', email: 'priya@techcorp.com', role: 'member', designation: 'UI Designer', status: 'active' },
+            { appId: 'u4', name: 'Arjun Patel', avatar: '', email: 'arjun@techcorp.com', role: 'member', designation: 'Backend Developer', status: 'active' },
+            { appId: 'u5', name: 'Neha Sharma', avatar: '', email: 'neha@techcorp.com', role: 'member', designation: 'QA Engineer', status: 'active' },
+            { appId: 'u6', name: 'Vikram Rao', avatar: '', email: 'vikram@techcorp.com', role: 'member', designation: 'DevOps Engineer', status: 'active' },
+        ]);
+    }
+
+    const projectCount = await ProjectModel.countDocuments();
+    if (projectCount === 0) {
+        await ProjectModel.insertMany([
+            { appId: 'p1', name: 'Mobile App', color: '#7AC555' },
+            { appId: 'p2', name: 'Website Redesign', color: '#FFA500' },
+            { appId: 'p3', name: 'Design System', color: '#E4CCFD' },
+            { appId: 'p4', name: 'Wireframes', color: '#76A5EA' },
+        ]);
+    }
+
+    const taskCount = await TaskModel.countDocuments();
+    if (taskCount === 0) {
+        await TaskModel.insertMany([
+            { appId: 't1', title: 'Brainstorming', description: "Brainstorming brings team members' diverse experience into play.", priority: 'low', status: 'todo', assignees: ['u1','u2','u3'], comments: 12, files: 0, dueDate: '2020-12-22', projectId: 'p2' },
+            { appId: 't2', title: 'Research', description: 'User research helps you to create an optimal product for users.', priority: 'high', status: 'todo', assignees: ['u1','u4'], comments: 10, files: 3, dueDate: '2020-12-15', projectId: 'p4' },
+            { appId: 't3', title: 'Wireframes', description: 'Low fidelity wireframes include the most basic content and visuals.', priority: 'high', status: 'todo', assignees: ['u2','u3','u5'], comments: 7, files: 2, dueDate: '2020-12-28', projectId: 'p4' },
+            { appId: 't4', title: 'Onboarding Illustrations', description: '', priority: 'low', status: 'in-progress', assignees: ['u1','u3','u4'], comments: 14, files: 15, dueDate: '2020-12-18', projectId: 'p1', images: ['https://images.unsplash.com/photo-1545239351-ef35f43d514b?w=200&h=120&fit=crop','https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=200&h=120&fit=crop'] },
+            { appId: 't5', title: 'Moodboard', description: '', priority: 'low', status: 'in-progress', assignees: ['u5'], comments: 9, files: 10, dueDate: '2020-12-20', projectId: 'p3', images: ['https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=200&h=120&fit=crop','https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=200&h=120&fit=crop'] },
+            { appId: 't6', title: 'Mobile App Design', description: '', priority: 'completed', status: 'done', assignees: ['u1','u2'], comments: 12, files: 15, projectId: 'p1', images: ['https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=200&h=120&fit=crop','https://images.unsplash.com/photo-1551650975-87deedd944c3?w=200&h=120&fit=crop'] },
+            { appId: 't7', title: 'Design System', description: 'It just needs to adapt the UI from what you did before', priority: 'completed', status: 'done', assignees: ['u1','u3','u4'], comments: 12, files: 15, projectId: 'p3' },
+        ]);
+    }
+
+    const attendanceCount = await AttendanceModel.countDocuments();
+    if (attendanceCount === 0) {
+        const seedAttendance = [
+            { userId: 'u1', date: '2020-12-01', status: 'present' }, { userId: 'u1', date: '2020-12-02', status: 'present' },
+            { userId: 'u1', date: '2020-12-03', status: 'present' }, { userId: 'u1', date: '2020-12-04', status: 'present' },
+            { userId: 'u1', date: '2020-12-05', status: 'present' },
+            { userId: 'u2', date: '2020-12-01', status: 'present' }, { userId: 'u2', date: '2020-12-02', status: 'present' },
+            { userId: 'u2', date: '2020-12-03', status: 'absent' }, { userId: 'u2', date: '2020-12-04', status: 'present' },
+            { userId: 'u2', date: '2020-12-05', status: 'present' },
+            { userId: 'u3', date: '2020-12-01', status: 'present' }, { userId: 'u3', date: '2020-12-02', status: 'present' },
+            { userId: 'u3', date: '2020-12-03', status: 'present' }, { userId: 'u3', date: '2020-12-04', status: 'present' },
+            { userId: 'u3', date: '2020-12-05', status: 'absent' },
+            { userId: 'u4', date: '2020-12-01', status: 'present' }, { userId: 'u4', date: '2020-12-02', status: 'absent' },
+            { userId: 'u4', date: '2020-12-03', status: 'present' }, { userId: 'u4', date: '2020-12-04', status: 'present' },
+            { userId: 'u4', date: '2020-12-05', status: 'present' },
+            { userId: 'u5', date: '2020-12-01', status: 'present' }, { userId: 'u5', date: '2020-12-02', status: 'present' },
+            { userId: 'u5', date: '2020-12-03', status: 'present' }, { userId: 'u5', date: '2020-12-04', status: 'absent' },
+            { userId: 'u5', date: '2020-12-05', status: 'present' },
+            { userId: 'u6', date: '2020-12-01', status: 'absent' }, { userId: 'u6', date: '2020-12-02', status: 'present' },
+            { userId: 'u6', date: '2020-12-03', status: 'present' }, { userId: 'u6', date: '2020-12-04', status: 'present' },
+            { userId: 'u6', date: '2020-12-05', status: 'present' },
+        ];
+        await AttendanceModel.insertMany(
+            seedAttendance.map(r => ({ ...r, recordId: `${r.userId}-${r.date}` }))
+        );
+    }
+}
+
+// ─── DB helpers: lean docs mapped to plain app objects ─────────────────────────
+
+function toUser(doc: IUser) {
+    return { id: doc.appId, name: doc.name, avatar: doc.avatar, email: doc.email, location: doc.location, role: doc.role, designation: doc.designation, status: doc.status };
+}
+
+function toProject(doc: IProject) {
+    return { id: doc.appId, name: doc.name, color: doc.color, tasks: [] };
+}
+
+function toTask(doc: ITask) {
+    return { id: doc.appId, title: doc.title, description: doc.description, priority: doc.priority, status: doc.status, assignees: doc.assignees, comments: doc.comments, files: doc.files, images: doc.images, dueDate: doc.dueDate, projectId: doc.projectId };
+}
+
+// ─── MongoDB connection ────────────────────────────────────────────────────────
+
+async function connectDB() {
+    const uri = process.env.MONGODB_URI;
+    if (!uri) {
+        console.error('MONGODB_URI not set — running in offline mode');
+        return;
+    }
+    try {
+        await mongoose.connect(uri);
+        console.log('MongoDB connected');
+        await seedIfEmpty();
+    } catch (err) {
+        console.error('MongoDB connection failed:', err);
+    }
+}
+
+// ─── IPC Handlers ─────────────────────────────────────────────────────────────
+
+function registerDbHandlers() {
+    // ── Projects ──
+    ipcMain.handle('db:projects:getAll', async () => {
+        const docs = await ProjectModel.find();
+        return docs.map(toProject);
+    });
+
+    ipcMain.handle('db:projects:create', async (_e, name: string, color: string) => {
+        const appId = `p${Date.now()}`;
+        const doc = await ProjectModel.create({ appId, name, color });
+        return toProject(doc);
+    });
+
+    ipcMain.handle('db:projects:update', async (_e, id: string, changes: { name?: string; color?: string }) => {
+        const doc = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { new: true });
+        return doc ? toProject(doc) : null;
+    });
+
+    ipcMain.handle('db:projects:delete', async (_e, id: string) => {
+        await ProjectModel.deleteOne({ appId: id });
+        await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } });
+        return true;
+    });
+
+    // ── Tasks ──
+    ipcMain.handle('db:tasks:getAll', async () => {
+        const docs = await TaskModel.find();
+        return docs.map(toTask);
+    });
+
+    ipcMain.handle('db:tasks:create', async (_e, taskData: Omit<ReturnType<typeof toTask>, 'id'>) => {
+        const appId = `t${Date.now()}`;
+        const doc = await TaskModel.create({ appId, ...taskData });
+        return toTask(doc);
+    });
+
+    ipcMain.handle('db:tasks:update', async (_e, id: string, changes: Partial<Omit<ReturnType<typeof toTask>, 'id'>>) => {
+        const doc = await TaskModel.findOneAndUpdate({ appId: id }, changes, { new: true });
+        return doc ? toTask(doc) : null;
+    });
+
+    ipcMain.handle('db:tasks:delete', async (_e, id: string) => {
+        await TaskModel.deleteOne({ appId: id });
+        return true;
+    });
+
+    ipcMain.handle('db:tasks:move', async (_e, id: string, newStatus: string) => {
+        const doc = await TaskModel.findOneAndUpdate({ appId: id }, { status: newStatus }, { new: true });
+        return doc ? toTask(doc) : null;
+    });
+
+    ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId: string) => {
+        await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } });
+        return true;
+    });
+
+    // ── Members ──
+    ipcMain.handle('db:members:getAll', async () => {
+        const docs = await UserModel.find();
+        return docs.map(toUser);
+    });
+
+    ipcMain.handle('db:members:add', async (_e, member: Omit<ReturnType<typeof toUser>, 'id'>) => {
+        const appId = `u${Date.now()}`;
+        const doc = await UserModel.create({ appId, ...member });
+        return toUser(doc);
+    });
+
+    ipcMain.handle('db:members:remove', async (_e, id: string) => {
+        await UserModel.deleteOne({ appId: id });
+        await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } });
+        return true;
+    });
+
+    // ── Attendance ──
+    ipcMain.handle('db:attendance:getAll', async () => {
+        const docs = await AttendanceModel.find();
+        return docs.map(d => ({ id: d.recordId, userId: d.userId, date: d.date, checkIn: d.checkIn, checkOut: d.checkOut, status: d.status, notes: d.notes }));
+    });
+
+    ipcMain.handle('db:attendance:set', async (_e, record: { userId: string; date: string; status: string; checkIn?: string; checkOut?: string; notes?: string }) => {
+        const recordId = `${record.userId}-${record.date}`;
+        const doc = await AttendanceModel.findOneAndUpdate(
+            { recordId },
+            { recordId, ...record },
+            { upsert: true, new: true }
+        );
+        return { id: doc!.recordId, userId: doc!.userId, date: doc!.date, checkIn: doc!.checkIn, checkOut: doc!.checkOut, status: doc!.status, notes: doc!.notes };
+    });
+
+    ipcMain.handle('db:attendance:delete', async (_e, userId: string, date: string) => {
+        await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` });
+        return true;
+    });
+}
+
+// ─── BrowserWindow ─────────────────────────────────────────────────────────────
+
+let mainWindow: BrowserWindow | null = null;
+
+let autoUpdater: typeof import('electron-updater').autoUpdater | null = null;
+if (!process.env.VITE_DEV_SERVER_URL) {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        autoUpdater = require('electron-updater').autoUpdater;
+    } catch {
+        // electron-updater not available in dev
+    }
+}
 
 function createWindow() {
-    const win = new BrowserWindow({
+    mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
         minWidth: 1100,
@@ -19,17 +324,68 @@ function createWindow() {
     });
 
     if (process.env.VITE_DEV_SERVER_URL) {
-        win.loadURL(process.env.VITE_DEV_SERVER_URL);
+        mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     } else {
-        win.loadFile(path.join(__dirname, '../dist/index.html'));
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 
-    win.once('ready-to-show', () => {
-        win.show();
+    mainWindow.once('ready-to-show', () => {
+        mainWindow?.show();
+        if (autoUpdater) {
+            setTimeout(() => checkForUpdates(), 3000);
+        }
+    });
+
+    mainWindow.on('closed', () => {
+        mainWindow = null;
     });
 }
 
-app.whenReady().then(createWindow);
+function checkForUpdates() {
+    if (!autoUpdater || !mainWindow) return;
+    autoUpdater.checkForUpdates().catch((err) => {
+        console.error('Update check failed:', err);
+    });
+}
+
+function setupAutoUpdater() {
+    if (!autoUpdater) return;
+
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    autoUpdater.on('checking-for-update', () => {
+        mainWindow?.webContents.send('update:checking');
+    });
+    autoUpdater.on('update-available', (info) => {
+        mainWindow?.webContents.send('update:available', { version: info.version, releaseDate: info.releaseDate, releaseNotes: info.releaseNotes });
+    });
+    autoUpdater.on('update-not-available', () => {
+        mainWindow?.webContents.send('update:not-available');
+    });
+    autoUpdater.on('download-progress', (progress) => {
+        mainWindow?.webContents.send('update:download-progress', { percent: Math.round(progress.percent), transferred: progress.transferred, total: progress.total, bytesPerSecond: progress.bytesPerSecond });
+    });
+    autoUpdater.on('update-downloaded', (info) => {
+        mainWindow?.webContents.send('update:downloaded', { version: info.version });
+    });
+    autoUpdater.on('error', (err) => {
+        mainWindow?.webContents.send('update:error', err.message);
+    });
+}
+
+ipcMain.handle('update:check', () => { checkForUpdates(); });
+ipcMain.handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
+ipcMain.handle('app:version', () => app.getVersion());
+
+// ─── App lifecycle ─────────────────────────────────────────────────────────────
+
+app.whenReady().then(async () => {
+    registerDbHandlers();
+    setupAutoUpdater();
+    await connectDB();
+    createWindow();
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

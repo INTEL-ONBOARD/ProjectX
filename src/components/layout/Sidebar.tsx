@@ -30,7 +30,7 @@ const navItems = [
     { id: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: '/messages', label: 'Messages', icon: MessageSquare },
     { id: '/tasks', label: 'Tasks', icon: CheckSquare },
-    { id: '/teams', label: 'Teams', icon: Users },
+    { id: '/teams', label: 'Projects', icon: Users },
     { id: '/members', label: 'Members', icon: Users },
     { id: '/attendance', label: 'Attendance', icon: Clock3 },
     { id: '/reports', label: 'Reports', icon: BarChart3 },
@@ -104,10 +104,17 @@ const Sidebar: React.FC<SidebarProps> = ({
                         const Icon = item.icon;
                         const isActive = location.pathname === item.id;
                         return (
-                            <motion.li key={item.id} whileHover={{ x: 2 }} transition={{ duration: 0.15 }}>
+                            <motion.li key={item.id} whileHover={{ x: 2 }} transition={{ duration: 0.15 }} className="relative">
+                                {isActive && (
+                                    <motion.div
+                                        className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-500 rounded-r-full"
+                                        layoutId="nav-indicator"
+                                        transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                                    />
+                                )}
                                 <button
                                     onClick={() => navigate(item.id)}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${isActive
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${isActive
                                         ? 'bg-primary-50 text-primary-600'
                                         : 'text-gray-500 hover:bg-surface-100 hover:text-gray-700'
                                         }`}
@@ -126,13 +133,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                                             </motion.span>
                                         )}
                                     </AnimatePresence>
-                                    {isActive && (
-                                        <motion.div
-                                            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-500 rounded-r-full"
-                                            layoutId="nav-indicator"
-                                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                                        />
-                                    )}
                                 </button>
                             </motion.li>
                         );

@@ -14,11 +14,6 @@ const locations: Record<string, string> = {
   u1: 'U.P, India', u2: 'Mumbai', u3: 'Remote',
   u4: 'Remote', u5: 'Bangalore', u6: 'Remote',
 };
-const memberTaskCounts: Record<string, { assigned: number; total: number }> = {
-  u1: { assigned: 4, total: 5 }, u2: { assigned: 3, total: 5 },
-  u3: { assigned: 3, total: 5 }, u4: { assigned: 2, total: 5 },
-  u5: { assigned: 2, total: 5 }, u6: { assigned: 0, total: 5 },
-};
 const onlineStatus: Record<string, 'online' | 'away' | 'offline'> = {
   u1: 'online', u2: 'online', u3: 'away', u4: 'online', u5: 'online', u6: 'offline',
 };
@@ -33,7 +28,14 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
 
 const MembersPage: React.FC = () => {
   const { members, getMemberColor, addMember, removeMember } = useMembersContext();
-  const { scrubAssignee } = useProjects();
+  const { scrubAssignee, allTasks } = useProjects();
+
+  const totalTasks = allTasks.length;
+  const memberTaskCounts: Record<string, { assigned: number; total: number }> = {};
+  members.forEach(m => {
+    const assigned = allTasks.filter(t => t.assignees.includes(m.id)).length;
+    memberTaskCounts[m.id] = { assigned, total: totalTasks };
+  });
   const navigate = useNavigate();
 
   const [selectedMember, setSelectedMember] = useState<User | null>(null);

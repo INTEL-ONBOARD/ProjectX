@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Building2, Users, MapPin, BarChart2, UserPlus, FolderKanban, Code2, Palette, Settings2, SearchCode, X, Plus } from 'lucide-react';
+import { Building2, Users, MapPin, BarChart2, FolderKanban, Code2, Palette, Settings2, SearchCode, X, Plus } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { currentUser, teamMembers, memberColors } from '../data/mockData';
@@ -65,7 +65,7 @@ const OrganizationPage: React.FC = () => {
           description="Team structure"
           actions={
             <motion.button onClick={() => setShowAddDept(true)} className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <UserPlus size={16} /> Add Member
+              <Plus size={16} /> New Department
             </motion.button>
           }
         />

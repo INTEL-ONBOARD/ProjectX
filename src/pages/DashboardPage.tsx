@@ -1,12 +1,12 @@
 import React, { useContext } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Users, CheckSquare, Clock, TrendingUp, CheckCircle, Plus, MessageSquare } from 'lucide-react';
+import { Users, CheckSquare, Clock, TrendingUp, CheckCircle, Plus } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { teamMembers, memberColors } from '../data/mockData';
 import { AppContext } from '../context/AppContext';
 import { useProjects } from '../context/ProjectContext';
+import { useMembersContext } from '../context/MembersContext';
 
 const designations: Record<string, string> = {
   u1: 'Project Manager', u2: 'Frontend Developer', u3: 'UI Designer',
@@ -17,18 +17,12 @@ const onlineStatus: Record<string, 'online' | 'away' | 'offline'> = {
 };
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 
-const activityItems = [
-  { id: 'a1', icon: CheckCircle, bg: 'bg-[#83C29D33]', color: 'text-[#68B266]', text: 'Mobile App Design marked as Done', time: '2m ago' },
-  { id: 'a2', icon: Plus, bg: 'bg-primary-50', color: 'text-primary-500', text: 'Wireframes task created', time: '1h ago' },
-  { id: 'a3', icon: Users, bg: 'bg-[#30C5E533]', color: 'text-[#30C5E5]', text: 'Priya Singh joined the team', time: '3h ago' },
-  { id: 'a4', icon: MessageSquare, bg: 'bg-surface-200', color: 'text-gray-400', text: '12 new comments on Brainstorming', time: '5h ago' },
-  { id: 'a5', icon: Clock, bg: 'bg-[#DFA87433]', color: 'text-[#D58D49]', text: 'Research task moved to In Progress', time: 'Yesterday' },
-];
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { attendanceRecords } = useContext(AppContext);
   const { allTasks } = useProjects();
+  const { members, getMemberColor } = useMembersContext();
   const todoTasks = allTasks.filter(t => t.status === 'todo');
   const doneTasks = allTasks.filter(t => t.status === 'done');
   const inProgressTasks = allTasks.filter(t => t.status === 'in-progress');
@@ -38,16 +32,31 @@ const DashboardPage: React.FC = () => {
   const inProgressCount = inProgressTasks.length;
   const sprintPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
-  const totalSlots = teamMembers.length * 5;
+  const totalSlots = members.length * 5;
   const presentSlots = attendanceRecords.filter(r => r.status === 'present' || r.status === 'wfh').length;
   const attendanceRate = totalSlots > 0 ? Math.round((presentSlots / totalSlots) * 100) : 0;
 
   const metrics = [
-    { label: 'Team Members', value: String(teamMembers.length), trend: 'Active this sprint', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
+    { label: 'Team Members', value: String(members.length), trend: 'Active this sprint', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
     { label: 'Tasks Completed', value: String(doneCount), trend: '↑ 1 today', trendUp: true, color: '#68B266', accent: false, icon: CheckSquare, barPct: totalTasks > 0 ? (doneCount / totalTasks) * 100 : 0 },
     { label: 'Tasks Pending', value: String(todoCount), trend: '2 overdue', trendUp: false, color: '#D8727D', accent: false, icon: Clock, barPct: totalTasks > 0 ? (todoCount / totalTasks) * 100 : 0 },
     { label: 'Attendance Rate', value: `${attendanceRate}%`, trend: 'Weekly avg', trendUp: true, color: '#30C5E5', accent: false, icon: TrendingUp, barPct: attendanceRate },
   ];
+
+  const activityItems = [
+    ...doneTasks.slice(0, 2).map((t, i) => ({
+      id: `done-${t.id}`, icon: CheckCircle, bg: 'bg-[#83C29D33]', color: 'text-[#68B266]',
+      text: `"${t.title}" marked as Done`, time: i === 0 ? '2m ago' : '1h ago',
+    })),
+    ...inProgressTasks.slice(0, 2).map((t, i) => ({
+      id: `prog-${t.id}`, icon: Clock, bg: 'bg-[#DFA87433]', color: 'text-[#D58D49]',
+      text: `"${t.title}" moved to In Progress`, time: i === 0 ? '3h ago' : 'Yesterday',
+    })),
+    ...todoTasks.slice(0, 1).map(t => ({
+      id: `todo-${t.id}`, icon: Plus, bg: 'bg-primary-50', color: 'text-primary-500',
+      text: `"${t.title}" task created`, time: '5h ago',
+    })),
+  ].slice(0, 5);
 
   const donutItems = [
     { label: 'To Do', count: todoCount, color: '#5030E5' },
@@ -229,8 +238,8 @@ const DashboardPage: React.FC = () => {
               <h3 className="font-bold text-gray-900 text-sm">Team</h3>
               <button onClick={() => navigate('/members')} className="text-xs text-primary-500 font-semibold hover:text-primary-700">View all →</button>
             </div>
-            {teamMembers.map((member, index) => {
-              const color = memberColors[index] ?? memberColors[0];
+            {members.map((member) => {
+              const color = getMemberColor(member.id);
               const status = onlineStatus[member.id] ?? 'online';
               return (
                 <div key={member.id} className="flex items-center gap-2.5 py-2 border-b border-surface-100 last:border-0">

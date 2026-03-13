@@ -1,5 +1,9 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
 
+const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dbApi = () => (window as any).electronAPI.db;
+
 export interface Organization {
     id: string;
     name: string;
@@ -151,6 +155,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(seedRecords);
 
+    // Load attendance from MongoDB when running in Electron
+    useEffect(() => {
+        if (isMock) return;
+        dbApi().getAttendance()
+            .then((docs: AttendanceRecord[]) => {
+                if (docs && docs.length > 0) setAttendanceRecords(docs);
+            })
+            .catch(console.error);
+    }, []);
+
     const setAttendanceRecord = useCallback((record: Omit<AttendanceRecord, 'id'>) => {
         const id = `${record.userId}-${record.date}`;
         setAttendanceRecords(prev => {
@@ -162,6 +176,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             return [...prev, { ...record, id }];
         });
+        // Persist to MongoDB
+        if (!isMock) {
+            dbApi().setAttendance({ ...record }).catch(console.error);
+        }
     }, []);
 
     useEffect(() => {

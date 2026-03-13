@@ -2,59 +2,57 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Download, BarChart3, TrendingUp, Users, AlertCircle } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
-import { teamMembers, memberColors, todoTasks, inProgressTasks, doneTasks, projects } from '../data/mockData';
-import { Task } from '../types';
 import { useProjects } from '../context/ProjectContext';
+import { useMembersContext } from '../context/MembersContext';
 import { downloadCsv } from '../utils/exportCsv';
-
-const taskProjects: Record<string, string> = {
-  t1: 'p2', t2: 'p4', t3: 'p4', t4: 'p1', t5: 'p3', t6: 'p1', t7: 'p3',
-};
-
-const allTasks: Task[] = [...todoTasks, ...inProgressTasks, ...doneTasks];
-const totalTasks = allTasks.length;
-const completionRate = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
-const overdueCount = 2;
-
-const bars = [
-  { label: 'To Do', count: todoTasks.length, color: '#5030E5' },
-  { label: 'In Progress', count: inProgressTasks.length, color: '#FFA500' },
-  { label: 'Done', count: doneTasks.length, color: '#68B266' },
-];
-
-// Tasks per project
-const projectTaskCounts: Record<string, number> = {};
-allTasks.forEach(t => {
-  const pid = taskProjects[t.id];
-  if (pid) projectTaskCounts[pid] = (projectTaskCounts[pid] ?? 0) + 1;
-});
-
-const highCount = allTasks.filter(t => t.priority === 'high').length;
-const lowCount = allTasks.filter(t => t.priority === 'low').length;
-const doneCount = doneTasks.length;
-const donutGradient = (() => {
-  if (totalTasks === 0) return '#e5e7eb';
-  const h = (highCount / totalTasks) * 100;
-  const l = (lowCount / totalTasks) * 100;
-  return `conic-gradient(#D8727D 0% ${h}%, #D58D49 ${h}% ${h + l}%, #68B266 ${h + l}% 100%)`;
-})();
-
-const metrics = [
-  { label: 'Completion Rate', value: `${completionRate}%`, trend: '↓ vs last sprint', trendUp: false, color: '', accent: true, icon: TrendingUp, barPct: completionRate },
-  { label: 'Total Tasks', value: String(totalTasks), trend: 'All projects', trendUp: true, color: '#5030E5', accent: false, icon: BarChart3, barPct: 100 },
-  { label: 'Active Members', value: String(teamMembers.length), trend: 'Contributing', trendUp: true, color: '#68B266', accent: false, icon: Users, barPct: 100 },
-  { label: 'Overdue', value: String(overdueCount), trend: 'Need attention', trendUp: false, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (overdueCount / totalTasks) * 100 : 0 },
-];
-
-const memberContributions = teamMembers.map((m, i) => ({
-  member: m,
-  color: memberColors[i] ?? memberColors[0],
-  count: allTasks.filter(t => t.assignees.includes(m.id)).length,
-}));
-const maxContribution = Math.max(1, ...memberContributions.map(c => c.count));
+import { MOCK_TODAY } from '../data/mockData';
 
 const ReportsPage: React.FC = () => {
   const { projects: ctxProjects, allTasks: ctxAllTasks } = useProjects();
+  const { members, getMemberColor } = useMembersContext();
+
+  const allTasks = ctxAllTasks;
+  const totalTasks = allTasks.length;
+  const doneTasks = allTasks.filter(t => t.status === 'done');
+  const todoTasks = allTasks.filter(t => t.status === 'todo');
+  const inProgressTasks = allTasks.filter(t => t.status === 'in-progress');
+  const completionRate = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
+  const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < MOCK_TODAY && t.status !== 'done').length;
+
+  const bars = [
+    { label: 'To Do', count: todoTasks.length, color: '#5030E5' },
+    { label: 'In Progress', count: inProgressTasks.length, color: '#FFA500' },
+    { label: 'Done', count: doneTasks.length, color: '#68B266' },
+  ];
+
+  const projectTaskCounts: Record<string, number> = {};
+  allTasks.forEach(t => {
+    if (t.projectId) projectTaskCounts[t.projectId] = (projectTaskCounts[t.projectId] ?? 0) + 1;
+  });
+
+  const highCount = allTasks.filter(t => t.priority === 'high').length;
+  const lowCount = allTasks.filter(t => t.priority === 'low').length;
+  const doneCount = doneTasks.length;
+  const donutGradient = (() => {
+    if (totalTasks === 0) return '#e5e7eb';
+    const h = (highCount / totalTasks) * 100;
+    const l = (lowCount / totalTasks) * 100;
+    return `conic-gradient(#D8727D 0% ${h}%, #D58D49 ${h}% ${h + l}%, #68B266 ${h + l}% 100%)`;
+  })();
+
+  const metrics = [
+    { label: 'Completion Rate', value: `${completionRate}%`, trend: '↓ vs last sprint', trendUp: false, color: '', accent: true, icon: TrendingUp, barPct: completionRate },
+    { label: 'Total Tasks', value: String(totalTasks), trend: 'All projects', trendUp: true, color: '#5030E5', accent: false, icon: BarChart3, barPct: 100 },
+    { label: 'Active Members', value: String(members.length), trend: 'Contributing', trendUp: true, color: '#68B266', accent: false, icon: Users, barPct: 100 },
+    { label: 'Overdue', value: String(overdueCount), trend: 'Need attention', trendUp: false, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (overdueCount / totalTasks) * 100 : 0 },
+  ];
+
+  const memberContributions = members.map(m => ({
+    member: m,
+    color: getMemberColor(m.id),
+    count: allTasks.filter(t => t.assignees.includes(m.id)).length,
+  }));
+  const maxContribution = Math.max(1, ...memberContributions.map(c => c.count));
 
   const handleExport = () => {
     const header = ['Project', 'Total Tasks', 'Completed', 'In Progress', 'To Do', 'Completion Rate'];
@@ -142,7 +140,7 @@ const ReportsPage: React.FC = () => {
 
             <div className="mt-5 pt-4 border-t border-surface-100">
               <h3 className="font-bold text-gray-900 text-xs mb-3">By Project</h3>
-              {projects.map((project, i) => {
+              {ctxProjects.map((project, i) => {
                 const count = projectTaskCounts[project.id] ?? 0;
                 const pct = totalTasks > 0 ? (count / totalTasks) * 100 : 0;
                 return (

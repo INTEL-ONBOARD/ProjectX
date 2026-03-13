@@ -9,7 +9,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar, AvatarGroup } from '../components/ui/Avatar';
-import { teamMembers, memberColors } from '../data/mockData';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import NewProjectModal from '../components/modals/NewProjectModal';
@@ -53,22 +52,25 @@ const initialRichData: Record<string, Partial<ProjectData>> = {
 };
 
 // ─── Project Detail Panel ──────────────────────────────────────────────────────
-const ProjectDetail: React.FC<{ project: ProjectData; onClose: () => void }> = ({ project, onClose }) => {
+const ProjectDetail: React.FC<{
+  project: ProjectData;
+  onClose: () => void;
+  onOpenProject: () => void;
+  onEdit: () => void;
+  getMemberColor: (id: string) => string;
+  membersById: Record<string, { id: string; name: string; designation?: string; role: string }>;
+  taskItems: { title: string; done: boolean }[];
+}> = ({ project, onClose, onOpenProject, onEdit, getMemberColor, membersById, taskItems }) => {
   const pct = project.taskTotal > 0 ? Math.round((project.taskDone / project.taskTotal) * 100) : 0;
   const sc = statusConfig[project.status];
   const pc = priorityConfig[project.priority];
 
   const detailMembers = project.memberIds.map(id => {
-    const idx = teamMembers.findIndex(m => m.id === id);
-    return idx !== -1 ? { member: teamMembers[idx], color: memberColors[idx] } : null;
-  }).filter(Boolean) as { member: typeof teamMembers[0]; color: string }[];
+    const member = membersById[id];
+    return member ? { member, color: getMemberColor(id) } : null;
+  }).filter(Boolean) as { member: { id: string; name: string; designation?: string; role: string }; color: string }[];
 
-  const mockTasks = [
-    { title: 'Initial research & scoping', done: true },
-    { title: 'Design wireframes', done: project.taskDone >= 2 },
-    { title: 'Set up project repo', done: false },
-    { title: 'Sprint planning meeting', done: false },
-  ].slice(0, Math.max(2, project.taskTotal));
+  const displayTasks = taskItems.length > 0 ? taskItems : [];
 
   return (
     <motion.div
@@ -174,7 +176,7 @@ const ProjectDetail: React.FC<{ project: ProjectData; onClose: () => void }> = (
           </button>
         </div>
         <div className="flex flex-col gap-2">
-          {mockTasks.map((t, i) => (
+          {displayTasks.map((t, i) => (
             <div key={i} className="flex items-center gap-2.5 py-2 border-b border-surface-50 last:border-0">
               {t.done
                 ? <CheckCircle2 size={14} className="text-[#7AC555] shrink-0" />
@@ -188,10 +190,10 @@ const ProjectDetail: React.FC<{ project: ProjectData; onClose: () => void }> = (
 
       {/* Actions */}
       <div className="px-5 pb-5 flex gap-2">
-        <button className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary-500 text-white text-xs font-semibold hover:bg-primary-600 transition-colors">
+        <button onClick={onOpenProject} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary-500 text-white text-xs font-semibold hover:bg-primary-600 transition-colors">
           <ArrowUpRight size={13} /> Open Project
         </button>
-        <button className="w-9 h-9 rounded-xl bg-surface-100 flex items-center justify-center hover:bg-surface-200 transition-colors">
+        <button onClick={onEdit} className="w-9 h-9 rounded-xl bg-surface-100 flex items-center justify-center hover:bg-surface-200 transition-colors">
           <Pencil size={13} className="text-gray-500" />
         </button>
       </div>
@@ -211,14 +213,16 @@ const ProjectCard: React.FC<{
   confirmDelete: boolean;
   onConfirmDelete: () => void;
   onCancelDelete: () => void;
-}> = ({ project, selected, onSelect, onStar, onDelete, onEdit, index, confirmDelete, onConfirmDelete, onCancelDelete }) => {
+  getMemberColor: (id: string) => string;
+  membersById: Record<string, { name: string }>;
+}> = ({ project, selected, onSelect, onStar, onDelete, onEdit, index, confirmDelete, onConfirmDelete, onCancelDelete, getMemberColor, membersById }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const pct = project.taskTotal > 0 ? Math.round((project.taskDone / project.taskTotal) * 100) : 0;
   const sc = statusConfig[project.status];
   const pc = priorityConfig[project.priority];
   const ids = project.memberIds;
-  const names = ids.map(id => teamMembers.find(m => m.id === id)?.name ?? '');
-  const colors = ids.map(id => memberColors[teamMembers.findIndex(m => m.id === id)] ?? memberColors[0]);
+  const names = ids.map(id => membersById[id]?.name ?? '');
+  const colors = ids.map(id => getMemberColor(id));
 
   return (
     <motion.div
@@ -346,14 +350,19 @@ const ProjectRow: React.FC<{
   onSelect: () => void;
   onStar: () => void;
   onDelete: () => void;
+  confirmDelete: boolean;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
   index: number;
-}> = ({ project, selected, onSelect, onStar, onDelete, index }) => {
+  getMemberColor: (id: string) => string;
+  membersById: Record<string, { name: string }>;
+}> = ({ project, selected, onSelect, onStar, onDelete, confirmDelete, onConfirmDelete, onCancelDelete, index, getMemberColor, membersById }) => {
   const pct = project.taskTotal > 0 ? Math.round((project.taskDone / project.taskTotal) * 100) : 0;
   const sc = statusConfig[project.status];
   const pc = priorityConfig[project.priority];
   const ids = project.memberIds;
-  const names = ids.map(id => teamMembers.find(m => m.id === id)?.name ?? '');
-  const colors = ids.map(id => memberColors[teamMembers.findIndex(m => m.id === id)] ?? memberColors[0]);
+  const names = ids.map(id => membersById[id]?.name ?? '');
+  const colors = ids.map(id => getMemberColor(id));
 
   return (
     <motion.tr
@@ -397,13 +406,22 @@ const ProjectRow: React.FC<{
       </td>
       <td className="px-4 py-3.5 text-xs text-gray-400">{project.dueDate}</td>
       <td className="px-4 py-3.5">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={e => { e.stopPropagation(); onStar(); }} className={`w-6 h-6 rounded-lg flex items-center justify-center ${project.starred ? 'text-[#FFA500]' : 'text-gray-300 hover:text-gray-400'}`}>
-            <Star size={11} fill={project.starred ? '#FFA500' : 'none'} />
-          </button>
-          <button onClick={e => { e.stopPropagation(); onDelete(); }} className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-[#D8727D]">
-            <Trash2 size={11} />
-          </button>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+          {confirmDelete ? (
+            <div className="flex items-center gap-1">
+              <button onClick={onConfirmDelete} className="text-[10px] bg-red-500 text-white rounded-lg px-2 py-0.5 font-semibold hover:bg-red-600">Yes</button>
+              <button onClick={onCancelDelete} className="text-[10px] bg-surface-100 text-gray-500 rounded-lg px-2 py-0.5 font-semibold hover:bg-surface-200">No</button>
+            </div>
+          ) : (
+            <>
+              <button onClick={e => { e.stopPropagation(); onStar(); }} className={`w-6 h-6 rounded-lg flex items-center justify-center ${project.starred ? 'text-[#FFA500]' : 'text-gray-300 hover:text-gray-400'}`}>
+                <Star size={11} fill={project.starred ? '#FFA500' : 'none'} />
+              </button>
+              <button onClick={e => { e.stopPropagation(); onDelete(); }} className="w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-[#D8727D]">
+                <Trash2 size={11} />
+              </button>
+            </>
+          )}
         </div>
       </td>
     </motion.tr>
@@ -419,21 +437,27 @@ const TeamsPage: React.FC = () => {
   // Merge context projects with local rich display data
   const [localRichData, setLocalRichData] = useState<Record<string, Partial<ProjectData>>>(initialRichData);
 
-  // Derived: combine context projects with local rich data for display
-  const projects: ProjectData[] = contextProjects.map(cp => ({
-    id: cp.id,
-    name: cp.name,
-    color: cp.color,
-    description: localRichData[cp.id]?.description ?? '',
-    status: localRichData[cp.id]?.status ?? 'active',
-    priority: localRichData[cp.id]?.priority ?? 'medium',
-    memberIds: localRichData[cp.id]?.memberIds ?? [],
-    taskTotal: localRichData[cp.id]?.taskTotal ?? 0,
-    taskDone: localRichData[cp.id]?.taskDone ?? 0,
-    dueDate: localRichData[cp.id]?.dueDate ?? 'TBD',
-    starred: localRichData[cp.id]?.starred ?? false,
-    category: localRichData[cp.id]?.category ?? 'General',
-  }));
+  // Build membersById lookup for child components
+  const membersById = Object.fromEntries(members.map(m => [m.id, m]));
+
+  // Derived: combine context projects with local rich data + real task counts
+  const projects: ProjectData[] = contextProjects.map(cp => {
+    const projectTasks = allTasks.filter(t => t.projectId === cp.id);
+    return {
+      id: cp.id,
+      name: cp.name,
+      color: cp.color,
+      description: localRichData[cp.id]?.description ?? '',
+      status: localRichData[cp.id]?.status ?? 'active',
+      priority: localRichData[cp.id]?.priority ?? 'medium',
+      memberIds: localRichData[cp.id]?.memberIds ?? [],
+      taskTotal: projectTasks.length,
+      taskDone: projectTasks.filter(t => t.status === 'done').length,
+      dueDate: localRichData[cp.id]?.dueDate ?? 'TBD',
+      starred: localRichData[cp.id]?.starred ?? false,
+      category: localRichData[cp.id]?.category ?? 'General',
+    };
+  });
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'list'>('grid');
@@ -441,7 +465,6 @@ const TeamsPage: React.FC = () => {
   const [search, setSearch] = useState('');
 
   // New context-driven state
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -468,7 +491,6 @@ const TeamsPage: React.FC = () => {
       return next;
     });
     if (selectedId === id) setSelectedId(null);
-    if (selectedProject?.id === id) setSelectedProject(null);
     setConfirmDeleteId(null);
   };
 
@@ -613,8 +635,6 @@ const TeamsPage: React.FC = () => {
                         selected={selectedId === p.id}
                         onSelect={() => {
                           setSelectedId(selectedId === p.id ? null : p.id);
-                          const ctxP = contextProjects.find(cp => cp.id === p.id) ?? null;
-                          setSelectedProject(selectedId === p.id ? null : ctxP);
                         }}
                         onStar={() => toggleStar(p.id)}
                         onDelete={() => setConfirmDeleteId(p.id)}
@@ -626,6 +646,8 @@ const TeamsPage: React.FC = () => {
                         confirmDelete={confirmDeleteId === p.id}
                         onConfirmDelete={() => handleDeleteProject(p.id)}
                         onCancelDelete={() => setConfirmDeleteId(null)}
+                        getMemberColor={getMemberColor}
+                        membersById={membersById}
                       />
                     ))}
                   </motion.div>
@@ -644,16 +666,14 @@ const TeamsPage: React.FC = () => {
                           <ProjectRow
                             key={p.id} project={p} index={i}
                             selected={selectedId === p.id}
-                            onSelect={() => {
-                              setSelectedId(selectedId === p.id ? null : p.id);
-                              const ctxP = contextProjects.find(cp => cp.id === p.id) ?? null;
-                              setSelectedProject(selectedId === p.id ? null : ctxP);
-                            }}
+                            onSelect={() => setSelectedId(selectedId === p.id ? null : p.id)}
                             onStar={() => toggleStar(p.id)}
-                            onDelete={() => {
-                              setConfirmDeleteId(p.id);
-                              handleDeleteProject(p.id);
-                            }}
+                            onDelete={() => setConfirmDeleteId(p.id)}
+                            confirmDelete={confirmDeleteId === p.id}
+                            onConfirmDelete={() => handleDeleteProject(p.id)}
+                            onCancelDelete={() => setConfirmDeleteId(null)}
+                            getMemberColor={getMemberColor}
+                            membersById={membersById}
                           />
                         ))}
                       </tbody>
@@ -668,7 +688,20 @@ const TeamsPage: React.FC = () => {
           <div className="w-80 shrink-0 flex flex-col bg-white border border-surface-200 rounded-2xl overflow-hidden">
             <AnimatePresence mode="wait">
               {selected ? (
-                <ProjectDetail key={selected.id} project={selected} onClose={() => { setSelectedId(null); setSelectedProject(null); }} />
+                <ProjectDetail
+                  key={selected.id}
+                  project={selected}
+                  onClose={() => setSelectedId(null)}
+                  onOpenProject={() => { setActiveProject(selected.id); navigate('/'); }}
+                  onEdit={() => {
+                    const ctxP = contextProjects.find(cp => cp.id === selected.id) ?? null;
+                    setEditingProject(ctxP);
+                    setShowProjectModal(true);
+                  }}
+                  getMemberColor={getMemberColor}
+                  membersById={membersById}
+                  taskItems={allTasks.filter(t => t.projectId === selected.id).map(t => ({ title: t.title, done: t.status === 'done' }))}
+                />
               ) : (
                 <motion.div
                   key="empty"
@@ -689,69 +722,6 @@ const TeamsPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Project detail slide-over panel */}
-      <AnimatePresence>
-        {selectedProject && (
-          <motion.div
-            className="fixed inset-0 top-16 z-50 flex"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="flex-1 bg-black/30" onClick={() => setSelectedProject(null)} />
-            <motion.div
-              className="w-[420px] bg-white h-full overflow-y-auto border-l border-surface-200 flex flex-col"
-              initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedProject.color }} />
-                  <span className="font-bold text-gray-900">{selectedProject.name}</span>
-                </div>
-                <button onClick={() => setSelectedProject(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="px-5 py-4 flex flex-col gap-4">
-                {(() => {
-                  const projTasks = allTasks.filter(t => t.projectId === selectedProject.id);
-                  const done = projTasks.filter(t => t.status === 'done').length;
-                  const rate = projTasks.length > 0 ? Math.round((done / projTasks.length) * 100) : 0;
-                  return (
-                    <>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-surface-50 rounded-xl p-3 text-center">
-                          <div className="text-lg font-bold text-gray-900">{projTasks.length}</div>
-                          <div className="text-xs text-gray-400">Total</div>
-                        </div>
-                        <div className="bg-surface-50 rounded-xl p-3 text-center">
-                          <div className="text-lg font-bold text-gray-900">{done}</div>
-                          <div className="text-xs text-gray-400">Done</div>
-                        </div>
-                        <div className="bg-surface-50 rounded-xl p-3 text-center">
-                          <div className="text-lg font-bold text-gray-900">{rate}%</div>
-                          <div className="text-xs text-gray-400">Complete</div>
-                        </div>
-                      </div>
-                      <div className="w-full h-2 bg-surface-100 rounded-full">
-                        <div className="h-2 rounded-full bg-primary-500 transition-all" style={{ width: `${rate}%` }} />
-                      </div>
-                    </>
-                  );
-                })()}
-                <motion.button
-                  onClick={() => { setActiveProject(selectedProject.id); navigate('/'); }}
-                  className="w-full flex items-center justify-center gap-2 bg-primary-500 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors"
-                  whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                >
-                  <ArrowRight size={15} /> Go to Board
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* New / Edit Project Modal */}
       <AnimatePresence>

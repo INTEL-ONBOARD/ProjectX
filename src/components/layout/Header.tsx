@@ -1,8 +1,9 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Calendar, HelpCircle, Bell, ChevronDown, CalendarClock, CheckCircle2, MessageCircle, AlertTriangle, BookOpen, PlayCircle, Headphones, Bug } from 'lucide-react';
+import { Search, Calendar, HelpCircle, Bell, ChevronDown, CalendarClock, CheckCircle2, MessageCircle, AlertTriangle, BookOpen, PlayCircle, Headphones, Bug, LogOut, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { memberColors } from '../../data/mockData';
 import { Avatar } from '../ui/Avatar';
 import CalendarDropdown from './CalendarDropdown';
@@ -30,14 +31,17 @@ const HelpIconMap: Record<HelpIcon, React.ElementType> = { book: BookOpen, play:
 const Header: React.FC = () => {
     const navigate = useNavigate();
     const { currentUser } = useContext(AppContext);
+    const { logout, user: authUser } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [isUserOpen, setIsUserOpen] = useState(false);
     const [readIds, setReadIds] = useState<string[]>([]);
     const calendarRef = useRef<HTMLDivElement>(null);
     const notifRef = useRef<HTMLDivElement>(null);
     const helpRef = useRef<HTMLDivElement>(null);
+    const userRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         function handleMouseDown(e: MouseEvent) {
@@ -49,6 +53,9 @@ const Header: React.FC = () => {
             }
             if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
                 setIsHelpOpen(false);
+            }
+            if (userRef.current && !userRef.current.contains(e.target as Node)) {
+                setIsUserOpen(false);
             }
         }
         document.addEventListener('mousedown', handleMouseDown);
@@ -189,22 +196,63 @@ const Header: React.FC = () => {
                 <div className="w-px h-8 bg-surface-200 mx-1" />
 
                 {/* User profile */}
-                <motion.button
-                    className="flex items-center gap-3 pl-2 pr-3 py-1.5 rounded-xl hover:bg-surface-100 transition-colors"
-                    whileHover={{ scale: 1.01 }}
-                    onClick={() => navigate('/settings')}
-                >
-                    <div className="text-right">
-                        <div className="text-sm font-semibold text-gray-800 leading-tight">
-                            {currentUser?.name ?? ''}
+                <div ref={userRef} className="relative">
+                    <motion.button
+                        className="flex items-center gap-3 pl-2 pr-3 py-1.5 rounded-xl hover:bg-surface-100 transition-colors"
+                        whileHover={{ scale: 1.01 }}
+                        onClick={() => { setIsUserOpen(o => !o); setIsNotifOpen(false); setIsHelpOpen(false); setIsCalendarOpen(false); }}
+                    >
+                        <div className="text-right">
+                            <div className="text-sm font-semibold text-gray-800 leading-tight">
+                                {authUser?.name ?? currentUser?.name ?? ''}
+                            </div>
+                            <div className="text-[11px] text-gray-400 leading-tight capitalize">
+                                {authUser?.role ?? currentUser?.designation ?? ''}
+                            </div>
                         </div>
-                        <div className="text-[11px] text-gray-400 leading-tight">
-                            {currentUser?.designation ?? ''}
-                        </div>
-                    </div>
-                    <Avatar name={currentUser?.name ?? ''} color={memberColors[0]} size="md" />
-                    <ChevronDown size={14} className="text-gray-400" />
-                </motion.button>
+                        <Avatar name={authUser?.name ?? currentUser?.name ?? ''} color={memberColors[0]} size="md" />
+                        <motion.div animate={{ rotate: isUserOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                            <ChevronDown size={14} className="text-gray-400" />
+                        </motion.div>
+                    </motion.button>
+                    <AnimatePresence>
+                        {isUserOpen && (
+                            <motion.div
+                                className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                                transition={{ duration: 0.15 }}
+                            >
+                                {/* User info header */}
+                                <div className="px-4 py-3 border-b border-surface-100">
+                                    <div className="text-sm font-semibold text-gray-800">{authUser?.name ?? currentUser?.name}</div>
+                                    <div className="text-xs text-gray-400">{authUser?.email}</div>
+                                </div>
+                                {/* Settings */}
+                                <button
+                                    onClick={() => { navigate('/settings'); setIsUserOpen(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-100 transition-colors text-left"
+                                >
+                                    <span className="w-7 h-7 rounded-lg bg-surface-100 flex items-center justify-center shrink-0">
+                                        <Settings size={14} className="text-gray-500" />
+                                    </span>
+                                    <span className="text-xs font-semibold text-gray-700">Settings</span>
+                                </button>
+                                {/* Sign out */}
+                                <button
+                                    onClick={() => { logout(); setIsUserOpen(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 transition-colors text-left"
+                                >
+                                    <span className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                                        <LogOut size={14} className="text-red-500" />
+                                    </span>
+                                    <span className="text-xs font-semibold text-red-500">Sign Out</span>
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
         </motion.header>
     );

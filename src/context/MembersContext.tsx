@@ -1,12 +1,17 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { teamMembers, memberColors } from '../data/mockData';
 import { User } from '../types';
+
+const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const api = () => (window as any).electronAPI.db;
 
 interface MembersContextValue {
   members: User[];
   getMemberColor: (id: string) => string;
-  addMember: (member: Omit<User, 'id'>) => void;
-  removeMember: (id: string) => void;
+  addMember: (member: Omit<User, 'id'>) => Promise<void>;
+  removeMember: (id: string) => Promise<void>;
 }
 
 const MembersContext = createContext<MembersContextValue | null>(null);
@@ -18,7 +23,17 @@ export const useMembersContext = () => {
 };
 
 export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [members, setMembers] = useState<User[]>(teamMembers);
+  const [members, setMembers] = useState<User[]>([]);
+
+  useEffect(() => {
+    if (isMock) {
+      setMembers(teamMembers);
+      return;
+    }
+    api().getMembers()
+      .then((docs: User[]) => setMembers(docs))
+      .catch(console.error);
+  }, []);
 
   const getMemberColor = (id: string): string => {
     const idx = members.findIndex(m => m.id === id);
@@ -26,12 +41,22 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return memberColors[idx % memberColors.length];
   };
 
-  const addMember = (member: Omit<User, 'id'>) => {
-    const newMember: User = { ...member, id: `u${Date.now()}` };
+  const addMember = async (member: Omit<User, 'id'>) => {
+    if (isMock) {
+      const newMember: User = { ...member, id: `u${Date.now()}` };
+      setMembers(prev => [...prev, newMember]);
+      return;
+    }
+    const newMember = await api().addMember(member) as User;
     setMembers(prev => [...prev, newMember]);
   };
 
-  const removeMember = (id: string) => {
+  const removeMember = async (id: string) => {
+    if (isMock) {
+      setMembers(prev => prev.filter(m => m.id !== id));
+      return;
+    }
+    await api().removeMember(id);
     setMembers(prev => prev.filter(m => m.id !== id));
   };
 

@@ -4,10 +4,11 @@ import {
   Save, User, Bell, Palette, Shield, CreditCard, Key, LogOut,
   Camera, Check, Globe, Clock, Moon, Sun, Monitor,
   Smartphone, Mail, Eye, EyeOff, AlertTriangle,
-  Download, Trash2, RefreshCw, Edit3, MapPin, Briefcase,
+  Download, Trash2, Edit3, MapPin, Briefcase,
   Link, Zap, Star, TrendingUp, Activity, X,
-  Search, Lock, ChevronRight,
+  Lock, ChevronRight, Info, RefreshCw, CheckCircle2,
 } from 'lucide-react';
+import { useAppUpdater } from '../hooks/useAppUpdater';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { teamMembers, memberColors } from '../data/mockData';
@@ -132,7 +133,7 @@ const navGroups = [
     label: 'Workspace',
     items: [
       { id: 'billing', label: 'Billing', icon: CreditCard },
-      { id: 'integrations', label: 'Integrations', icon: RefreshCw },
+      { id: 'about', label: 'About', icon: Info },
     ],
   },
 ];
@@ -155,6 +156,7 @@ const SettingsPage: React.FC = () => {
   const userColor = memberColors[userIdx !== -1 ? userIdx : 0];
 
   const [activeSection, setActiveSection] = useState('profile');
+  const { state: updateState, checkForUpdate, installUpdate } = useAppUpdater();
 
   // Profile
   const [nameValue,     setNameValue]     = useState(() => currentUser?.name        || 'Anima Agrawal');
@@ -170,7 +172,6 @@ const SettingsPage: React.FC = () => {
     projectUpdates: true, securityAlerts: true,
   });
   const [quietHours, setQuietHours] = useState(true);
-  const [testSent, setTestSent] = useState<string | null>(null);
 
   // Appearance
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
@@ -183,14 +184,10 @@ const SettingsPage: React.FC = () => {
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const strength = calcStrength(passwords.next);
 
-  // Integrations
-  const [connectedApps, setConnectedApps] = useState<Record<string, boolean>>({
-    GitHub: true, Slack: true, Figma: false, 'Google Drive': false, Jira: false,
-  });
-  const [integrationSearch, setIntegrationSearch] = useState('');
 
   // Save feedback
   const [saved, setSaved] = useState(false);
+
 
   const toggleNotif = (key: keyof typeof notifications) =>
     setNotifications(p => ({ ...p, [key]: !p[key] }));
@@ -234,20 +231,6 @@ const SettingsPage: React.FC = () => {
     { label: 'Rating', value: '4.9', icon: Star, color: '#30C5E5', bg: 'bg-[#30C5E520]' },
   ];
 
-  const allIntegrations = [
-    { name: 'GitHub',       sub: 'github.com/anima',        desc: 'Sync repositories and track commits', color: '#24292e', initial: 'Gh' },
-    { name: 'Slack',        sub: 'projectm-team.slack.com', desc: 'Send notifications to channels',       color: '#4A154B', initial: 'Sl' },
-    { name: 'Figma',        sub: 'figma.com',               desc: 'Embed designs and prototypes',         color: '#F24E1E', initial: 'Fi' },
-    { name: 'Google Drive', sub: 'drive.google.com',        desc: 'Attach and share files',               color: '#4285F4', initial: 'Gd' },
-    { name: 'Jira',         sub: 'atlassian.net',           desc: 'Sync issues and sprints',              color: '#0052CC', initial: 'Ji' },
-  ];
-
-  const filteredIntegrations = allIntegrations.filter(app =>
-    app.name.toLowerCase().includes(integrationSearch.toLowerCase()) ||
-    app.desc.toLowerCase().includes(integrationSearch.toLowerCase())
-  );
-  const activeIntegrations    = filteredIntegrations.filter(app => connectedApps[app.name]);
-  const availableIntegrations = filteredIntegrations.filter(app => !connectedApps[app.name]);
 
   return (
     <motion.div
@@ -432,19 +415,14 @@ const SettingsPage: React.FC = () => {
                         </div>
 
                         {/* Stat pills */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          {stats.map((s, i) => {
+                        <div className="flex items-center gap-4 shrink-0">
+                          {stats.map((s) => {
                             const Icon = s.icon;
-                            const borders = ['rgba(80,48,229,0.15)', 'rgba(80,48,229,0.12)', 'rgba(255,165,0,0.15)', 'rgba(48,197,229,0.15)'];
-                            const bgs = ['rgba(80,48,229,0.04)', 'rgba(80,48,229,0.04)', 'rgba(255,165,0,0.04)', 'rgba(48,197,229,0.04)'];
                             return (
-                              <div key={s.label}
-                                className="flex flex-col items-center px-4 py-2.5 rounded-xl min-w-[58px]"
-                                style={{ background: bgs[i], border: `1px solid ${borders[i]}` }}
-                              >
-                                <Icon size={11} style={{ color: s.color }} />
-                                <div className="text-sm font-extrabold text-gray-900 mt-1 leading-none">{s.value}</div>
-                                <div className="text-[9px] text-gray-400 mt-0.5 font-medium leading-tight text-center">{s.label}</div>
+                              <div key={s.label} className="flex items-center gap-1.5">
+                                <Icon size={13} style={{ color: s.color }} strokeWidth={2.2} />
+                                <span className="text-sm font-bold text-gray-900">{s.value}</span>
+                                <span className="text-xs text-gray-400">{s.label}</span>
                               </div>
                             );
                           })}
@@ -526,60 +504,37 @@ const SettingsPage: React.FC = () => {
                   {/* Delivery channels */}
                   <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
                     <SectionHeader title="Delivery Channels" subtitle="How you want to receive alerts" />
-                    <div className="px-5 py-4 flex flex-col gap-3">
+                    <div className="px-5 py-1">
                       {[
-                        { key: 'emailNotifs' as const, icon: Mail, label: 'Email notifications', sub: `Receive updates to ${emailValue}`, color: '#5030E5', bg: 'bg-primary-50' },
-                        { key: 'pushNotifs'  as const, icon: Bell, label: 'Push notifications',  sub: 'Browser and desktop alerts',       color: '#FFA500', bg: 'bg-[#FFA50020]' },
-                        { key: 'smsNotifs'   as const, icon: Smartphone, label: 'SMS notifications', sub: 'Text messages for critical alerts', color: '#68B266', bg: 'bg-[#83C29D20]' },
+                        { key: 'emailNotifs' as const, icon: Mail,       label: 'Email',        sub: emailValue },
+                        { key: 'pushNotifs'  as const, icon: Bell,       label: 'Push',         sub: 'Browser & desktop' },
+                        { key: 'smsNotifs'   as const, icon: Smartphone, label: 'SMS',          sub: 'Critical alerts only' },
                       ].map(row => {
                         const Icon = row.icon;
                         return (
-                          <div
-                            key={row.key}
-                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${notifications[row.key] ? 'border-primary-200 bg-primary-50/40' : 'border-surface-100 bg-surface-50'}`}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className={`w-11 h-11 rounded-xl ${row.bg} flex items-center justify-center shrink-0`}>
-                                <Icon size={18} style={{ color: row.color }} />
-                              </div>
+                          <div key={row.key} className="flex items-center justify-between py-3.5 border-b border-surface-50 last:border-0">
+                            <div className="flex items-center gap-3">
+                              <Icon size={15} className={notifications[row.key] ? 'text-primary-400' : 'text-gray-300'} />
                               <div>
-                                <div className="text-sm font-semibold text-gray-900">{row.label}</div>
-                                <div className="text-xs text-gray-400 mt-0.5">{row.sub}</div>
+                                <div className="text-sm font-medium text-gray-900">{row.label}</div>
+                                <div className="text-[11px] text-gray-400">{row.sub}</div>
                               </div>
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
-                              <motion.button
-                                onClick={() => { setTestSent(row.key); setTimeout(() => setTestSent(null), 2000); }}
-                                disabled={!notifications[row.key]}
-                                className={`text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
-                                  testSent === row.key
-                                    ? 'bg-[#68B26620] text-[#68B266]'
-                                    : notifications[row.key]
-                                    ? 'bg-surface-100 text-gray-500 hover:bg-surface-200'
-                                    : 'opacity-30 cursor-not-allowed bg-surface-100 text-gray-400'
-                                }`}
-                                whileTap={notifications[row.key] ? { scale: 0.95 } : {}}
-                              >
-                                {testSent === row.key ? '✓ Sent!' : 'Test'}
-                              </motion.button>
                               <Toggle on={notifications[row.key]} onChange={() => toggleNotif(row.key)} />
                             </div>
                           </div>
                         );
                       })}
 
-                      <hr className="border-surface-100" />
-
                       {/* Quiet Hours */}
-                      <div className={`flex items-center justify-between p-4 rounded-xl border transition-all ${quietHours ? 'border-primary-200 bg-primary-50/40' : 'border-surface-100 bg-surface-50'}`}>
-                        <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 rounded-xl bg-[#5030E520] flex items-center justify-center shrink-0">
-                            <Moon size={18} className="text-primary-500" />
-                          </div>
+                      <div className="flex items-center justify-between py-3.5">
+                        <div className="flex items-center gap-3">
+                          <Moon size={15} className={quietHours ? 'text-primary-400' : 'text-gray-300'} />
                           <div>
-                            <div className="text-sm font-semibold text-gray-900">Quiet Hours</div>
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              {quietHours ? 'Silenced 10:00 PM – 8:00 AM' : 'Notifications allowed all day'}
+                            <div className="text-sm font-medium text-gray-900">Quiet Hours</div>
+                            <div className="text-[11px] text-gray-400">
+                              {quietHours ? '10:00 PM – 8:00 AM' : 'All day'}
                             </div>
                           </div>
                         </div>
@@ -1125,106 +1080,101 @@ const SettingsPage: React.FC = () => {
                 </motion.div>
               )}
 
-              {/* ══ Integrations ══ */}
-              {activeSection === 'integrations' && (
-                <motion.div key="integrations" className="flex flex-col gap-4 bg-white pb-4"
+
+              {/* ══ About ══ */}
+              {activeSection === 'about' && (
+                <motion.div key="about" className="flex flex-col gap-4 bg-white pb-4"
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2 }}>
 
-                  {/* Search */}
-                  <div className="relative">
-                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      value={integrationSearch}
-                      onChange={e => setIntegrationSearch(e.target.value)}
-                      placeholder="Search integrations..."
-                      className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-surface-200 rounded-xl focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all shadow-sm"
-                    />
+                  {/* App identity card */}
+                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+                    <div className="h-1.5 w-full bg-gradient-to-r from-primary-500 via-[#8B5CF6] to-[#0EA5E9]" />
+                    <div className="p-6 flex items-center gap-5">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-[#8B5CF6] flex items-center justify-center shadow-lg shrink-0">
+                        <span className="text-white font-bold text-2xl tracking-tight">P</span>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-gray-900">ProjectX</div>
+                        <div className="text-sm text-gray-400 mt-0.5">
+                          Version {updateState.appVersion ?? '1.0.0'}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1">Project planning for high-performance teams</div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Active integrations */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader
-                      title={`Active (${activeIntegrations.length})`}
-                      subtitle="Currently connected services"
-                    />
-                    {activeIntegrations.length === 0
-                      ? <p className="px-6 py-6 text-sm text-gray-400 text-center">No connected integrations</p>
-                      : activeIntegrations.map(app => {
-                          const connected = connectedApps[app.name] ?? false;
-                          return (
-                            <div key={app.name} className="p-5 border-b border-surface-100 last:border-0 hover:bg-surface-50/50 transition-colors">
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-sm font-bold"
-                                  style={{ backgroundColor: app.color + '1A', color: app.color }}
-                                >
-                                  {app.initial}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-0.5">
-                                    <span className="text-sm font-bold text-gray-900">{app.name}</span>
-                                    {connected && (
-                                      <span className="inline-flex items-center gap-1 text-[9px] bg-[#83C29D33] text-[#68B266] font-bold px-1.5 py-0.5 rounded-full">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-[#68B266]" />
-                                        Active
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-gray-400">{app.sub}</div>
-                                </div>
-                                <button
-                                  onClick={() => setConnectedApps(p => ({ ...p, [app.name]: !p[app.name] }))}
-                                  className="text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0 text-[#D8727D] bg-[#D8727D0A] hover:bg-[#D8727D15] border border-[#D8727D22]"
-                                >
-                                  Disconnect
-                                </button>
-                              </div>
+                  {/* Update status */}
+                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+                    <SectionHeader title="Software Update" subtitle="Keep ProjectX up to date" />
+                    <div className="px-6 py-5">
+                      {/* Status row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                            updateState.status === 'downloaded' ? 'bg-[#68B26615]' :
+                            updateState.status === 'error'      ? 'bg-red-50' :
+                            'bg-primary-50'
+                          }`}>
+                            {updateState.status === 'downloaded' ? (
+                              <CheckCircle2 size={16} className="text-[#68B266]" />
+                            ) : updateState.status === 'error' ? (
+                              <AlertTriangle size={16} className="text-red-500" />
+                            ) : (
+                              <RefreshCw size={16} className={`text-primary-500 ${updateState.status === 'checking' || updateState.status === 'downloading' ? 'animate-spin' : ''}`} />
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-gray-800">
+                              {updateState.status === 'idle'          && 'Up to date'}
+                              {updateState.status === 'checking'      && 'Checking for updates…'}
+                              {updateState.status === 'not-available' && 'Already on the latest version'}
+                              {updateState.status === 'available'     && `v${updateState.version} available — downloading…`}
+                              {updateState.status === 'downloading'   && `Downloading… ${updateState.progress ?? 0}%`}
+                              {updateState.status === 'downloaded'    && `v${updateState.version} ready to install`}
+                              {updateState.status === 'error'         && 'Update check failed'}
                             </div>
-                          );
-                        })
-                    }
-                  </div>
-
-                  {/* Available integrations */}
-                  {availableIntegrations.length > 0 && (
-                    <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                      <SectionHeader
-                        title={`Available (${availableIntegrations.length})`}
-                        subtitle="Connect additional services"
-                      />
-                      {availableIntegrations.map(app => (
-                        <div key={app.name} className="p-5 border-b border-surface-100 last:border-0 hover:bg-surface-50/50 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div
-                              className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-sm font-bold"
-                              style={{ backgroundColor: app.color + '1A', color: app.color }}
-                            >
-                              {app.initial}
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              {updateState.status === 'error'
+                                ? updateState.errorMessage ?? 'An error occurred.'
+                                : `Current version: ${updateState.appVersion ?? '1.0.0'}`}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-gray-900 mb-0.5">{app.name}</div>
-                              <div className="text-xs text-gray-400">{app.desc}</div>
-                            </div>
-                            <button
-                              onClick={() => setConnectedApps(p => ({ ...p, [app.name]: !p[app.name] }))}
-                              className="text-xs font-semibold px-4 py-2 rounded-xl transition-colors shrink-0 text-primary-600 bg-primary-50 hover:bg-primary-100 border border-primary-200"
-                            >
-                              Connect
-                            </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
 
-                  {filteredIntegrations.length === 0 && (
-                    <div className="bg-white rounded-2xl border border-surface-200 p-10 text-center">
-                      <Search size={24} className="text-gray-300 mx-auto mb-3" />
-                      <div className="text-sm font-semibold text-gray-500">No integrations found</div>
-                      <div className="text-xs text-gray-400 mt-1">Try searching with different keywords</div>
+                        {/* Action button */}
+                        {updateState.status === 'downloaded' ? (
+                          <button
+                            onClick={installUpdate}
+                            className="px-4 py-2 bg-primary-500 text-white text-xs font-semibold rounded-xl hover:bg-primary-600 transition-colors"
+                          >
+                            Restart & install
+                          </button>
+                        ) : (
+                          <button
+                            onClick={checkForUpdate}
+                            disabled={updateState.status === 'checking' || updateState.status === 'downloading'}
+                            className="px-4 py-2 bg-surface-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-surface-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Check for updates
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Progress bar */}
+                      {(updateState.status === 'downloading' || updateState.status === 'available') && (
+                        <div className="mt-4 h-1.5 bg-surface-100 rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full bg-primary-500 rounded-full"
+                            initial={{ width: '0%' }}
+                            animate={{ width: `${updateState.progress ?? 0}%` }}
+                            transition={{ ease: 'linear', duration: 0.3 }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
+
                 </motion.div>
               )}
 
