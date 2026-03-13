@@ -5,15 +5,12 @@ import {
   Share2, LayoutGrid, List, X, Check,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { memberColors, MOCK_TODAY } from '../../data/mockData';
+import { memberColors } from '../../data/mockData';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import { useProjects } from '../../context/ProjectContext';
 import { useMembersContext } from '../../context/MembersContext';
 import InviteMemberModal from '../modals/InviteMemberModal';
 import { useToast } from '../../hooks/useToast';
-
-// MOCK_TODAY is imported for future use
-void MOCK_TODAY;
 
 interface ProjectHeaderProps {
   onFilterChange?: (filters: { priority: string; assignees: string[]; dueDateFilter: string }) => void;
@@ -43,7 +40,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayTo
 
   const commitName = () => {
     if (activeProject && nameValue.trim()) {
-      updateProject(activeProject, { name: nameValue.trim() || 'Untitled' });
+      updateProject(activeProject, { name: nameValue.trim() || 'Untitled' }).catch(console.error);
     }
     setEditingName(false);
   };
@@ -259,7 +256,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayTo
         {showInvite && (
           <InviteMemberModal
             onClose={() => setShowInvite(false)}
-            onSubmit={member => addMember(member)}
+            onSubmit={member => addMember(member).catch(console.error)}
           />
         )}
       </AnimatePresence>

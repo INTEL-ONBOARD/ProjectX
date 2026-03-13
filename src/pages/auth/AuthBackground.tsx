@@ -1,6 +1,13 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+// ── GlassCard ─────────────────────────────────────────────────────────────────
+export const GlassCard: React.FC<{ className?: string; children?: React.ReactNode }> = ({ className = '', children }) => (
+  <div className={`bg-white rounded-2xl shadow-xl border border-surface-100 ${className}`}>
+    {children}
+  </div>
+);
+
 // ── Logo mark ─────────────────────────────────────────────────────────────────
 export const LogoMark: React.FC<{ size?: number; dark?: boolean }> = ({ size = 40, dark = false }) => (
   <div

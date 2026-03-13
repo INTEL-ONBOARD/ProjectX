@@ -38,7 +38,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, t
   const assigneeNames = task.assignees.map(id => members.find(m => m.id === id)?.name ?? 'Unknown');
   const assigneeColors = task.assignees.map(id => getMemberColor(id));
 
-  const isToday = todayMode && task.dueDate === MOCK_TODAY;
+  const isToday = todayMode && task.dueDate === TODAY;
 
   useEffect(() => {
     if (!showMenu) return;
