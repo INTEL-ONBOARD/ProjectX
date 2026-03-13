@@ -1,6 +1,6 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { AppContext } from '../../context/AppContext';
 
 interface CalendarDropdownProps {
@@ -57,6 +57,14 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
     const [viewMonth, setViewMonth] = useState(today.getMonth());
     const [selectedDate, setSelectedDate] = useState(toISODate(today));
 
+    useEffect(() => {
+        function handleKeyDown(e: KeyboardEvent) {
+            if (e.key === 'Escape') onClose();
+        }
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     // Guard after all hooks
     if (!currentUser) return null;
 
@@ -69,12 +77,16 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
     const currentStatus = currentRecord?.status;
 
     function prevMonth() {
-        if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-        else setViewMonth(m => m - 1);
+        const newMonth = viewMonth === 0 ? 11 : viewMonth - 1;
+        const newYear  = viewMonth === 0 ? viewYear - 1 : viewYear;
+        setViewMonth(newMonth);
+        setViewYear(newYear);
     }
     function nextMonth() {
-        if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-        else setViewMonth(m => m + 1);
+        const newMonth = viewMonth === 11 ? 0 : viewMonth + 1;
+        const newYear  = viewMonth === 11 ? viewYear + 1 : viewYear;
+        setViewMonth(newMonth);
+        setViewYear(newYear);
     }
 
     function markAttendance(status: 'present' | 'absent' | 'wfh') {
