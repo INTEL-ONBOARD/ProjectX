@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import AuthBackground, { GlassCard, LogoMark } from './AuthBackground';
+import { BrandPanel, FormPanel, LogoMark } from './AuthBackground';
 
 interface RegisterPageProps {
   onNavigateLogin: () => void;
 }
 
 const fi = (i: number) => ({
-  initial: { opacity: 0, y: 14 },
+  initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
-  transition: { delay: i * 0.06 + 0.1, duration: 0.38, ease: 'easeOut' as const },
+  transition: { delay: i * 0.055 + 0.08, duration: 0.36, ease: 'easeOut' as const },
 });
 
 type Role = 'admin' | 'manager' | 'member';
-const roles: { value: Role; label: string }[] = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'member', label: 'Member' },
+const roles: { value: Role; label: string; desc: string }[] = [
+  { value: 'admin', label: 'Admin', desc: 'Full access' },
+  { value: 'manager', label: 'Manager', desc: 'Manage teams' },
+  { value: 'member', label: 'Member', desc: 'View & edit' },
 ];
 
 const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
@@ -34,11 +34,12 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   const [globalError, setGlobalError] = useState('');
   const [focus, setFocus] = useState<Record<string, boolean>>({});
 
-  const setF = (f: string, v: boolean) => setFocus(p => ({ ...p, [f]: v }));
-  const inputBase = 'w-full px-3.5 py-2.5 rounded-xl text-sm text-gray-800 outline-none transition-all duration-200 bg-white border placeholder-gray-400';
-  const inputStyle = (field: string) => ({
-    borderColor: focus[field] ? '#5030E5' : '#EBEBEB',
-    boxShadow: focus[field] ? '0 0 0 3px rgba(80,48,229,0.08)' : 'none',
+  const sf = (f: string, v: boolean) => setFocus(p => ({ ...p, [f]: v }));
+  const inputCls = 'w-full px-4 py-3 rounded-xl text-sm text-gray-800 border outline-none transition-all duration-200 placeholder-gray-400';
+  const inputStyle = (f: string) => ({
+    borderColor: errors[f] ? '#EF4444' : focus[f] ? '#5030E5' : 'transparent',
+    boxShadow: errors[f] ? '0 0 0 3px rgba(239,68,68,0.08)' : focus[f] ? '0 0 0 3px rgba(80,48,229,0.1)' : 'none',
+    background: focus[f] ? '#fff' : '#F5F5F5',
   });
 
   const validate = () => {
@@ -47,7 +48,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
     if (!email.trim()) e.email = 'Email is required.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email.';
     if (!password) e.password = 'Password is required.';
-    else if (password.length < 6) e.password = 'At least 6 characters required.';
+    else if (password.length < 6) e.password = 'At least 6 characters.';
     if (!confirm) e.confirm = 'Please confirm your password.';
     else if (confirm !== password) e.confirm = 'Passwords do not match.';
     return e;
@@ -70,169 +71,102 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   };
 
   return (
-    <AuthBackground>
-      <div className="w-full max-w-sm px-4 py-4 overflow-y-auto max-h-screen">
-        <GlassCard className="p-8">
-          {/* Logo + heading */}
-          <motion.div {...fi(0)} className="flex flex-col items-center gap-3 mb-7">
-            <LogoMark size={48} />
-            <div className="text-center">
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Create account</h1>
-              <p className="text-sm text-gray-400 mt-1">Join your team on Project M.</p>
+    <div className="fixed inset-0 flex overflow-hidden bg-white">
+      <BrandPanel />
+      <FormPanel>
+        <motion.div {...fi(0)} className="mb-2">
+          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+            <LogoMark size={32} />
+            <span className="font-bold text-base text-gray-900 tracking-tight">Project M.</span>
+          </div>
+          <h1 className="text-[1.75rem] font-bold text-gray-900 tracking-tight leading-tight">Create your account</h1>
+          <p className="text-gray-500 text-sm mt-1.5">Join your team on Project M. It only takes a minute.</p>
+        </motion.div>
+
+        <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-3.5">
+          <motion.div {...fi(1)}>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Full Name</label>
+            <input type="text" className={inputCls} style={inputStyle('name')} placeholder="Jane Smith"
+              value={name} onChange={e => setName(e.target.value)} onFocus={() => sf('name', true)} onBlur={() => sf('name', false)} disabled={loading} />
+            {errors.name && <p className="text-xs text-red-500 mt-1.5">{errors.name}</p>}
+          </motion.div>
+
+          <motion.div {...fi(2)}>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Email</label>
+            <input type="email" className={inputCls} style={inputStyle('email')} placeholder="you@company.com"
+              value={email} onChange={e => setEmail(e.target.value)} onFocus={() => sf('email', true)} onBlur={() => sf('email', false)} disabled={loading} />
+            {errors.email && <p className="text-xs text-red-500 mt-1.5">{errors.email}</p>}
+          </motion.div>
+
+          <motion.div {...fi(3)}>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Password</label>
+            <div className="relative">
+              <input type={showPass ? 'text' : 'password'} className={inputCls} style={{ ...inputStyle('password'), paddingRight: '2.75rem' }}
+                placeholder="Min. 6 characters" value={password} onChange={e => setPassword(e.target.value)}
+                onFocus={() => sf('password', true)} onBlur={() => sf('password', false)} disabled={loading} />
+              <button type="button" onClick={() => setShowPass(!showPass)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors" tabIndex={-1}>
+                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {errors.password && <p className="text-xs text-red-500 mt-1.5">{errors.password}</p>}
+          </motion.div>
+
+          <motion.div {...fi(4)}>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Confirm Password</label>
+            <input type="password" className={inputCls} style={inputStyle('confirm')} placeholder="Re-enter password"
+              value={confirm} onChange={e => setConfirm(e.target.value)} onFocus={() => sf('confirm', true)} onBlur={() => sf('confirm', false)} disabled={loading} />
+            {errors.confirm && <p className="text-xs text-red-500 mt-1.5">{errors.confirm}</p>}
+          </motion.div>
+
+          <motion.div {...fi(5)}>
+            <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Role</label>
+            <div className="grid grid-cols-3 gap-2">
+              {roles.map(r => (
+                <button key={r.value} type="button" onClick={() => setRole(r.value)}
+                  className="flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl border-2 text-center transition-all"
+                  style={{ background: role === r.value ? '#F0EDFF' : '#F5F5F5', borderColor: role === r.value ? '#5030E5' : 'transparent' }}>
+                  <span className="text-xs font-bold" style={{ color: role === r.value ? '#5030E5' : '#374151' }}>{r.label}</span>
+                  <span className="text-[10px] font-medium" style={{ color: role === r.value ? '#5030E5' : '#9CA3AF' }}>{r.desc}</span>
+                </button>
+              ))}
             </div>
           </motion.div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-            {/* Full Name */}
-            <motion.div {...fi(1)}>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Full Name</label>
-              <input
-                type="text"
-                className={inputBase}
-                style={inputStyle('name')}
-                placeholder="Jane Smith"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onFocus={() => setF('name', true)}
-                onBlur={() => setF('name', false)}
-                disabled={loading}
-              />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
-            </motion.div>
-
-            {/* Email */}
-            <motion.div {...fi(2)}>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email address</label>
-              <input
-                type="email"
-                className={inputBase}
-                style={inputStyle('email')}
-                placeholder="you@company.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onFocus={() => setF('email', true)}
-                onBlur={() => setF('email', false)}
-                disabled={loading}
-              />
-              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-            </motion.div>
-
-            {/* Password */}
-            <motion.div {...fi(3)}>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  className={inputBase}
-                  style={{ ...inputStyle('password'), paddingRight: '2.75rem' }}
-                  placeholder="Min. 6 characters"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  onFocus={() => setF('password', true)}
-                  onBlur={() => setF('password', false)}
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-            </motion.div>
-
-            {/* Confirm Password */}
-            <motion.div {...fi(4)}>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm Password</label>
-              <input
-                type="password"
-                className={inputBase}
-                style={inputStyle('confirm')}
-                placeholder="Re-enter password"
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                onFocus={() => setF('confirm', true)}
-                onBlur={() => setF('confirm', false)}
-                disabled={loading}
-              />
-              {errors.confirm && <p className="text-xs text-red-500 mt-1">{errors.confirm}</p>}
-            </motion.div>
-
-            {/* Role selector */}
-            <motion.div {...fi(5)}>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Role</label>
-              <div className="flex gap-2">
-                {roles.map(r => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => setRole(r.value)}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold transition-all border"
-                    style={{
-                      background: role === r.value ? '#5030E5' : '#fff',
-                      color: role === r.value ? '#fff' : '#6B7280',
-                      borderColor: role === r.value ? '#5030E5' : '#EBEBEB',
-                    }}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* Global error */}
+          <AnimatePresence>
             {globalError && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="px-3.5 py-2.5 rounded-xl text-xs text-red-600 bg-red-50 border border-red-100 flex items-center gap-2"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm text-red-600 bg-red-50 border border-red-100">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0">
                   <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
                 {globalError}
               </motion.div>
             )}
+          </AnimatePresence>
 
-            {/* Submit */}
-            <motion.div {...fi(6)} className="mt-1">
-              <motion.button
-                type="submit"
-                disabled={loading}
-                whileHover={!loading ? { scale: 1.01 } : {}}
-                whileTap={!loading ? { scale: 0.99 } : {}}
-                className="w-full py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-colors"
-                style={{ background: loading ? '#856FFB' : '#5030E5', cursor: loading ? 'not-allowed' : 'pointer' }}
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin" width="15" height="15" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3"/>
-                      <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" strokeLinecap="round"/>
-                    </svg>
-                    Creating account...
-                  </>
-                ) : 'Create Account'}
-              </motion.button>
-            </motion.div>
-          </form>
+          <motion.div {...fi(6)} className="pt-1">
+            <motion.button type="submit" disabled={loading}
+              whileHover={!loading ? { scale: 1.015, boxShadow: '0 8px 28px rgba(80,48,229,0.35)' } : {}}
+              whileTap={!loading ? { scale: 0.985 } : {}}
+              className="w-full py-3.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all"
+              style={{ background: loading ? '#856FFB' : 'linear-gradient(135deg, #5030E5 0%, #6B44F8 100%)', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 4px 20px rgba(80,48,229,0.3)' }}>
+              {loading ? (
+                <><svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3"/>
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" strokeLinecap="round"/>
+                </svg>Creating account...</>
+              ) : 'Create account'}
+            </motion.button>
+          </motion.div>
+        </form>
 
-          {/* Login link */}
-          <motion.p {...fi(7)} className="text-center mt-5 text-sm text-gray-500">
-            Already have an account?{' '}
-            <button
-              onClick={onNavigateLogin}
-              className="font-semibold text-primary-500 hover:text-primary-600 transition-colors"
-            >
-              Sign in
-            </button>
-          </motion.p>
-        </GlassCard>
-      </div>
-    </AuthBackground>
+        <motion.p {...fi(7)} className="text-center mt-5 text-sm text-gray-500">
+          Already have an account?{' '}
+          <button onClick={onNavigateLogin} className="font-semibold text-primary-500 hover:text-primary-600 transition-colors">Sign in</button>
+        </motion.p>
+      </FormPanel>
+    </div>
   );
 };
 

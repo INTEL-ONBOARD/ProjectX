@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Mail } from 'lucide-react';
-import AuthBackground, { GlassCard, LogoMark } from './AuthBackground';
+import { ArrowLeft } from 'lucide-react';
+import { BrandPanel, FormPanel, LogoMark } from './AuthBackground';
 
 interface ForgotPasswordPageProps {
   onNavigateLogin: () => void;
 }
+
+const fi = (i: number) => ({
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  transition: { delay: i * 0.07 + 0.08, duration: 0.36, ease: 'easeOut' as const },
+});
 
 const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin }) => {
   const [email, setEmail] = useState('');
@@ -26,132 +32,169 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
   };
 
   const inputStyle = {
-    borderColor: focused ? '#5030E5' : '#EBEBEB',
-    boxShadow: focused ? '0 0 0 3px rgba(80,48,229,0.08)' : 'none',
+    borderColor: error ? '#EF4444' : focused ? '#5030E5' : 'transparent',
+    boxShadow: error ? '0 0 0 3px rgba(239,68,68,0.08)' : focused ? '0 0 0 3px rgba(80,48,229,0.1)' : 'none',
+    background: focused ? '#fff' : '#F5F5F5',
   };
 
   return (
-    <AuthBackground>
-      <div className="w-full max-w-sm px-4">
-        <GlassCard className="p-8 overflow-hidden">
-          <AnimatePresence mode="wait">
-            {!sent ? (
-              <motion.div
-                key="form"
-                initial={{ opacity: 0, x: 0 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -32 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
+    <div className="fixed inset-0 flex overflow-hidden bg-white">
+      <BrandPanel />
+      <FormPanel>
+        <AnimatePresence mode="wait">
+          {!sent ? (
+            <motion.div
+              key="form"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            >
+              {/* Back button */}
+              <motion.button
+                {...fi(0)}
+                onClick={onNavigateLogin}
+                className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors mb-8 group"
               >
-                {/* Logo + heading */}
-                <div className="flex flex-col items-center gap-3 mb-7">
-                  <LogoMark size={48} />
-                  <div className="text-center">
-                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">Reset password</h1>
-                    <p className="text-sm text-gray-400 mt-1 max-w-[26ch] mx-auto leading-relaxed">
-                      Enter your email and we'll send you a reset link.
-                    </p>
-                  </div>
+                <ArrowLeft size={15} className="group-hover:-translate-x-0.5 transition-transform" />
+                Back to login
+              </motion.button>
+
+              {/* Header */}
+              <motion.div {...fi(1)} className="mb-8">
+                <div className="flex items-center gap-2.5 mb-6 lg:hidden">
+                  <LogoMark size={32} />
+                  <span className="font-bold text-base text-gray-900 tracking-tight">Project M.</span>
                 </div>
+                {/* Key icon */}
+                <div className="w-14 h-14 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center mb-5">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5030E5" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="7.5" cy="15.5" r="5.5"/>
+                    <path d="M21 2l-9.6 9.6M15.5 7.5L19 4M17.5 9.5L21 6"/>
+                  </svg>
+                </div>
+                <h1 className="text-[1.75rem] font-bold text-gray-900 tracking-tight leading-tight">Forgot password?</h1>
+                <p className="text-gray-500 text-sm mt-1.5 leading-relaxed">
+                  No worries. Enter your email and we'll send you a reset link right away.
+                </p>
+              </motion.div>
 
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email address</label>
-                    <input
-                      type="email"
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm text-gray-800 outline-none transition-all duration-200 bg-white border placeholder-gray-400"
-                      style={inputStyle}
-                      placeholder="you@company.com"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      onFocus={() => setFocused(true)}
-                      onBlur={() => setFocused(false)}
-                      disabled={loading}
-                      autoComplete="email"
-                    />
-                    {error && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-xs text-red-500 mt-1"
-                      >
-                        {error}
-                      </motion.p>
-                    )}
-                  </div>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <motion.div {...fi(2)}>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Email address</label>
+                  <input
+                    type="email"
+                    className="w-full px-4 py-3 rounded-xl text-sm text-gray-800 border outline-none transition-all duration-200 placeholder-gray-400"
+                    style={inputStyle}
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => setFocused(false)}
+                    disabled={loading}
+                    autoComplete="email"
+                  />
+                  {error && (
+                    <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-red-500 mt-1.5">
+                      {error}
+                    </motion.p>
+                  )}
+                </motion.div>
 
+                <motion.div {...fi(3)}>
                   <motion.button
                     type="submit"
                     disabled={loading}
-                    whileHover={!loading ? { scale: 1.01 } : {}}
-                    whileTap={!loading ? { scale: 0.99 } : {}}
-                    className="w-full py-2.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-colors"
-                    style={{ background: loading ? '#856FFB' : '#5030E5', cursor: loading ? 'not-allowed' : 'pointer' }}
+                    whileHover={!loading ? { scale: 1.015, boxShadow: '0 8px 28px rgba(80,48,229,0.35)' } : {}}
+                    whileTap={!loading ? { scale: 0.985 } : {}}
+                    className="w-full py-3.5 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all"
+                    style={{
+                      background: loading ? '#856FFB' : 'linear-gradient(135deg, #5030E5 0%, #6B44F8 100%)',
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      boxShadow: loading ? 'none' : '0 4px 20px rgba(80,48,229,0.3)',
+                    }}
                   >
                     {loading ? (
                       <>
-                        <svg className="animate-spin" width="15" height="15" viewBox="0 0 24 24" fill="none">
+                        <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
                           <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3"/>
                           <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" strokeLinecap="round"/>
                         </svg>
-                        Sending...
+                        Sending link...
                       </>
-                    ) : 'Send Reset Link'}
+                    ) : 'Send reset link'}
                   </motion.button>
-                </form>
-
-                <button
-                  onClick={onNavigateLogin}
-                  className="flex items-center gap-1.5 mx-auto mt-5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <ArrowLeft size={14} />
-                  Back to Login
-                </button>
-              </motion.div>
-            ) : (
+                </motion.div>
+              </form>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="success"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className="flex flex-col"
+            >
+              {/* Animated success icon */}
               <motion.div
-                key="success"
-                initial={{ opacity: 0, x: 32 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.35, ease: 'easeOut' }}
-                className="flex flex-col items-center text-center py-4"
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.05 }}
+                className="w-16 h-16 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center mb-6"
               >
-                {/* Mail icon with check */}
-                <motion.div
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.1 }}
-                  className="w-20 h-20 rounded-2xl bg-primary-50 border border-primary-100 flex items-center justify-center mb-5"
-                >
-                  <Mail size={36} className="text-primary-500" strokeWidth={1.5} />
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25, duration: 0.35 }}
-                >
-                  <h2 className="text-xl font-bold text-gray-900 tracking-tight mb-2">Check your inbox</h2>
-                  <p className="text-sm text-gray-400 leading-relaxed mb-6 max-w-[26ch] mx-auto">
-                    We sent a reset link to{' '}
-                    <span className="font-semibold text-gray-700">{email}</span>
-                  </p>
-
-                  <motion.button
-                    onClick={onNavigateLogin}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    className="px-8 py-2.5 rounded-xl font-semibold text-sm text-white bg-primary-500 hover:bg-primary-600 transition-colors"
-                  >
-                    Back to Login
-                  </motion.button>
-                </motion.div>
+                <motion.svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                  <motion.path
+                    d="M6 16l7 7 13-13"
+                    stroke="#5030E5"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ delay: 0.2, duration: 0.5, ease: 'easeOut' }}
+                  />
+                </motion.svg>
               </motion.div>
-            )}
-          </AnimatePresence>
-        </GlassCard>
-      </div>
-    </AuthBackground>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.35 }}
+              >
+                <h2 className="text-[1.75rem] font-bold text-gray-900 tracking-tight leading-tight mb-2">
+                  Check your email
+                </h2>
+                <p className="text-gray-500 text-sm leading-relaxed mb-8">
+                  We've sent a password reset link to{' '}
+                  <span className="font-semibold text-gray-800">{email}</span>.{' '}
+                  It should arrive within a minute.
+                </p>
+
+                <motion.button
+                  onClick={onNavigateLogin}
+                  whileHover={{ scale: 1.015, boxShadow: '0 8px 28px rgba(80,48,229,0.35)' }}
+                  whileTap={{ scale: 0.985 }}
+                  className="w-full py-3.5 rounded-xl font-semibold text-sm text-white transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg, #5030E5 0%, #6B44F8 100%)',
+                    boxShadow: '0 4px 20px rgba(80,48,229,0.3)',
+                  }}
+                >
+                  Back to login
+                </motion.button>
+
+                <p className="text-center mt-4 text-xs text-gray-400">
+                  Didn't receive it?{' '}
+                  <button onClick={() => setSent(false)} className="font-semibold text-primary-500 hover:text-primary-600 transition-colors">
+                    Try again
+                  </button>
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </FormPanel>
+    </div>
   );
 };
 
