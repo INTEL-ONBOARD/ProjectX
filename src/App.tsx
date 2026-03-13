@@ -20,9 +20,16 @@ import { MembersProvider } from './context/MembersContext';
 import BugReportModal from './components/ui/BugReportModal';
 
 // Layout wrapper
-const Layout: React.FC<{ children: React.ReactNode; showProjectHeader?: boolean }> = ({
+const Layout: React.FC<{
+    children: React.ReactNode;
+    showProjectHeader?: boolean;
+    onFilterChange?: (f: { priority: string; assignees: string[]; dueDateFilter: string }) => void;
+    onTodayToggle?: (v: boolean) => void;
+}> = ({
     children,
     showProjectHeader = false,
+    onFilterChange,
+    onTodayToggle,
 }) => {
     const { sidebarCollapsed, setSidebarCollapsed } = useContext(AppContext);
     const { activeProject, setActiveProject } = useProjects();
@@ -41,10 +48,25 @@ const Layout: React.FC<{ children: React.ReactNode; showProjectHeader?: boolean 
                 transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             >
                 <Header />
-                {showProjectHeader && <ProjectHeader />}
+                {showProjectHeader && <ProjectHeader onFilterChange={onFilterChange} onTodayToggle={onTodayToggle} />}
                 {children}
             </motion.div>
         </div>
+    );
+};
+
+// KanbanRoute bridges filter state between ProjectHeader and KanbanBoard
+const KanbanRoute: React.FC = () => {
+    const [filters, setFilters] = React.useState({ priority: 'all', assignees: [] as string[], dueDateFilter: 'all' });
+    const [todayMode, setTodayMode] = React.useState(false);
+    return (
+        <Layout
+            showProjectHeader={true}
+            onFilterChange={setFilters}
+            onTodayToggle={setTodayMode}
+        >
+            <KanbanBoard filters={filters} todayMode={todayMode} />
+        </Layout>
     );
 };
 
@@ -55,14 +77,7 @@ const App: React.FC = () => {
         <ProjectProvider>
         <HashRouter>
             <Routes>
-                <Route
-                    path="/"
-                    element={
-                        <Layout showProjectHeader={true}>
-                            <KanbanBoard />
-                        </Layout>
-                    }
-                />
+                <Route path="/" element={<KanbanRoute />} />
                 <Route
                     path="/messages"
                     element={
