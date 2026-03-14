@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkForUpdate: () => ipcRenderer.invoke('update:check'),
     installUpdate: () => ipcRenderer.invoke('update:install'),
 
+    // DB connection event listeners
+    onDbConnected: (cb) => { ipcRenderer.on('db:connected', cb); return () => ipcRenderer.removeListener('db:connected', cb); },
+    onDbConnectionFailed: (cb) => { ipcRenderer.on('db:connection-failed', cb); return () => ipcRenderer.removeListener('db:connection-failed', cb); },
+
     // Update event listeners
     onUpdateChecking: (cb) => { ipcRenderer.on('update:checking', cb); return () => ipcRenderer.removeListener('update:checking', cb); },
     onUpdateAvailable: (cb) => { ipcRenderer.on('update:available', cb); return () => ipcRenderer.removeListener('update:available', cb); },
@@ -93,6 +97,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Project rich data
         getProjectRich: () => ipcRenderer.invoke('db:projectrich:getAll'),
         setProjectRich: (data) => ipcRenderer.invoke('db:projectrich:set', data),
+        deleteProjectRich: (projectId) => ipcRenderer.invoke('db:projectrich:delete', projectId),
 
         // Organization
         getOrg: () => ipcRenderer.invoke('db:org:get'),
@@ -101,5 +106,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Role permissions
         getRolePerms: () => ipcRenderer.invoke('db:roleperms:getAll'),
         setRolePerms: (data) => ipcRenderer.invoke('db:roleperms:set', data),
+
+        // Roles (dynamic)
+        getRoles:        ()     => ipcRenderer.invoke('db:roles:getAll'),
+        createRole:      (data) => ipcRenderer.invoke('db:roles:create', data),
+        updateRoleColor: (data) => ipcRenderer.invoke('db:roles:updateColor', data),
+        renameRole:      (data) => ipcRenderer.invoke('db:roles:rename', data),
+        deleteRole:      (data) => ipcRenderer.invoke('db:roles:delete', data),
+        deleteRolePerms: (data) => ipcRenderer.invoke('db:roleperms:delete', data),
     },
 });

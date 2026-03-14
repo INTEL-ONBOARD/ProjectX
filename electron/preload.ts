@@ -23,6 +23,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkForUpdate: (): Promise<void> => ipcRenderer.invoke('update:check'),
     installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
 
+    // DB connection event listeners
+    onDbConnected: (cb: () => void) => {
+        ipcRenderer.on('db:connected', cb);
+        return () => ipcRenderer.removeListener('db:connected', cb);
+    },
+    onDbConnectionFailed: (cb: (_: unknown, message: string) => void) => {
+        ipcRenderer.on('db:connection-failed', cb);
+        return () => ipcRenderer.removeListener('db:connection-failed', cb);
+    },
+
     // Update event listeners
     onUpdateChecking: (cb: () => void) => {
         ipcRenderer.on('update:checking', cb);
@@ -49,30 +59,97 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => ipcRenderer.removeListener('update:error', cb);
     },
 
+    // User preferences (theme, sidebar, week start, walkthrough, view)
+    userPrefs: {
+        get: (userId: string) => ipcRenderer.invoke('db:userpref:get', userId),
+        set: (prefs: object)  => ipcRenderer.invoke('db:userpref:set', prefs),
+    },
+
+    // Notification preferences
+    notifPrefs: {
+        get: (userId: string) => ipcRenderer.invoke('db:notifpref:get', userId),
+        set: (prefs: object)  => ipcRenderer.invoke('db:notifpref:set', prefs),
+    },
+
+    // Appearance preferences
+    appearancePrefs: {
+        get: (userId: string) => ipcRenderer.invoke('db:appearancepref:get', userId),
+        set: (prefs: object)  => ipcRenderer.invoke('db:appearancepref:set', prefs),
+    },
+
+    // Auth — credentials stored in MongoDB Atlas
+    auth: {
+        login:          (email: string, password: string)                                  => ipcRenderer.invoke('db:auth:login', email, password),
+        register:       (name: string, email: string, password: string, role: string)      => ipcRenderer.invoke('db:auth:register', name, email, password, role),
+        updatePassword: (userId: string, currentPassword: string, newPassword: string)     => ipcRenderer.invoke('db:auth:updatePassword', userId, currentPassword, newPassword),
+        updateName:     (userId: string, newName: string)                                  => ipcRenderer.invoke('db:auth:updateName', userId, newName),
+        seedDefault:    ()                                                                 => ipcRenderer.invoke('db:auth:seedDefault'),
+        getAll:         ()                                                                 => ipcRenderer.invoke('db:auth:getAll'),
+        updateRole:     (userId: string, role: string)                                     => ipcRenderer.invoke('db:auth:updateRole', userId, role),
+    },
+
     // Database — all operations go through Electron main → MongoDB Atlas
     db: {
         // Projects
-        getProjects: (): Promise<unknown[]> => ipcRenderer.invoke('db:projects:getAll'),
-        createProject: (name: string, color: string): Promise<unknown> => ipcRenderer.invoke('db:projects:create', name, color),
+        getProjects:   (): Promise<unknown[]>                                  => ipcRenderer.invoke('db:projects:getAll'),
+        createProject: (name: string, color: string): Promise<unknown>         => ipcRenderer.invoke('db:projects:create', name, color),
         updateProject: (id: string, changes: { name?: string; color?: string }): Promise<unknown> => ipcRenderer.invoke('db:projects:update', id, changes),
-        deleteProject: (id: string): Promise<boolean> => ipcRenderer.invoke('db:projects:delete', id),
+        deleteProject: (id: string): Promise<boolean>                          => ipcRenderer.invoke('db:projects:delete', id),
 
         // Tasks
-        getTasks: (): Promise<unknown[]> => ipcRenderer.invoke('db:tasks:getAll'),
-        createTask: (task: object): Promise<unknown> => ipcRenderer.invoke('db:tasks:create', task),
-        updateTask: (id: string, changes: object): Promise<unknown> => ipcRenderer.invoke('db:tasks:update', id, changes),
-        deleteTask: (id: string): Promise<boolean> => ipcRenderer.invoke('db:tasks:delete', id),
-        moveTask: (id: string, newStatus: string): Promise<unknown> => ipcRenderer.invoke('db:tasks:move', id, newStatus),
-        scrubAssignee: (memberId: string): Promise<boolean> => ipcRenderer.invoke('db:tasks:scrubAssignee', memberId),
+        getTasks:      (): Promise<unknown[]>                                  => ipcRenderer.invoke('db:tasks:getAll'),
+        createTask:    (task: object): Promise<unknown>                        => ipcRenderer.invoke('db:tasks:create', task),
+        updateTask:    (id: string, changes: object): Promise<unknown>         => ipcRenderer.invoke('db:tasks:update', id, changes),
+        deleteTask:    (id: string): Promise<boolean>                          => ipcRenderer.invoke('db:tasks:delete', id),
+        moveTask:      (id: string, newStatus: string): Promise<unknown>       => ipcRenderer.invoke('db:tasks:move', id, newStatus),
+        scrubAssignee: (memberId: string): Promise<boolean>                    => ipcRenderer.invoke('db:tasks:scrubAssignee', memberId),
 
         // Members
-        getMembers: (): Promise<unknown[]> => ipcRenderer.invoke('db:members:getAll'),
-        addMember: (member: object): Promise<unknown> => ipcRenderer.invoke('db:members:add', member),
-        removeMember: (id: string): Promise<boolean> => ipcRenderer.invoke('db:members:remove', id),
+        getMembers:    (): Promise<unknown[]>                                  => ipcRenderer.invoke('db:members:getAll'),
+        addMember:     (member: object): Promise<unknown>                      => ipcRenderer.invoke('db:members:add', member),
+        updateMember:  (id: string, changes: object): Promise<unknown>         => ipcRenderer.invoke('db:members:update', id, changes),
+        removeMember:  (id: string): Promise<boolean>                          => ipcRenderer.invoke('db:members:remove', id),
 
         // Attendance
-        getAttendance: (): Promise<unknown[]> => ipcRenderer.invoke('db:attendance:getAll'),
-        setAttendance: (record: object): Promise<unknown> => ipcRenderer.invoke('db:attendance:set', record),
-        deleteAttendance: (userId: string, date: string): Promise<boolean> => ipcRenderer.invoke('db:attendance:delete', userId, date),
+        getAttendance:    (): Promise<unknown[]>                               => ipcRenderer.invoke('db:attendance:getAll'),
+        setAttendance:    (record: object): Promise<unknown>                   => ipcRenderer.invoke('db:attendance:set', record),
+        deleteAttendance: (userId: string, date: string): Promise<boolean>     => ipcRenderer.invoke('db:attendance:delete', userId, date),
+
+        // Messages
+        getMessagesBetween: (userId: string, peerId: string): Promise<unknown[]> => ipcRenderer.invoke('db:messages:getBetween', userId, peerId),
+        sendMessage:        (msg: object): Promise<unknown>                       => ipcRenderer.invoke('db:messages:send', msg),
+        reactToMessage:     (msgId: string, userId: string, emoji: string): Promise<unknown> => ipcRenderer.invoke('db:messages:react', msgId, userId, emoji),
+        deleteMessage:      (msgId: string): Promise<boolean>                     => ipcRenderer.invoke('db:messages:delete', msgId),
+
+        // Conv meta
+        getConvMeta: (userId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:convmeta:getAll', userId),
+        setConvMeta: (meta: object): Promise<unknown>                          => ipcRenderer.invoke('db:convmeta:set', meta),
+
+        // Departments
+        getDepts:    (): Promise<unknown[]>                                    => ipcRenderer.invoke('db:depts:getAll'),
+        createDept:  (dept: object): Promise<unknown>                          => ipcRenderer.invoke('db:depts:create', dept),
+        updateDept:  (id: string, changes: object): Promise<unknown>           => ipcRenderer.invoke('db:depts:update', id, changes),
+        deleteDept:  (id: string): Promise<boolean>                            => ipcRenderer.invoke('db:depts:delete', id),
+
+        // Project rich data
+        getProjectRich: (): Promise<unknown[]>                                 => ipcRenderer.invoke('db:projectrich:getAll'),
+        setProjectRich: (data: object): Promise<unknown>                       => ipcRenderer.invoke('db:projectrich:set', data),
+        deleteProjectRich: (projectId: string): Promise<boolean>               => ipcRenderer.invoke('db:projectrich:delete', projectId),
+
+        // Organization
+        getOrg: (): Promise<unknown>                                           => ipcRenderer.invoke('db:org:get'),
+        setOrg: (data: object): Promise<unknown>                               => ipcRenderer.invoke('db:org:set', data),
+
+        // Role permissions
+        getRolePerms: (): Promise<unknown[]>                                   => ipcRenderer.invoke('db:roleperms:getAll'),
+        setRolePerms: (data: object): Promise<unknown>                         => ipcRenderer.invoke('db:roleperms:set', data),
+
+        // Roles (dynamic)
+        getRoles:        ():             Promise<unknown[]> => ipcRenderer.invoke('db:roles:getAll'),
+        createRole:      (data: object): Promise<unknown>   => ipcRenderer.invoke('db:roles:create', data),
+        updateRoleColor: (data: object): Promise<unknown>   => ipcRenderer.invoke('db:roles:updateColor', data),
+        renameRole:      (data: object): Promise<unknown>   => ipcRenderer.invoke('db:roles:rename', data),
+        deleteRole:      (data: object): Promise<unknown>   => ipcRenderer.invoke('db:roles:delete', data),
+        deleteRolePerms: (data: object): Promise<unknown>   => ipcRenderer.invoke('db:roleperms:delete', data),
     },
 });

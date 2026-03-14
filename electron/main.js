@@ -25,9 +25,10 @@ const TaskSchema = new Schema({
     title: { type: String, required: true },
     description: { type: String, default: '' },
     priority: { type: String, enum: ['low', 'high', 'completed'], default: 'low' },
-    status: { type: String, enum: ['todo', 'in-progress', 'done'], default: 'todo' },
+    status: { type: String, enum: ['todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'done'], default: 'todo' },
     assignees: [String],
     comments: { type: Number, default: 0 },
+    commentData: { type: [{ id: String, author: String, text: String, time: String }], default: [] },
     files: { type: Number, default: 0 },
     images: [String],
     dueDate: String,
@@ -159,7 +160,7 @@ const ProjectRichModel = mongoose.model('ProjectRich', ProjectRichSchema);
 
 const toUser = d => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email: d.email ?? '', location: d.location ?? '', role: d.role, designation: d.designation ?? '', status: d.status });
 const toProject = d => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
-const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });
+const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, commentData: (d.commentData ?? []).map(c => ({ id: c.id, author: c.author, text: c.text, time: c.time })), files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });
 
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
@@ -219,7 +220,7 @@ function registerDbHandlers() {
     ipcMain.handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
 
     // Messages
-    const toMsg = d => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
+    const toMsg = d => ({ id: d.msgId, from: d.fromId, to: d.toId, text: d.text, time: d.timestamp, read: false, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
 
     ipcMain.handle('db:messages:getBetween', async (_e, userId, peerId) => {
         const msgs = await MessageModel.find({ $or: [{ fromId: userId, toId: peerId }, { fromId: peerId, toId: userId }] }).sort({ timestamp: 1 }).lean();
@@ -272,6 +273,10 @@ function registerDbHandlers() {
     ipcMain.handle('db:projectrich:set', async (_e, data) => {
         const d = await ProjectRichModel.findOneAndUpdate({ projectId: data.projectId }, data, { upsert: true, new: true }).lean();
         return safe(toProjectRich(d));
+    });
+    ipcMain.handle('db:projectrich:delete', async (_e, projectId) => {
+        await ProjectRichModel.deleteOne({ projectId });
+        return true;
     });
 
     // Auth — credentials stored in MongoDB
@@ -330,7 +335,7 @@ function registerDbHandlers() {
         }
         // Default role permissions — always upsert admin to ensure new routes are included
         const defaultPerms = [
-            { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings', '/admin'] },
+            { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings'] },
             { role: 'manager', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/attendance', '/settings'] },
             { role: 'member',  allowedRoutes: ['/settings'] },
         ];
