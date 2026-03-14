@@ -1,8 +1,17 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
 
-const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const dbApi = () => (window as any).electronAPI.db;
+const win = () => window as any;
+const isMock = typeof window === 'undefined' || !win().electronAPI?.db;
+const dbApi = () => win().electronAPI.db;
+const prefsApi = () => win().electronAPI.userPrefs;
+
+function currentWeekMonday(): string {
+    const d = new Date();
+    const day = d.getDay();
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    return d.toISOString().slice(0, 10);
+}
 
 export interface Organization {
     id: string;
@@ -95,24 +104,36 @@ export const AppContext = createContext<AppContextType>({
     setSidebarCollapsed: () => { },
     attendanceRecords: [],
     setAttendanceRecord: () => {},
-    selectedWeekStart: (() => { const d = new Date(); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); return d.toISOString().slice(0, 10); })(),
+    selectedWeekStart: currentWeekMonday(),
     setSelectedWeekStart: () => {},
 });
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [org, setOrg] = useState<Organization | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [theme, setThemeState] = useState<'light' | 'dark'>('light');
+    const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-    const [selectedWeekStart, setSelectedWeekStart] = useState<string>(() => {
-        const d = new Date();
-        const day = d.getDay();
-        d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-        return d.toISOString().slice(0, 10);
-    });
+    const [selectedWeekStart, setSelectedWeekStartState] = useState<string>(currentWeekMonday);
+    // Track which userId we last loaded prefs for (avoid re-loading on unrelated re-renders)
+    const [prefLoadedFor, setPrefLoadedFor] = useState<string | null>(null);
 
-    // Load attendance from MongoDB when running in Electron
+    // Load user prefs whenever currentUser changes
+    useEffect(() => {
+        if (!currentUser || isMock) return;
+        if (prefLoadedFor === currentUser.id) return;
+        prefsApi().get(currentUser.id)
+            .then((prefs: { theme?: 'light' | 'dark'; sidebarCollapsed?: boolean; selectedWeekStart?: string | null } | null) => {
+                if (!prefs) return;
+                if (prefs.theme) setThemeState(prefs.theme);
+                if (typeof prefs.sidebarCollapsed === 'boolean') setSidebarCollapsedState(prefs.sidebarCollapsed);
+                if (prefs.selectedWeekStart) setSelectedWeekStartState(prefs.selectedWeekStart);
+            })
+            .catch((err: unknown) => console.error('[AppContext] Failed to load user prefs:', err))
+            .finally(() => setPrefLoadedFor(currentUser.id));
+    }, [currentUser, prefLoadedFor]);
+
+    // Load attendance from MongoDB
     useEffect(() => {
         if (isMock) return;
         dbApi().getAttendance()
@@ -121,6 +142,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             })
             .catch((err: unknown) => console.error('[AppContext] Failed to load attendance records:', err));
     }, []);
+
+    // Apply theme to DOM
+    useEffect(() => {
+        document.body.dataset.theme = theme;
+    }, [theme]);
+
+    const setTheme = useCallback((t: 'light' | 'dark') => {
+        setThemeState(t);
+        if (!isMock && currentUser) {
+            prefsApi().set({ userId: currentUser.id, theme: t })
+                .catch((err: unknown) => console.error('[AppContext] Failed to save theme:', err));
+        }
+    }, [currentUser]);
+
+    const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+        setSidebarCollapsedState(collapsed);
+        if (!isMock && currentUser) {
+            prefsApi().set({ userId: currentUser.id, sidebarCollapsed: collapsed })
+                .catch((err: unknown) => console.error('[AppContext] Failed to save sidebar state:', err));
+        }
+    }, [currentUser]);
+
+    const setSelectedWeekStart = useCallback((date: string) => {
+        setSelectedWeekStartState(date);
+        if (!isMock && currentUser) {
+            prefsApi().set({ userId: currentUser.id, selectedWeekStart: date })
+                .catch((err: unknown) => console.error('[AppContext] Failed to save week start:', err));
+        }
+    }, [currentUser]);
 
     const setAttendanceRecord = useCallback((record: Omit<AttendanceRecord, 'id'>) => {
         const id = `${record.userId}-${record.date}`;
@@ -133,15 +183,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             return [...prev, { ...record, id }];
         });
-        // Persist to MongoDB
         if (!isMock) {
             dbApi().setAttendance({ ...record }).catch((err: unknown) => console.error('[AppContext] Failed to persist attendance record:', err));
         }
     }, []);
-
-    useEffect(() => {
-        document.body.dataset.theme = theme;
-    }, [theme]);
 
     const value = useMemo(
         () => ({
@@ -158,7 +203,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             selectedWeekStart,
             setSelectedWeekStart,
         }),
-        [org, currentUser, theme, sidebarCollapsed, attendanceRecords, setAttendanceRecord, selectedWeekStart]
+        [org, currentUser, theme, setTheme, sidebarCollapsed, setSidebarCollapsed, attendanceRecords, setAttendanceRecord, selectedWeekStart, setSelectedWeekStart]
     );
 
     return (

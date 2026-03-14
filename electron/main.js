@@ -95,7 +95,40 @@ const AuthUserSchema = new Schema({
     role:     { type: String, enum: ['admin', 'manager', 'member'], default: 'member' },
 });
 
+const UserPrefSchema = new Schema({
+    userId:            { type: String, required: true, unique: true },
+    theme:             { type: String, enum: ['light', 'dark'], default: 'light' },
+    sidebarCollapsed:  { type: Boolean, default: false },
+    selectedWeekStart: { type: String, default: null },
+    hasSeenWalkthrough:{ type: Boolean, default: false },
+    projectsView:      { type: String, enum: ['grid', 'list'], default: 'grid' },
+});
+
+const NotifPrefSchema = new Schema({
+    userId:         { type: String, required: true, unique: true },
+    taskUpdates:    { type: Boolean, default: true },
+    teamMentions:   { type: Boolean, default: true },
+    weeklyDigest:   { type: Boolean, default: false },
+    emailNotifs:    { type: Boolean, default: true },
+    pushNotifs:     { type: Boolean, default: true },
+    smsNotifs:      { type: Boolean, default: false },
+    projectUpdates: { type: Boolean, default: true },
+    securityAlerts: { type: Boolean, default: true },
+    quietHours:     { type: Boolean, default: true },
+});
+
+const AppearancePrefSchema = new Schema({
+    userId:      { type: String, required: true, unique: true },
+    themeMode:   { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
+    accentColor: { type: String, default: '#5030E5' },
+    fontSize:    { type: String, enum: ['sm', 'md', 'lg'], default: 'md' },
+    compactMode: { type: Boolean, default: false },
+});
+
 const AuthUserModel = mongoose.model('AuthUser', AuthUserSchema);
+const UserPrefModel = mongoose.model('UserPref', UserPrefSchema);
+const NotifPrefModel = mongoose.model('NotifPref', NotifPrefSchema);
+const AppearancePrefModel = mongoose.model('AppearancePref', AppearancePrefSchema);
 const UserModel = mongoose.model('User', UserSchema);
 const TaskModel = mongoose.model('Task', TaskSchema);
 const ProjectModel = mongoose.model('Project', ProjectSchema);
@@ -236,6 +269,51 @@ function registerDbHandlers() {
         if (!existing) {
             await AuthUserModel.create({ appId: 'auth-default', name: 'Admin User', email: 'admin@projectm.com', password: 'password123', role: 'admin' });
         }
+    });
+
+    // User preferences (theme, sidebar, week start, walkthrough, view)
+    const toUserPref = d => ({
+        userId: d.userId, theme: d.theme, sidebarCollapsed: d.sidebarCollapsed ?? false,
+        selectedWeekStart: d.selectedWeekStart ?? null, hasSeenWalkthrough: d.hasSeenWalkthrough ?? false,
+        projectsView: d.projectsView ?? 'grid',
+    });
+    ipcMain.handle('db:userpref:get', async (_e, userId) => {
+        const d = await UserPrefModel.findOne({ userId }).lean();
+        return d ? toUserPref(d) : null;
+    });
+    ipcMain.handle('db:userpref:set', async (_e, prefs) => {
+        const d = await UserPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
+        return toUserPref(d);
+    });
+
+    // Notification preferences
+    const toNotifPref = d => ({
+        userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions,
+        weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs,
+        smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts,
+        quietHours: d.quietHours,
+    });
+    ipcMain.handle('db:notifpref:get', async (_e, userId) => {
+        const d = await NotifPrefModel.findOne({ userId }).lean();
+        return d ? toNotifPref(d) : null;
+    });
+    ipcMain.handle('db:notifpref:set', async (_e, prefs) => {
+        const d = await NotifPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
+        return toNotifPref(d);
+    });
+
+    // Appearance preferences
+    const toAppearancePref = d => ({
+        userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor,
+        fontSize: d.fontSize, compactMode: d.compactMode ?? false,
+    });
+    ipcMain.handle('db:appearancepref:get', async (_e, userId) => {
+        const d = await AppearancePrefModel.findOne({ userId }).lean();
+        return d ? toAppearancePref(d) : null;
+    });
+    ipcMain.handle('db:appearancepref:set', async (_e, prefs) => {
+        const d = await AppearancePrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
+        return toAppearancePref(d);
     });
 }
 

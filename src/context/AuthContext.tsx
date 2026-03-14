@@ -5,6 +5,10 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const win = () => window as any;
 const isMock = typeof window === 'undefined' || !win().electronAPI?.auth;
+const prefsApi = () => win().electronAPI.userPrefs as {
+  get: (userId: string) => Promise<{ hasSeenWalkthrough?: boolean } | null>;
+  set: (prefs: { userId: string; hasSeenWalkthrough?: boolean }) => Promise<void>;
+};
 const authApi = () => win().electronAPI.auth as {
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (name: string, email: string, password: string, role: 'admin' | 'manager' | 'member') => Promise<AuthUser>;
@@ -68,8 +72,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasSeenWalkthrough, setHasSeenWalkthrough] = useState(false);
 
   useEffect(() => {
-    setHasSeenWalkthrough(localStorage.getItem(WALKTHROUGH_KEY) === 'true');
-
     // Seed default account then restore session
     const init = async () => {
       try {
@@ -80,10 +82,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch { /* ignore seed errors */ }
 
+      // Restore session
+      let restoredUser: AuthUser | null = null;
       try {
         const raw = localStorage.getItem(SESSION_KEY);
-        if (raw) setUser(JSON.parse(raw));
+        if (raw) {
+          restoredUser = JSON.parse(raw) as AuthUser;
+          setUser(restoredUser);
+        }
       } catch { /* ignore */ }
+
+      // Load walkthrough flag: DB first, then localStorage fallback
+      if (!isMock && restoredUser) {
+        try {
+          const prefs = await prefsApi().get(restoredUser.id);
+          const seen = prefs?.hasSeenWalkthrough ?? false;
+          setHasSeenWalkthrough(seen);
+          // backfill localStorage so non-Electron paths stay in sync
+          if (seen) localStorage.setItem(WALKTHROUGH_KEY, 'true');
+        } catch {
+          setHasSeenWalkthrough(localStorage.getItem(WALKTHROUGH_KEY) === 'true');
+        }
+      } else {
+        setHasSeenWalkthrough(localStorage.getItem(WALKTHROUGH_KEY) === 'true');
+      }
     };
 
     // Keep splash duration — resolve after 2500ms minimum
@@ -140,7 +162,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const markWalkthroughSeen = useCallback(() => {
     localStorage.setItem(WALKTHROUGH_KEY, 'true');
     setHasSeenWalkthrough(true);
-  }, []);
+    if (!isMock && user) {
+      prefsApi().set({ userId: user.id, hasSeenWalkthrough: true })
+        .catch((err: unknown) => console.error('[AuthContext] Failed to save walkthrough flag:', err));
+    }
+  }, [user]);
 
   const updatePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     if (!user) throw new Error('Not authenticated.');

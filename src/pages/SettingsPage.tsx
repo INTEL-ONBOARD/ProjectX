@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Save, User, Bell, Palette, Shield, CreditCard, Key, LogOut,
@@ -17,12 +17,32 @@ import { useAuth } from '../context/AuthContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
 
+// ── IPC bridge ───────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const win = () => window as any;
+const isMock = typeof window === 'undefined' || !win().electronAPI?.notifPrefs;
+const notifPrefsApi  = () => win().electronAPI.notifPrefs  as { get: (uid: string) => Promise<NotifPrefs | null>; set: (p: NotifPrefs & { userId: string }) => Promise<void> };
+const appearApi      = () => win().electronAPI.appearancePrefs as { get: (uid: string) => Promise<AppearPrefs | null>; set: (p: AppearPrefs & { userId: string }) => Promise<void> };
+
 // ── Notification defaults ────────────────────────────────────────────────────
 
-const defaultNotifications = {
+const defaultNotifications: NotifPrefs = {
   taskUpdates: true, teamMentions: true, weeklyDigest: false,
   emailNotifs: true, pushNotifs: true, smsNotifs: false,
-  projectUpdates: true, securityAlerts: true,
+  projectUpdates: true, securityAlerts: true, quietHours: true,
+};
+
+type NotifPrefs = {
+  taskUpdates: boolean; teamMentions: boolean; weeklyDigest: boolean;
+  emailNotifs: boolean; pushNotifs: boolean; smsNotifs: boolean;
+  projectUpdates: boolean; securityAlerts: boolean; quietHours: boolean;
+};
+
+type AppearPrefs = {
+  themeMode: 'light' | 'dark' | 'system';
+  accentColor: string;
+  fontSize: 'sm' | 'md' | 'lg';
+  compactMode: boolean;
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -179,28 +199,48 @@ const SettingsPage: React.FC = () => {
   const [timezoneValue, setTimezoneValue] = useState('');
   const [roleValue,     setRoleValue]     = useState(() => currentUser?.designation || '');
 
-  // Notifications — persisted to localStorage per user
-  const notifKey = `pm_notif_${currentUser?.id ?? 'default'}`;
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      const raw = localStorage.getItem(notifKey);
-      if (raw) return JSON.parse(raw) as typeof defaultNotifications;
-    } catch { /* ignore */ }
-    return defaultNotifications;
-  });
-  const [quietHours, setQuietHours] = useState(() => {
-    try {
-      const raw = localStorage.getItem(`${notifKey}_quiet`);
-      if (raw !== null) return raw === 'true';
-    } catch { /* ignore */ }
-    return true;
-  });
+  // Notifications — persisted to MongoDB (localStorage fallback in mock mode)
+  const [notifications, setNotifications] = useState<NotifPrefs>(defaultNotifications);
+  const notifLoaded = useRef(false);
 
-  // Appearance
+  useEffect(() => {
+    if (notifLoaded.current || !currentUser?.id) return;
+    notifLoaded.current = true;
+    if (isMock) {
+      try {
+        const raw = localStorage.getItem(`pm_notif_${currentUser.id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setNotifications({ ...defaultNotifications, ...parsed });
+        }
+      } catch { /* ignore */ }
+      return;
+    }
+    notifPrefsApi().get(currentUser.id)
+      .then(prefs => { if (prefs) setNotifications({ ...defaultNotifications, ...prefs }); })
+      .catch((err: unknown) => console.error('[SettingsPage] Failed to load notif prefs:', err));
+  }, [currentUser?.id]);
+
+  // Appearance — persisted to MongoDB (in-memory fallback in mock mode)
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(theme === 'dark' ? 'dark' : 'light');
   const [accentColor, setAccentColor] = useState('#5030E5');
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [compactMode, setCompactMode] = useState(false);
+  const appearLoaded = useRef(false);
+
+  useEffect(() => {
+    if (appearLoaded.current || !currentUser?.id || isMock) return;
+    appearLoaded.current = true;
+    appearApi().get(currentUser.id)
+      .then(prefs => {
+        if (!prefs) return;
+        setThemeMode(prefs.themeMode);
+        setAccentColor(prefs.accentColor);
+        setFontSize(prefs.fontSize);
+        setCompactMode(prefs.compactMode);
+      })
+      .catch((err: unknown) => console.error('[SettingsPage] Failed to load appearance prefs:', err));
+  }, [currentUser?.id]);
 
   // Security
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
@@ -212,19 +252,26 @@ const SettingsPage: React.FC = () => {
   const [saved, setSaved] = useState(false);
 
 
-  const toggleNotif = (key: keyof typeof defaultNotifications) => {
-    setNotifications((p: typeof defaultNotifications) => {
-      const updated = { ...p, [key]: !p[key] };
-      try { localStorage.setItem(notifKey, JSON.stringify(updated)); } catch { /* ignore */ }
-      return updated;
-    });
+  const saveAppearance = (patch: Partial<AppearPrefs>) => {
+    if (!isMock && currentUser?.id) {
+      const current: AppearPrefs & { userId: string } = {
+        userId: currentUser.id, themeMode, accentColor, fontSize, compactMode, ...patch,
+      };
+      appearApi().set(current)
+        .catch((err: unknown) => console.error('[SettingsPage] Failed to save appearance prefs:', err));
+    }
   };
 
-  const toggleQuietHours = () => {
-    setQuietHours(prev => {
-      const next = !prev;
-      try { localStorage.setItem(`${notifKey}_quiet`, String(next)); } catch { /* ignore */ }
-      return next;
+  const toggleNotif = (key: keyof NotifPrefs) => {
+    setNotifications(p => {
+      const updated = { ...p, [key]: !p[key] };
+      if (isMock && currentUser?.id) {
+        try { localStorage.setItem(`pm_notif_${currentUser.id}`, JSON.stringify(updated)); } catch { /* ignore */ }
+      } else if (!isMock && currentUser?.id) {
+        notifPrefsApi().set({ userId: currentUser.id, ...updated })
+          .catch((err: unknown) => console.error('[SettingsPage] Failed to save notif prefs:', err));
+      }
+      return updated;
     });
   };
 
@@ -592,15 +639,15 @@ const SettingsPage: React.FC = () => {
                       {/* Quiet Hours */}
                       <div className="flex items-center justify-between py-3.5">
                         <div className="flex items-center gap-3">
-                          <Moon size={15} className={quietHours ? 'text-primary-400' : 'text-gray-300'} />
+                          <Moon size={15} className={notifications.quietHours ? 'text-primary-400' : 'text-gray-300'} />
                           <div>
                             <div className="text-sm font-medium text-gray-900">Quiet Hours</div>
                             <div className="text-[11px] text-gray-400">
-                              {quietHours ? '10:00 PM – 8:00 AM' : 'All day'}
+                              {notifications.quietHours ? '10:00 PM – 8:00 AM' : 'All day'}
                             </div>
                           </div>
                         </div>
-                        <Toggle on={quietHours} onChange={toggleQuietHours} />
+                        <Toggle on={notifications.quietHours} onChange={() => toggleNotif('quietHours')} />
                       </div>
                     </div>
                   </div>
@@ -681,7 +728,7 @@ const SettingsPage: React.FC = () => {
                         return (
                           <button
                             key={opt.id}
-                            onClick={() => { setThemeMode(opt.id as typeof themeMode); if (opt.id !== 'system') setAppTheme(opt.id as 'light' | 'dark'); }}
+                            onClick={() => { const m = opt.id as typeof themeMode; setThemeMode(m); if (m !== 'system') setAppTheme(m); saveAppearance({ themeMode: m }); }}
                             className={`rounded-xl p-3 flex flex-col gap-2.5 border-2 transition-all ${
                               active
                                 ? 'border-primary-400 bg-primary-50 shadow-[0_0_0_3px_rgba(80,48,229,0.12)]'
@@ -711,7 +758,7 @@ const SettingsPage: React.FC = () => {
                       {ACCENT_COLORS.map(c => (
                         <button
                           key={c.hex}
-                          onClick={() => setAccentColor(c.hex)}
+                          onClick={() => { setAccentColor(c.hex); saveAppearance({ accentColor: c.hex }); }}
                           title={c.label}
                           className="relative w-9 h-9 rounded-full transition-transform hover:scale-110 focus:outline-none"
                           style={{ backgroundColor: c.hex }}
@@ -749,7 +796,7 @@ const SettingsPage: React.FC = () => {
                         {(['sm', 'md', 'lg'] as const).map(size => (
                           <button
                             key={size}
-                            onClick={() => setFontSize(size)}
+                            onClick={() => { setFontSize(size); saveAppearance({ fontSize: size }); }}
                             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                               fontSize === size
                                 ? 'bg-white text-primary-600 shadow-sm'
@@ -768,7 +815,7 @@ const SettingsPage: React.FC = () => {
                         <div className="text-sm font-semibold text-gray-900">Compact Mode</div>
                         <div className="text-xs text-gray-400 mt-0.5">Reduce spacing in lists and cards</div>
                       </div>
-                      <Toggle on={compactMode} onChange={() => setCompactMode(c => !c)} />
+                      <Toggle on={compactMode} onChange={() => { setCompactMode(c => { saveAppearance({ compactMode: !c }); return !c; }); }} />
                     </div>
                   </div>
 

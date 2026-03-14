@@ -19,6 +19,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onUpdateDownloaded: (cb) => { ipcRenderer.on('update:downloaded', cb); return () => ipcRenderer.removeListener('update:downloaded', cb); },
     onUpdateError: (cb) => { ipcRenderer.on('update:error', cb); return () => ipcRenderer.removeListener('update:error', cb); },
 
+    // User preferences (theme, sidebar, week start, walkthrough, view)
+    userPrefs: {
+        get: (userId)  => ipcRenderer.invoke('db:userpref:get', userId),
+        set: (prefs)   => ipcRenderer.invoke('db:userpref:set', prefs),
+    },
+
+    // Notification preferences
+    notifPrefs: {
+        get: (userId)  => ipcRenderer.invoke('db:notifpref:get', userId),
+        set: (prefs)   => ipcRenderer.invoke('db:notifpref:set', prefs),
+    },
+
+    // Appearance preferences
+    appearancePrefs: {
+        get: (userId)  => ipcRenderer.invoke('db:appearancepref:get', userId),
+        set: (prefs)   => ipcRenderer.invoke('db:appearancepref:set', prefs),
+    },
+
     // Auth — credentials stored in MongoDB Atlas
     auth: {
         login:          (email, password)                    => ipcRenderer.invoke('db:auth:login', email, password),

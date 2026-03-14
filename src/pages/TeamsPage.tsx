@@ -11,12 +11,15 @@ import PageHeader from '../components/ui/PageHeader';
 import { Avatar, AvatarGroup } from '../components/ui/Avatar';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
+import { useAuth } from '../context/AuthContext';
 import NewProjectModal from '../components/modals/NewProjectModal';
 import { Project } from '../types';
 
 const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dbApi = () => (window as any).electronAPI.db;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const userPrefsApi = () => (window as any).electronAPI.userPrefs as { get: (uid: string) => Promise<{ projectsView?: 'grid' | 'list' } | null>; set: (p: { userId: string; projectsView: 'grid' | 'list' }) => Promise<void> };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ProjectData {
@@ -431,6 +434,7 @@ const ProjectRow: React.FC<{
 const TeamsPage: React.FC = () => {
   const { projects: contextProjects, allTasks, createProject, updateProject, deleteProject, setActiveProject } = useProjects();
   const { members, getMemberColor } = useMembersContext();
+  const { user: authUser } = useAuth();
   const navigate = useNavigate();
 
   // Merge context projects with local rich display data
@@ -470,8 +474,24 @@ const TeamsPage: React.FC = () => {
   });
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<'grid' | 'list'>('grid');
+  const [view, setViewState] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState<'all' | 'active' | 'on-hold' | 'completed'>('all');
+
+  // Load view preference from MongoDB on mount
+  useEffect(() => {
+    if (isMock || !authUser?.id) return;
+    userPrefsApi().get(authUser.id)
+      .then(prefs => { if (prefs?.projectsView) setViewState(prefs.projectsView); })
+      .catch((err: unknown) => console.error('[TeamsPage] Failed to load view pref:', err));
+  }, [authUser?.id]);
+
+  const setView = (v: 'grid' | 'list') => {
+    setViewState(v);
+    if (!isMock && authUser?.id) {
+      userPrefsApi().set({ userId: authUser.id, projectsView: v })
+        .catch((err: unknown) => console.error('[TeamsPage] Failed to save view pref:', err));
+    }
+  };
   const [search, setSearch] = useState('');
 
   // New context-driven state
