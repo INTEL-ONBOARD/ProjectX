@@ -19,6 +19,7 @@ import { AppProvider, AppContext } from './context/AppContext';
 import { MembersProvider } from './context/MembersContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RolePermsProvider, useRolePerms } from './context/RolePermsContext';
+import { RolesProvider } from './context/RolesContext';
 import BugReportModal from './components/ui/BugReportModal';
 import UpdateBanner from './components/ui/UpdateBanner';
 import { ToastProvider } from './components/ui/Toast';
@@ -36,7 +37,6 @@ const AuthAppSync: React.FC = () => {
         if (authUser) {
             setCurrentUser({
                 id: authUser.id,
-                orgId: 'org-toursurv',
                 name: authUser.name,
                 email: authUser.email,
                 role: authUser.role,
@@ -196,17 +196,19 @@ const App: React.FC = () => (
     <AuthProvider>
         <AppProvider>
             <AuthAppSync />
-            <RolePermsProvider>
-                <MembersProvider>
-                    <ProjectProvider>
-                        <ToastProvider>
-                            <HashRouter>
-                                <Root />
-                            </HashRouter>
-                        </ToastProvider>
-                    </ProjectProvider>
-                </MembersProvider>
-            </RolePermsProvider>
+            <RolesProvider>
+                <RolePermsProvider>
+                    <MembersProvider>
+                        <ProjectProvider>
+                            <ToastProvider>
+                                <HashRouter>
+                                    <Root />
+                                </HashRouter>
+                            </ToastProvider>
+                        </ProjectProvider>
+                    </MembersProvider>
+                </RolePermsProvider>
+            </RolesProvider>
         </AppProvider>
     </AuthProvider>
 );
