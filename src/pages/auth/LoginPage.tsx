@@ -192,21 +192,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
           </button>
         </motion.p>
 
-        {/* Demo credentials */}
-        <motion.div
-          {...fi(6)}
-          className="mt-8 px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 flex items-start gap-3"
-        >
-          <div className="w-6 h-6 rounded-lg bg-primary-100 flex items-center justify-center shrink-0 mt-0.5">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5030E5" strokeWidth="2.5" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-600">Demo credentials</p>
-            <p className="text-xs text-gray-400 mt-0.5">admin@projectm.com · password123</p>
-          </div>
-        </motion.div>
       </FormPanel>
     </div>
   );
