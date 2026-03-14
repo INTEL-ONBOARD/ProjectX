@@ -7,7 +7,7 @@ export interface User {
     avatar?: string;
     email?: string;
     location?: string;
-    role: 'admin' | 'manager' | 'member';
+    role: string;
     designation?: string;
     status?: 'active' | 'inactive';
 }
@@ -19,6 +19,13 @@ export interface TaskComment {
     createdAt: string;
 }
 
+export interface TaskCommentItem {
+    id: string;
+    author: string;
+    text: string;
+    time: string;
+}
+
 export interface Task {
     id: string;
     title: string;
@@ -27,6 +34,7 @@ export interface Task {
     status: TaskStatus;
     assignees: string[];
     comments: number;
+    commentData?: TaskCommentItem[];
     files: number;
     images?: string[];
     dueDate?: string;

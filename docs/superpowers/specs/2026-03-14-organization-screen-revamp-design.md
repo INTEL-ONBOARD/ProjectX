@@ -26,17 +26,10 @@ Four-tab left sidebar nav. **Users, Roles, and Permissions are admin-only — hi
 
 ## Required Type & Schema Changes
 
-### `src/types/index.ts`
+### `src/types/index.ts` ✅ already applied
 ```ts
-// Change User.role from:
-role: 'admin' | 'manager' | 'member';
-// To:
+// User.role — changed to:
 role: string;
-
-// Change User.status from:
-status?: 'active' | 'inactive';
-// To (no change — keep as-is, acceptable union):
-status?: 'active' | 'inactive';
 ```
 
 ### `src/context/AuthContext.tsx`
@@ -118,17 +111,27 @@ deleteRolePerms: (data) => ipcRenderer.invoke('db:roleperms:delete', data),
 
 ## Shared State Architecture
 
-Introduce a `RolesContext` (new context, `src/context/RolesContext.tsx`) that loads and owns:
+### `RolesContext` (new — `src/context/RolesContext.tsx`)
+Owns:
 - `roles: RoleDoc[]` where `RoleDoc = { appId: string; name: string; color: string }`
 - `loadRoles()` — re-fetches from `db:roles:getAll`
+- `addRole(role: RoleDoc)` — appends to local state (called after createRole)
+- `updateRole(appId: string, changes: Partial<RoleDoc>)` — patches local state (called after updateRoleColor)
+- `renameRoleLocal(appId: string, newName: string)` — updates `name` field in local state (called after renameRole IPC succeeds)
+- `removeRole(appId: string)` — removes from local state (called after deleteRole IPC succeeds)
 
-**Timing:** `RolesContext` calls `loadRoles()` on mount. The existing app startup flow calls `authApi().seedDefault()` (which triggers DB connection) before rendering the main app. Role seeding (`db:roles:getAll` check + insert) runs in the same startup hook, so by the time `RolesContext` mounts, the Role collection is guaranteed to be seeded.
+**Timing:** `RolesContext` calls `loadRoles()` on mount. Role seeding happens server-side in the same startup hook as `seedDefault`, so the Role collection is seeded before `RolesContext` mounts.
 
-**Both** the Roles tab and the Permissions tab read from this context, so both always see up-to-date role list regardless of which tab was visited first.
+### `RolePermsContext` (extended — `src/context/RolePermsContext.tsx`)
+Extend the existing context to add:
+- `addRolePerms(entry: RolePerms)` — appends to local `perms` state (called after createRole → setRolePerms)
+- `renameRolePerms(oldName: string, newName: string)` — renames the key in local `perms` state (called after renameRole IPC succeeds)
+- `removeRolePerms(roleName: string)` — removes the entry from local `perms` state (called after deleteRolePerms IPC succeeds)
 
-`RolePermsContext` is extended to dynamically load perms for all roles (not just manager/member). On mount it calls `dbApi().getRolePerms()` which already returns all stored `RolePerms` docs — no IPC change needed.
+These three methods are pure local-state mutations — no additional IPC calls. They keep `RolePermsContext.perms` in sync with the DB operations triggered by `RolesContext` actions.
 
-**Auth users** are loaded once when the Organization page mounts (not scoped to a specific tab), stored in `authUsers` local state of `OrganizationPage`. This ensures the Roles tab has access to member counts without requiring the Users tab to be visited first. After a successful `renameRole`, `authUsers` is re-fetched (call `loadUsers()`) so member chips in Role cards reflect the new role name.
+### `authUsers` page-level state
+Loaded once on `OrganizationPage` mount via `authApi().getAll()`. Stored in local state, available to all tabs. Re-fetched after a successful `renameRole` so member chips and counts stay accurate.
 
 ---
 
@@ -158,7 +161,10 @@ Opens on row click. Closes via backdrop click or X button.
 **Self-guard:** if the row being clicked is the logged-in user (`u.id === authUser.id`), the Role dropdown in the drawer is rendered as a static badge (cannot demote self), matching the existing `RoleDropdown` behaviour.
 
 **Editable fields** (all saved together via "Save" button):
-- Name → `dbApi().updateMember(id, { name })` + `window.electronAPI.auth.updateName(id, name)` (called directly on the preload — `AuthContext` does not expose `updateName`, so reach through `window.electronAPI.auth` from the drawer component). If the renamed user is the logged-in user, also call `AuthContext`'s internal `setUser` to update the in-memory name — extend `AuthContextValue` to expose an `updateDisplayName(name: string) => void` method for this purpose.
+- Name:
+  1. `dbApi().updateMember(id, { name })` — updates the `User` collection
+  2. `window.electronAPI.auth.updateName(id, name)` — updates the `AuthUser` collection (called directly via preload; `AuthContext` does not expose this)
+  3. If the saved user is the logged-in user (`id === authUser.id`): call `AuthContext.updateDisplayName(name)` — see AuthContext changes below. This updates the in-memory `user.name` and rewrites the `pm_auth_session` localStorage token so the name is not stale after page reload.
 - Designation → `dbApi().updateMember(id, { designation })`
 - Location → `dbApi().updateMember(id, { location })`
 - Status toggle (active / inactive) → `dbApi().updateMember(id, { status })`
@@ -202,16 +208,21 @@ Opens on row click. Closes via backdrop click or X button.
 - Shows member count + full coverage bar (admin has all routes)
 
 **All other role cards — editable when expanded:**
-- **Name field:** text input pre-filled with current name. On blur or Enter: if value changed and non-empty → calls `dbApi().renameRole({ appId, newName })` → on success (returns `{ ok: true, oldName }`): update `RolesContext.roles` (replace matching `appId` entry with new name) + update `RolePermsContext.perms` (replace entry with key `oldName` to `newName`) + re-fetch `authUsers` (`loadUsers()`). If name already exists (IPC throws): error toast + revert field to previous name. If blank: revert without saving.
+- **Name field:** text input pre-filled with current name. On blur or Enter: if value changed and non-empty → calls `dbApi().renameRole({ appId, newName })` → on success (returns `{ ok: true, oldName }`):
+  1. `RolesContext.renameRoleLocal(appId, newName)`
+  2. `RolePermsContext.renameRolePerms(oldName, newName)`
+  3. Re-fetch `authUsers` (`loadUsers()`)
+
+  If IPC returns `{ ok: false }` or throws: error toast + revert field to previous name. If blank: revert without saving.
 - **Color picker:** preset swatches from `PROJECT_COLORS`. On swatch click: immediately calls `dbApi().updateRoleColor({ appId, color })` → update `RolesContext` local state. No save button needed.
 - **Members:** avatar + name chips for `authUsers.filter(u => u.role === role.name)`. Display only.
 - **Delete button:**
   - Disabled with tooltip "Reassign all users first" when member count > 0
   - Enabled when count = 0: clicking shows inline confirm ("Delete role [name]? This cannot be undone.") → on confirm:
-    1. `dbApi().deleteRole({ appId })` — deletes Role doc
+    1. `dbApi().deleteRole({ appId })` — deletes Role doc only
     2. On success: `dbApi().deleteRolePerms({ roleName: role.name })` — deletes RolePerms doc
-    3. On success: remove from `RolesContext.roles` + remove from `RolePermsContext.perms` local state → success toast
-    4. If either IPC fails: error toast, role card stays (no partial local state removal)
+    3. On success: `RolesContext.removeRole(appId)` + `RolePermsContext.removeRolePerms(role.name)` → success toast
+    4. If either IPC fails: error toast, role card stays, no local state changes
 
 ### "+ New Role" form (inline, at top of list)
 - Text input for role name + color swatch picker (default: first `PROJECT_COLORS` swatch)
@@ -220,8 +231,8 @@ Opens on row click. Closes via backdrop click or X button.
   1. Validate name is unique (client-side check against `RolesContext.roles`) → show error toast if duplicate, stop
   2. Call `dbApi().createRole({ name, color })` → returns `{ appId, name, color }`
   3. Call `dbApi().setRolePerms({ role: name, allowedRoutes: ['/settings'] })` — using role **name** as the key, matching `RolePermsSchema`
-  4. Add `{ appId, name, color }` to `RolesContext.roles` local state
-  5. Add `{ role: name, allowedRoutes: ['/settings'] }` to `RolePermsContext.perms` local state
+  4. `RolesContext.addRole({ appId, name, color })`
+  5. `RolePermsContext.addRolePerms({ role: name, allowedRoutes: ['/settings'] })`
   6. Collapse creation form, expand newly created role card
 - On failure: error toast, form stays open
 
@@ -272,7 +283,7 @@ When a role is created in Tab 3, `RolesContext.roles` updates reactively → new
 | `PermissionsMatrix` | `src/components/org/PermissionsMatrix.tsx` | Matrix grid |
 | `RolesContext` | `src/context/RolesContext.tsx` | New context for `Role` collection |
 | `RolePermsContext` | `src/context/RolePermsContext.tsx` | Extend: load perms for all roles dynamically |
-| `AuthContext` | `src/context/AuthContext.tsx` | Add `updateDisplayName(name: string): void` to `AuthContextValue` — updates in-memory `user.name` after a name save in the drawer |
+| `AuthContext` | `src/context/AuthContext.tsx` | Add `updateDisplayName(name: string): void` to `AuthContextValue`. Implementation: `setUser(prev => prev ? { ...prev, name } : prev)` + `localStorage.setItem(SESSION_KEY, JSON.stringify({ ...user, name }))`. Called only when editing the logged-in user's own name in the drawer. |
 
 ---
 
