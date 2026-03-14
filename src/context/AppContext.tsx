@@ -95,7 +95,7 @@ export const AppContext = createContext<AppContextType>({
     setSidebarCollapsed: () => { },
     attendanceRecords: [],
     setAttendanceRecord: () => {},
-    selectedWeekStart: '2020-12-14',
+    selectedWeekStart: (() => { const d = new Date(); const day = d.getDay(); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); return d.toISOString().slice(0, 10); })(),
     setSelectedWeekStart: () => {},
 });
 
@@ -105,7 +105,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-    const [selectedWeekStart, setSelectedWeekStart] = useState<string>('2020-12-14');
+    const [selectedWeekStart, setSelectedWeekStart] = useState<string>(() => {
+        const d = new Date();
+        const day = d.getDay();
+        d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+        return d.toISOString().slice(0, 10);
+    });
 
     // Load attendance from MongoDB when running in Electron
     useEffect(() => {
@@ -114,7 +119,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             .then((docs: AttendanceRecord[]) => {
                 if (docs && docs.length > 0) setAttendanceRecords(docs);
             })
-            .catch(console.error);
+            .catch((err: unknown) => console.error('[AppContext] Failed to load attendance records:', err));
     }, []);
 
     const setAttendanceRecord = useCallback((record: Omit<AttendanceRecord, 'id'>) => {
@@ -130,7 +135,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         });
         // Persist to MongoDB
         if (!isMock) {
-            dbApi().setAttendance({ ...record }).catch(console.error);
+            dbApi().setAttendance({ ...record }).catch((err: unknown) => console.error('[AppContext] Failed to persist attendance record:', err));
         }
     }, []);
 

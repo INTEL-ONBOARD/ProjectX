@@ -17,6 +17,8 @@ const ReportsPage: React.FC = () => {
   const todoTasks = allTasks.filter(t => t.status === 'todo');
   const inProgressTasks = allTasks.filter(t => t.status === 'in-progress');
   const completionRate = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
+  const completionTrend = completionRate >= 80 ? '↑ On track' : completionRate >= 50 ? '→ In progress' : completionRate > 0 ? '↓ Needs focus' : 'No tasks yet';
+  const completionTrendUp = completionRate >= 50;
   const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY && t.status !== 'done').length;
 
   const bars = [
@@ -41,7 +43,7 @@ const ReportsPage: React.FC = () => {
   })();
 
   const metrics = [
-    { label: 'Completion Rate', value: `${completionRate}%`, trend: '↓ vs last sprint', trendUp: false, color: '', accent: true, icon: TrendingUp, barPct: completionRate },
+    { label: 'Completion Rate', value: `${completionRate}%`, trend: completionTrend, trendUp: completionTrendUp, color: '', accent: true, icon: TrendingUp, barPct: completionRate },
     { label: 'Total Tasks', value: String(totalTasks), trend: 'All projects', trendUp: true, color: '#5030E5', accent: false, icon: BarChart3, barPct: 100 },
     { label: 'Active Members', value: String(members.length), trend: 'Contributing', trendUp: true, color: '#68B266', accent: false, icon: Users, barPct: 100 },
     { label: 'Overdue', value: String(overdueCount), trend: 'Need attention', trendUp: false, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (overdueCount / totalTasks) * 100 : 0 },

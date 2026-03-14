@@ -52,9 +52,9 @@ const Header: React.FC = () => {
 
     // ── Help items (with toasts instead of alerts) ─────────────────────────────
     const HELP_ITEMS: { icon: HelpIcon; label: string; desc: string; action: () => void }[] = [
-        { icon: 'book',      label: 'Documentation',    desc: 'Guides & references', action: () => showToast('Documentation coming soon', 'info') },
-        { icon: 'play',      label: 'Video Tutorials',  desc: 'Learn by watching',   action: () => showToast('Video tutorials coming soon', 'info') },
-        { icon: 'headphones',label: 'Live Chat Support', desc: 'Talk to the team',   action: () => showToast('Live chat requires backend integration', 'info') },
+        { icon: 'book',      label: 'Documentation',    desc: 'Not available yet',   action: () => showToast('Documentation is not available in this version', 'info') },
+        { icon: 'play',      label: 'Video Tutorials',  desc: 'Not available yet',   action: () => showToast('Video tutorials are not available in this version', 'info') },
+        { icon: 'headphones',label: 'Live Chat Support', desc: 'Not available yet',  action: () => showToast('Live chat is not available in this version', 'info') },
         { icon: 'bug',       label: 'Report a Bug',     desc: 'Something broken?',   action: () => window.dispatchEvent(new CustomEvent('open-bug-report')) },
     ];
 
@@ -71,7 +71,8 @@ const Header: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleMouseDown);
     }, []);
 
-    const unreadCount = 0;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const unreadCount = allTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== 'done').length;
 
     const handleSearchKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -257,8 +258,27 @@ const Header: React.FC = () => {
                             >
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-surface-100">
                                     <span className="text-xs font-bold text-gray-900">Notifications</span>
+                                    {unreadCount > 0 && <span className="text-[10px] font-bold text-[#D8727D] bg-[#D8727D15] px-2 py-0.5 rounded-full">{unreadCount} overdue</span>}
                                 </div>
-                                <div className="px-4 py-6 text-center text-xs text-gray-400">No notifications</div>
+                                {unreadCount === 0 ? (
+                                    <div className="px-4 py-6 text-center text-xs text-gray-400">No notifications</div>
+                                ) : (
+                                    <div className="max-h-60 overflow-y-auto">
+                                        {allTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== 'done').slice(0, 8).map(task => (
+                                            <button
+                                                key={task.id}
+                                                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-surface-50 transition-colors text-left border-b border-surface-100 last:border-0"
+                                                onClick={() => { navigate('/tasks', { state: { search: task.title } }); setIsNotifOpen(false); }}
+                                            >
+                                                <div className="w-2 h-2 rounded-full bg-[#D8727D] shrink-0 mt-1.5" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-semibold text-gray-800 truncate">{task.title}</div>
+                                                    <div className="text-[10px] text-[#D8727D] mt-0.5">Due {task.dueDate}</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>

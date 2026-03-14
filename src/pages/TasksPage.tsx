@@ -87,12 +87,15 @@ const TasksPage: React.FC = () => {
   })();
 
   const sprintPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
+  const TODAY_STR = new Date().toISOString().split('T')[0];
+  const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY_STR && t.status !== 'done').length;
+  const completionPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
   const metrics = [
-    { label: 'Total Tasks', value: String(totalTasks), trend: '↑ 2 this week', trendUp: true, color: '', accent: true, icon: CheckSquare, barPct: 100 },
+    { label: 'Total Tasks', value: String(totalTasks), trend: `${contextProjects.length} project${contextProjects.length !== 1 ? 's' : ''}`, trendUp: true, color: '', accent: true, icon: CheckSquare, barPct: 100 },
     { label: 'In Progress', value: String(inProgCount), trend: 'Active now', trendUp: true, color: '#FFA500', accent: false, icon: Clock, barPct: totalTasks > 0 ? (inProgCount / totalTasks) * 100 : 0 },
-    { label: 'Completed', value: String(doneCount), trend: '↑ 1 today', trendUp: true, color: '#68B266', accent: false, icon: TrendingUp, barPct: totalTasks > 0 ? (doneCount / totalTasks) * 100 : 0 },
-    { label: 'Pending', value: String(todoCount), trend: '2 overdue', trendUp: false, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (todoCount / totalTasks) * 100 : 0 },
+    { label: 'Completed', value: String(doneCount), trend: `${completionPct}% done`, trendUp: true, color: '#68B266', accent: false, icon: TrendingUp, barPct: totalTasks > 0 ? (doneCount / totalTasks) * 100 : 0 },
+    { label: 'Pending', value: String(todoCount), trend: overdueCount > 0 ? `${overdueCount} overdue` : 'On track', trendUp: overdueCount === 0, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (todoCount / totalTasks) * 100 : 0 },
   ];
 
   const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>, cb: (url: string) => void) => {

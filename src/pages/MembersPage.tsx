@@ -41,7 +41,7 @@ const MembersPage: React.FC = () => {
   const onlineCount = members.filter(m => m.status === 'active').length;
 
   const metrics = [
-    { label: 'Total Members', value: String(members.length), trend: '↑ 1 new', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
+    { label: 'Total Members', value: String(members.length), trend: `${members.length} in team`, trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
     { label: 'Admins', value: String(adminCount), trend: `${members.length > 0 ? Math.round((adminCount / members.length) * 100) : 0}%`, trendUp: true, color: '#5030E5', accent: false, icon: Shield, barPct: members.length > 0 ? (adminCount / members.length) * 100 : 0 },
     { label: 'Managers', value: String(managerCount), trend: `${members.length > 0 ? Math.round((managerCount / members.length) * 100) : 0}%`, trendUp: true, color: '#D97706', accent: false, icon: Briefcase, barPct: members.length > 0 ? (managerCount / members.length) * 100 : 0 },
     { label: 'Active Members', value: String(onlineCount), trend: `${onlineCount} online`, trendUp: true, color: '#68B266', accent: false, icon: UserCheck, barPct: members.length > 0 ? (onlineCount / members.length) * 100 : 0 },

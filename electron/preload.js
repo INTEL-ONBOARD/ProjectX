@@ -19,6 +19,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onUpdateDownloaded: (cb) => { ipcRenderer.on('update:downloaded', cb); return () => ipcRenderer.removeListener('update:downloaded', cb); },
     onUpdateError: (cb) => { ipcRenderer.on('update:error', cb); return () => ipcRenderer.removeListener('update:error', cb); },
 
+    // Auth — credentials stored in MongoDB Atlas
+    auth: {
+        login:          (email, password)                    => ipcRenderer.invoke('db:auth:login', email, password),
+        register:       (name, email, password, role)        => ipcRenderer.invoke('db:auth:register', name, email, password, role),
+        updatePassword: (userId, currentPassword, newPassword) => ipcRenderer.invoke('db:auth:updatePassword', userId, currentPassword, newPassword),
+        seedDefault:    ()                                   => ipcRenderer.invoke('db:auth:seedDefault'),
+    },
+
     // Database — all operations go through Electron main → MongoDB Atlas
     db: {
         // Projects
@@ -38,11 +46,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Members
         getMembers: () => ipcRenderer.invoke('db:members:getAll'),
         addMember: (member) => ipcRenderer.invoke('db:members:add', member),
+        updateMember: (id, changes) => ipcRenderer.invoke('db:members:update', id, changes),
         removeMember: (id) => ipcRenderer.invoke('db:members:remove', id),
 
         // Attendance
         getAttendance: () => ipcRenderer.invoke('db:attendance:getAll'),
         setAttendance: (record) => ipcRenderer.invoke('db:attendance:set', record),
         deleteAttendance: (userId, date) => ipcRenderer.invoke('db:attendance:delete', userId, date),
+
+        // Messages
+        getMessagesBetween: (userId, peerId) => ipcRenderer.invoke('db:messages:getBetween', userId, peerId),
+        sendMessage: (msg) => ipcRenderer.invoke('db:messages:send', msg),
+        reactToMessage: (msgId, userId, emoji) => ipcRenderer.invoke('db:messages:react', msgId, userId, emoji),
+        deleteMessage: (msgId) => ipcRenderer.invoke('db:messages:delete', msgId),
+        // Conv meta
+        getConvMeta: (userId) => ipcRenderer.invoke('db:convmeta:getAll', userId),
+        setConvMeta: (meta) => ipcRenderer.invoke('db:convmeta:set', meta),
+
+        // Departments
+        getDepts: () => ipcRenderer.invoke('db:depts:getAll'),
+        createDept: (dept) => ipcRenderer.invoke('db:depts:create', dept),
+        updateDept: (id, changes) => ipcRenderer.invoke('db:depts:update', id, changes),
+        deleteDept: (id) => ipcRenderer.invoke('db:depts:delete', id),
+
+        // Project rich data
+        getProjectRich: () => ipcRenderer.invoke('db:projectrich:getAll'),
+        setProjectRich: (data) => ipcRenderer.invoke('db:projectrich:set', data),
     },
 });

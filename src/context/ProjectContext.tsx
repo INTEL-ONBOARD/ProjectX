@@ -51,7 +51,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setAllTasks(typedTasks);
         setActiveProject(typedProjects[0]?.id ?? '');
       })
-      .catch(console.error)
+      .catch(err => console.error('[ProjectContext] Failed to load projects/tasks:', err))
       .finally(() => setLoading(false));
   }, []);
 

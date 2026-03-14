@@ -32,6 +32,8 @@ const BugReportModal: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    // Log report to console — no external tracker integrated yet
+    console.info('[BugReport]', { type, title: title.trim(), description: description.trim(), timestamp: new Date().toISOString() });
     setSubmitted(true);
     timerRef.current = setTimeout(() => {
       setOpen(false);
@@ -178,7 +180,7 @@ const BugReportModal: React.FC = () => {
 
                       {/* Footer */}
                       <div className="px-6 pb-5 flex items-center justify-between">
-                        <span className="text-[11px] text-gray-400">Your report goes directly to the team</span>
+                        <span className="text-[11px] text-gray-400">Your report will be logged for review</span>
                         <motion.button
                           type="submit"
                           disabled={!title.trim()}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, LayoutGrid, List, Calendar,
@@ -13,6 +13,10 @@ import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import NewProjectModal from '../components/modals/NewProjectModal';
 import { Project } from '../types';
+
+const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dbApi = () => (window as any).electronAPI.db;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ProjectData {
@@ -432,6 +436,17 @@ const TeamsPage: React.FC = () => {
   // Merge context projects with local rich display data
   const [localRichData, setLocalRichData] = useState<Record<string, Partial<ProjectData>>>(initialRichData);
 
+  useEffect(() => {
+    if (isMock) return;
+    dbApi().getProjectRich()
+        .then((docs: Array<{ projectId: string; description: string; status: 'active' | 'on-hold' | 'completed'; priority: 'low' | 'medium' | 'high'; memberIds: string[]; dueDate: string; starred: boolean; category: string }>) => {
+            const richMap: Record<string, Partial<ProjectData>> = {};
+            docs.forEach(d => { richMap[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category }; });
+            setLocalRichData(richMap);
+        })
+        .catch((err: unknown) => console.error('[TeamsPage] Failed to load project rich data:', err));
+  }, []);
+
   // Build membersById lookup for child components
   const membersById = Object.fromEntries(members.map(m => [m.id, m]));
 
@@ -472,11 +487,18 @@ const TeamsPage: React.FC = () => {
     return true;
   });
 
-  const toggleStar = (id: string) =>
+  const toggleStar = (id: string) => {
+    const newStarred = !localRichData[id]?.starred;
     setLocalRichData(prev => ({
       ...prev,
-      [id]: { ...prev[id], starred: !prev[id]?.starred },
+      [id]: { ...prev[id], starred: newStarred },
     }));
+    if (!isMock) {
+      const current = localRichData[id] ?? {};
+      dbApi().setProjectRich({ projectId: id, description: current.description ?? '', status: current.status ?? 'active', priority: current.priority ?? 'medium', memberIds: current.memberIds ?? [], dueDate: current.dueDate ?? '', starred: newStarred, category: current.category ?? 'General' })
+          .catch((err: unknown) => console.error('[TeamsPage] Failed to persist star:', err));
+    }
+  };
 
   const handleDeleteProject = (id: string) => {
     deleteProject(id).catch(console.error);

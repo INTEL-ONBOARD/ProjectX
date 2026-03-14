@@ -61,11 +61,9 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
 
     // Hooks MUST come before any conditional return (Rules of Hooks)
     const today = new Date();
-    // Default to the reference week (Dec 2020) so changes immediately reflect on AttendancePage
-    const REF_DATE = new Date(2020, 11, 3); // Dec 3, 2020
-    const [viewYear, setViewYear] = useState(REF_DATE.getFullYear());
-    const [viewMonth, setViewMonth] = useState(REF_DATE.getMonth());
-    const [selectedDate, setSelectedDate] = useState(toISODate(REF_DATE));
+    const [viewYear, setViewYear] = useState(today.getFullYear());
+    const [viewMonth, setViewMonth] = useState(today.getMonth());
+    const [selectedDate, setSelectedDate] = useState(toISODate(today));
 
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
@@ -105,19 +103,19 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
 
     const toggleBtns: { label: string; status: 'present' | 'absent' | 'wfh'; active: string; inactive: string }[] = [
         {
-            label: 'Clock In',
+            label: 'Present',
             status: 'present',
             active: 'bg-[#68B266] text-white border-[#68B266]',
             inactive: 'border-[#68B266] text-[#68B266] hover:bg-[#68B26610]',
         },
         {
-            label: 'Break',
+            label: 'WFH',
             status: 'wfh',
             active: 'bg-[#FFA500] text-white border-[#FFA500]',
             inactive: 'border-[#FFA500] text-[#FFA500] hover:bg-[#FFA50010]',
         },
         {
-            label: 'Clock Out',
+            label: 'Absent',
             status: 'absent',
             active: 'bg-[#D8727D] text-white border-[#D8727D]',
             inactive: 'border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D10]',

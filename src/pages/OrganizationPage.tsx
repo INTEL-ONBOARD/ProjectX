@@ -1,12 +1,16 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Building2, Users, MapPin, BarChart2, FolderKanban, Code2, Palette, Settings2, SearchCode, X, Plus } from 'lucide-react';
+import { Building2, Users, MapPin, BarChart2, FolderKanban, Code2, Palette, Settings2, SearchCode, X, Plus, ChevronDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AppContext } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
 import { PROJECT_COLORS } from '../data/mockData';
+
+const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dbApi = () => (window as any).electronAPI.db;
 
 const roleStyles: Record<string, { bg: string; text: string }> = {
   admin: { bg: 'bg-primary-50', text: 'text-primary-600' },
@@ -15,11 +19,138 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
 };
 
 interface DeptEntry {
+  id?: string;
   name: string;
   icon: React.ElementType;
   color: string;
   memberIds: string[];
 }
+
+// ── Department Directory ───────────────────────────────────────────────────────
+interface User { id: string; name: string; role: string; designation?: string; }
+
+const DepartmentDirectory: React.FC<{
+  deptRoster: DeptEntry[];
+  members: User[];
+  getMemberColor: (id: string) => string;
+  onAddMember: (idx: number) => void;
+}> = ({ deptRoster, members, getMemberColor, onAddMember }) => {
+  const [expanded, setExpanded] = useState<Record<number, boolean>>(() =>
+    Object.fromEntries(deptRoster.map((_, i) => [i, true]))
+  );
+
+  const toggle = (i: number) => setExpanded(prev => ({ ...prev, [i]: !prev[i] }));
+
+  return (
+    <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100 shrink-0">
+        <h2 className="font-bold text-gray-900 text-sm">Department Directory</h2>
+        <span className="text-xs text-gray-400">{deptRoster.length} departments</span>
+      </div>
+      <div className="overflow-y-auto flex-1 divide-y divide-surface-100">
+        {deptRoster.map((dept, deptIndex) => {
+          const Icon = dept.icon;
+          const deptMembers = dept.memberIds
+            .map(id => members.find(m => m.id === id))
+            .filter((m): m is User => m !== undefined);
+          const isOpen = expanded[deptIndex] ?? true;
+
+          return (
+            <div key={deptIndex}>
+              {/* Dept header row */}
+              <button
+                onClick={() => toggle(deptIndex)}
+                className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-surface-50 transition-colors text-left"
+              >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: dept.color + '18' }}>
+                  <Icon size={15} style={{ color: dept.color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-800 text-sm">{dept.name}</div>
+                  <div className="text-xs text-gray-400">{deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}</div>
+                </div>
+                {/* Stacked avatars preview */}
+                <div className="flex items-center mr-1">
+                  {deptMembers.slice(0, 4).map((m, j) => (
+                    <div key={m.id} className="w-6 h-6 rounded-full border-2 border-white -ml-1.5 first:ml-0 shrink-0 flex items-center justify-center text-[9px] font-bold text-white"
+                      style={{ background: getMemberColor(m.id), zIndex: 10 - j }}>
+                      {m.name.charAt(0).toUpperCase()}
+                    </div>
+                  ))}
+                  {deptMembers.length > 4 && (
+                    <div className="w-6 h-6 rounded-full border-2 border-white -ml-1.5 bg-surface-200 flex items-center justify-center text-[9px] font-bold text-gray-500">
+                      +{deptMembers.length - 4}
+                    </div>
+                  )}
+                </div>
+                <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                  <ChevronDown size={14} className="text-gray-400" />
+                </motion.div>
+              </button>
+
+              {/* Expanded member grid */}
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="px-5 pb-4 pt-1">
+                      {deptMembers.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-5 rounded-xl border border-dashed border-surface-200 gap-1.5">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: dept.color + '12' }}>
+                            <Icon size={14} style={{ color: dept.color }} />
+                          </div>
+                          <p className="text-xs text-gray-400">No members assigned</p>
+                          <button
+                            onClick={e => { e.stopPropagation(); onAddMember(deptIndex); }}
+                            className="text-xs font-semibold px-3 py-1 rounded-lg transition-colors"
+                            style={{ color: dept.color, background: dept.color + '12' }}
+                          >
+                            + Add first member
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {deptMembers.map((m) => {
+                            const role = roleStyles[m.role] ?? roleStyles.member;
+                            return (
+                              <div key={m.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors">
+                                <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-bold text-white"
+                                  style={{ background: getMemberColor(m.id) }}>
+                                  {m.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-semibold text-gray-800 truncate">{m.name}</div>
+                                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md inline-block ${role.bg} ${role.text}`}>
+                                    {m.role.charAt(0).toUpperCase()}{m.role.slice(1)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <button
+                            onClick={e => { e.stopPropagation(); onAddMember(deptIndex); }}
+                            className="flex items-center justify-center gap-1 p-2.5 rounded-xl border border-dashed border-surface-200 hover:border-primary-300 hover:bg-primary-50 text-gray-400 hover:text-primary-500 transition-colors text-xs font-medium"
+                          >
+                            <Plus size={12} /> Add
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const OrganizationPage: React.FC = () => {
   const { currentUser } = useContext(AppContext);
@@ -30,13 +161,25 @@ const OrganizationPage: React.FC = () => {
   const locationCount = new Set(members.map(m => m.location).filter(Boolean)).size || members.length;
   const avgWorkload = members.length > 0 ? (allTasks.length / members.length).toFixed(1) : '0.0';
 
-  const [deptRoster, setDeptRoster] = useState<DeptEntry[]>([
-    { icon: FolderKanban, name: 'Project Management', color: '#5030E5', memberIds: [] },
-    { icon: Code2,        name: 'Frontend',            color: '#30C5E5', memberIds: [] },
-    { icon: Palette,      name: 'Design',               color: '#FFA500', memberIds: [] },
-    { icon: Settings2,    name: 'Backend',              color: '#68B266', memberIds: [] },
-    { icon: SearchCode,   name: 'QA',                   color: '#D8727D', memberIds: [] },
-  ]);
+  const [deptRoster, setDeptRoster] = useState<DeptEntry[]>([]);
+
+  useEffect(() => {
+    if (isMock) {
+        setDeptRoster([
+            { icon: FolderKanban, name: 'Project Management', color: '#5030E5', memberIds: [] },
+            { icon: Code2, name: 'Frontend', color: '#30C5E5', memberIds: [] },
+            { icon: Palette, name: 'Design', color: '#FFA500', memberIds: [] },
+            { icon: Settings2, name: 'Backend', color: '#68B266', memberIds: [] },
+            { icon: SearchCode, name: 'QA', color: '#D8727D', memberIds: [] },
+        ]);
+        return;
+    }
+    dbApi().getDepts()
+        .then((docs: Array<{ id: string; name: string; color: string; memberIds: string[] }>) => {
+            setDeptRoster(docs.map(d => ({ id: d.id, name: d.name, color: d.color, memberIds: d.memberIds, icon: FolderKanban })));
+        })
+        .catch((err: unknown) => console.error('[OrganizationPage] Failed to load departments:', err));
+  }, []);
 
   const metrics = [
     { label: 'Total Members', value: String(members.length), trend: 'In org', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
@@ -99,55 +242,13 @@ const OrganizationPage: React.FC = () => {
 
       {/* Two-column body */}
       <div className="grid grid-cols-[1fr_300px] gap-5 flex-1 min-h-0 pb-6">
-        {/* Main: Org Chart */}
-        <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden overflow-y-auto">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
-            <h2 className="font-bold text-gray-900 text-sm">Org Chart</h2>
-          </div>
-          <div className="p-8">
-            {/* Root node */}
-            <motion.div className="flex justify-center mb-0"
-              initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}>
-              <div className="bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200 rounded-2xl p-5 text-center w-44">
-                <Avatar name={currentUser?.name ?? ''} color={getMemberColor(currentUser?.id ?? '')} size="xl" className="mx-auto" />
-                <div className="font-bold text-gray-900 text-sm mt-2">{currentUser?.name ?? ''}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{currentUser?.designation ?? ''}</div>
-                <span className="bg-primary-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block">Admin</span>
-              </div>
-            </motion.div>
-
-            {/* Connector */}
-            <div className="mx-auto w-px h-10 bg-surface-300" />
-
-            {/* Horizontal line */}
-            <div className="relative h-px bg-surface-300 mx-8 mb-0" />
-
-            {/* Subordinate nodes */}
-            <div className="flex flex-wrap justify-center gap-3 mt-0">
-              {subordinates.map((member, i) => {
-                const color = getMemberColor(member.id);
-                const role = roleStyles[member.role] ?? roleStyles.member;
-                return (
-                  <motion.div
-                    key={member.id}
-                    className="bg-white rounded-xl p-4 text-center w-40 border border-surface-200 hover:border-primary-200 transition-colors"
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: i * 0.06, ease: [0.4, 0, 0.2, 1] }}
-                    whileHover={{ y: -2, transition: { duration: 0.2 } }}
-                  >
-                    <Avatar name={member.name} color={color} size="lg" className="mx-auto" />
-                    <div className="font-semibold text-gray-800 text-xs mt-2">{member.name}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">{member.designation ?? ''}</div>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md mt-1.5 inline-block ${role.bg} ${role.text}`}>
-                      {member.role?.charAt(0).toUpperCase()}{member.role?.slice(1) ?? ''}
-                    </span>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        {/* Main: Department Directory */}
+        <DepartmentDirectory
+          deptRoster={deptRoster}
+          members={members}
+          getMemberColor={getMemberColor}
+          onAddMember={setAddMemberToDept}
+        />
 
         {/* Side panels */}
         <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
@@ -239,6 +340,15 @@ const OrganizationPage: React.FC = () => {
                 onClick={() => {
                   if (!newDeptName.trim()) return;
                   setDeptRoster(prev => [...prev, { icon: FolderKanban, name: newDeptName.trim(), color: newDeptColor, memberIds: [] }]);
+                  if (!isMock) {
+                    dbApi().createDept({ name: newDeptName.trim(), color: newDeptColor, memberIds: [] })
+                        .then((d: { id: string; name: string; color: string; memberIds: string[] }) => {
+                            setDeptRoster(prev => prev.map(dept =>
+                                dept.name === newDeptName.trim() && dept.color === newDeptColor ? { ...dept, id: d.id } : dept
+                            ));
+                        })
+                        .catch((err: unknown) => console.error('[OrganizationPage] Failed to create department:', err));
+                  }
                   setNewDeptName('');
                   setNewDeptColor(PROJECT_COLORS[0]);
                   setShowAddDept(false);
@@ -277,6 +387,11 @@ const OrganizationPage: React.FC = () => {
                     setDeptRoster(prev => prev.map((d, i) =>
                       i === addMemberToDept ? { ...d, memberIds: [...d.memberIds, m.id] } : d
                     ));
+                    const updatedDept = deptRoster[addMemberToDept!];
+                    if (!isMock && updatedDept?.id) {
+                        dbApi().updateDept(updatedDept.id, { memberIds: [...updatedDept.memberIds, m.id] })
+                            .catch((err: unknown) => console.error('[OrganizationPage] Failed to update department:', err));
+                    }
                     setAddMemberToDept(null);
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-50 transition-colors"

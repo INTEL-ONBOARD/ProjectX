@@ -55,11 +55,15 @@ const AttendancePage: React.FC = () => {
         members.filter(m => isPresent(getMemberStatus(m.id, date))).length
     );
 
+    const daysWithData = WEEK_DATES.filter(date =>
+        members.some(m => getMemberStatus(m.id, date) !== undefined)
+    ).length;
+
     const metrics = [
         { label: 'Team Avg Rate', value: `${avgRate}%`, trend: 'This week', trendUp: true, color: '', accent: true, icon: TrendingUp, barPct: avgRate },
         { label: 'Perfect Attendance', value: String(perfectCount), trend: '100% rate', trendUp: true, color: '#68B266', accent: false, icon: CheckCircle, barPct: members.length > 0 ? (perfectCount / members.length) * 100 : 0 },
         { label: 'One Absence', value: String(members.length - perfectCount), trend: '80% rate', trendUp: false, color: '#D58D49', accent: false, icon: AlertCircle, barPct: members.length > 0 ? ((members.length - perfectCount) / members.length) * 100 : 0 },
-        { label: 'Days Tracked', value: '5', trend: 'Mon–Fri', trendUp: true, color: '#30C5E5', accent: false, icon: Calendar, barPct: 100 },
+        { label: 'Days Tracked', value: String(daysWithData), trend: 'Mon–Fri', trendUp: true, color: '#30C5E5', accent: false, icon: Calendar, barPct: (daysWithData / 5) * 100 },
     ];
 
     const handleExport = () => {

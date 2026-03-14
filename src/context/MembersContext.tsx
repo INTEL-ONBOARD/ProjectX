@@ -11,6 +11,7 @@ interface MembersContextValue {
   members: User[];
   getMemberColor: (id: string) => string;
   addMember: (member: Omit<User, 'id'>) => Promise<void>;
+  updateMember: (id: string, changes: Partial<Omit<User, 'id'>>) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
 }
 
@@ -29,7 +30,7 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (isMock) return;
     api().getMembers()
       .then((docs: User[]) => setMembers(docs))
-      .catch(console.error);
+      .catch((err: unknown) => console.error('[MembersContext] Failed to load members:', err));
   }, []);
 
   const getMemberColor = (id: string): string => {
@@ -48,6 +49,15 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMembers(prev => [...prev, newMember]);
   };
 
+  const updateMember = async (id: string, changes: Partial<Omit<User, 'id'>>) => {
+    if (isMock) {
+      setMembers(prev => prev.map(m => m.id === id ? { ...m, ...changes } : m));
+      return;
+    }
+    await api().updateMember(id, changes);
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, ...changes } : m));
+  };
+
   const removeMember = async (id: string) => {
     if (isMock) {
       setMembers(prev => prev.filter(m => m.id !== id));
@@ -58,7 +68,7 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   return (
-    <MembersContext.Provider value={{ members, getMemberColor, addMember, removeMember }}>
+    <MembersContext.Provider value={{ members, getMemberColor, addMember, updateMember, removeMember }}>
       {children}
     </MembersContext.Provider>
   );

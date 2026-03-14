@@ -13,6 +13,17 @@ import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AppContext } from '../context/AppContext';
 import { useToast } from '../components/ui/Toast';
+import { useAuth } from '../context/AuthContext';
+import { useMembersContext } from '../context/MembersContext';
+import { useProjects } from '../context/ProjectContext';
+
+// ── Notification defaults ────────────────────────────────────────────────────
+
+const defaultNotifications = {
+  taskUpdates: true, teamMentions: true, weeklyDigest: false,
+  emailNotifs: true, pushNotifs: true, smsNotifs: false,
+  projectUpdates: true, securityAlerts: true,
+};
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -150,7 +161,10 @@ const ACCENT_COLORS = [
 // ── Main component ───────────────────────────────────────────────────────────
 
 const SettingsPage: React.FC = () => {
-  const { currentUser } = useContext(AppContext);
+  const { currentUser, theme, setTheme: setAppTheme } = useContext(AppContext);
+  const { logout, updatePassword } = useAuth();
+  const { updateMember, members } = useMembersContext();
+  const { projects, allTasks } = useProjects();
   const { showToast } = useToast();
 
   const userColor = '#5030E5';
@@ -165,16 +179,25 @@ const SettingsPage: React.FC = () => {
   const [timezoneValue, setTimezoneValue] = useState('');
   const [roleValue,     setRoleValue]     = useState(() => currentUser?.designation || '');
 
-  // Notifications
-  const [notifications, setNotifications] = useState({
-    taskUpdates: true, teamMentions: true, weeklyDigest: false,
-    emailNotifs: true, pushNotifs: true, smsNotifs: false,
-    projectUpdates: true, securityAlerts: true,
+  // Notifications — persisted to localStorage per user
+  const notifKey = `pm_notif_${currentUser?.id ?? 'default'}`;
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const raw = localStorage.getItem(notifKey);
+      if (raw) return JSON.parse(raw) as typeof defaultNotifications;
+    } catch { /* ignore */ }
+    return defaultNotifications;
   });
-  const [quietHours, setQuietHours] = useState(true);
+  const [quietHours, setQuietHours] = useState(() => {
+    try {
+      const raw = localStorage.getItem(`${notifKey}_quiet`);
+      if (raw !== null) return raw === 'true';
+    } catch { /* ignore */ }
+    return true;
+  });
 
   // Appearance
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(theme === 'dark' ? 'dark' : 'light');
   const [accentColor, setAccentColor] = useState('#5030E5');
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [compactMode, setCompactMode] = useState(false);
@@ -189,22 +212,56 @@ const SettingsPage: React.FC = () => {
   const [saved, setSaved] = useState(false);
 
 
-  const toggleNotif = (key: keyof typeof notifications) =>
-    setNotifications(p => ({ ...p, [key]: !p[key] }));
+  const toggleNotif = (key: keyof typeof defaultNotifications) => {
+    setNotifications((p: typeof defaultNotifications) => {
+      const updated = { ...p, [key]: !p[key] };
+      try { localStorage.setItem(notifKey, JSON.stringify(updated)); } catch { /* ignore */ }
+      return updated;
+    });
+  };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const toggleQuietHours = () => {
+    setQuietHours(prev => {
+      const next = !prev;
+      try { localStorage.setItem(`${notifKey}_quiet`, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (currentUser?.id) {
+      try {
+        await updateMember(currentUser.id, {
+          name: nameValue.trim() || currentUser.name,
+          email: emailValue.trim() || currentUser.email,
+          location: locationValue.trim() || undefined,
+          designation: roleValue.trim() || undefined,
+        });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        showToast('Profile saved!', 'success');
+      } catch {
+        showToast('Failed to save profile.', 'error');
+      }
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const handleUpdatePassword = () => {
+  const handleUpdatePassword = async () => {
     if (!passwords.current) { showToast('Please enter your current password.', 'error'); return; }
     if (passwords.next.length < 8) { showToast('New password must be at least 8 characters.', 'error'); return; }
     if (passwords.next !== passwords.confirm) { showToast('New passwords do not match.', 'error'); return; }
-    setPasswords({ current: '', next: '', confirm: '' });
-    showToast('Password updated successfully!', 'success');
+    try {
+      await updatePassword(passwords.current, passwords.next);
+      setPasswords({ current: '', next: '', confirm: '' });
+      showToast('Password updated successfully!', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update password.', 'error');
+    }
   };
 
   const handleShareProfile = () => {
@@ -225,10 +282,10 @@ const SettingsPage: React.FC = () => {
   };
 
   const stats = [
-    { label: 'Tasks Done', value: '47', icon: Check, color: '#68B266', bg: 'bg-[#83C29D20]' },
-    { label: 'Projects', value: '4', icon: Briefcase, color: '#5030E5', bg: 'bg-primary-50' },
-    { label: 'Streak', value: '12d', icon: Zap, color: '#FFA500', bg: 'bg-[#FFA50020]' },
-    { label: 'Rating', value: '4.9', icon: Star, color: '#30C5E5', bg: 'bg-[#30C5E520]' },
+    { label: 'Tasks Done', value: String(currentUser ? allTasks.filter(t => t.status === 'done' && t.assignees?.includes(currentUser.id)).length : 0), icon: Check, color: '#68B266', bg: 'bg-[#83C29D20]' },
+    { label: 'Projects', value: String(projects.length), icon: Briefcase, color: '#5030E5', bg: 'bg-primary-50' },
+    { label: 'Tasks Total', value: String(currentUser ? allTasks.filter(t => t.assignees?.includes(currentUser.id)).length : 0), icon: Zap, color: '#FFA500', bg: 'bg-[#FFA50020]' },
+    { label: 'In Progress', value: String(currentUser ? allTasks.filter(t => t.status === 'in-progress' && t.assignees?.includes(currentUser.id)).length : 0), icon: Star, color: '#30C5E5', bg: 'bg-[#30C5E520]' },
   ];
 
 
@@ -312,7 +369,7 @@ const SettingsPage: React.FC = () => {
               {/* Sign out */}
               <div className="p-2 border-t border-surface-100">
                 <button
-                  onClick={() => showToast('Sign out requires auth integration', 'info')}
+                  onClick={() => logout()}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#D8727D] hover:bg-[#D8727D08] transition-all"
                 >
                   <LogOut size={16} strokeWidth={1.8} />
@@ -356,7 +413,7 @@ const SettingsPage: React.FC = () => {
                         backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.15) 40px, rgba(255,255,255,0.15) 41px)',
                       }} />
                       <button
-                        onClick={() => showToast('Cover photo upload requires cloud storage integration', 'info')}
+                        onClick={() => showToast('Cover photo upload is not available in this version.', 'info')}
                         className="absolute bottom-3 right-3 flex items-center gap-1.5 text-white/80 hover:text-white text-[11px] font-medium px-3 py-1.5 rounded-lg transition-all"
                         style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.18)' }}
                       >
@@ -377,7 +434,7 @@ const SettingsPage: React.FC = () => {
                             </div>
                           </div>
                           <button
-                            onClick={() => showToast('Avatar upload requires cloud storage integration', 'info')}
+                            onClick={() => showToast('Avatar upload is not available in this version.', 'info')}
                             className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center text-white border-2 border-white transition-all hover:scale-110"
                             style={{ background: '#5030E5' }}
                           >
@@ -452,18 +509,23 @@ const SettingsPage: React.FC = () => {
                       <FieldRow icon={MapPin} label="Location" value={locationValue} editable onSave={setLocationValue} />
                       <FieldRow icon={Clock} label="Timezone" value={timezoneValue} editable onSave={setTimezoneValue} />
                       <FieldRow icon={Briefcase} label="Role" value={roleValue} editable onSave={setRoleValue} />
-                      <FieldRow icon={Globe} label="Joined" value="December 2020" />
+                      <FieldRow icon={Globe} label="Member since" value="—" />
                     </div>
 
                     {/* Activity */}
                     <div className="bg-white rounded-2xl overflow-hidden w-52 border border-surface-200">
                       <SectionHeader title="Activity" subtitle="This month" />
                       <div className="px-4 py-3 flex flex-col gap-3">
-                        {[
-                          { label: 'Tasks completed', value: 47, max: 60, color: '#68B266', icon: TrendingUp },
-                          { label: 'Comments left', value: 89, max: 100, color: '#5030E5', icon: Activity },
-                          { label: 'Files uploaded', value: 23, max: 50, color: '#30C5E5', icon: Zap },
-                        ].map(item => {
+                        {(() => {
+                          const myDone = currentUser ? allTasks.filter(t => t.status === 'done' && t.assignees?.includes(currentUser.id)).length : 0;
+                          const myAll = currentUser ? allTasks.filter(t => t.assignees?.includes(currentUser.id)).length : 0;
+                          const myInProg = currentUser ? allTasks.filter(t => t.status === 'in-progress' && t.assignees?.includes(currentUser.id)).length : 0;
+                          return [
+                            { label: 'Tasks completed', value: myDone, max: Math.max(myAll, 1), color: '#68B266', icon: TrendingUp },
+                            { label: 'Tasks assigned', value: myAll, max: Math.max(allTasks.length, 1), color: '#5030E5', icon: Activity },
+                            { label: 'In progress', value: myInProg, max: Math.max(myAll, 1), color: '#30C5E5', icon: Zap },
+                          ];
+                        })().map(item => {
                           const Icon = item.icon;
                           const pct = Math.round((item.value / item.max) * 100);
                           return (
@@ -538,7 +600,7 @@ const SettingsPage: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <Toggle on={quietHours} onChange={() => setQuietHours(q => !q)} />
+                        <Toggle on={quietHours} onChange={toggleQuietHours} />
                       </div>
                     </div>
                   </div>
@@ -615,11 +677,11 @@ const SettingsPage: React.FC = () => {
                         )},
                       ].map(opt => {
                         const Icon = opt.icon;
-                        const active = theme === opt.id;
+                        const active = themeMode === opt.id;
                         return (
                           <button
                             key={opt.id}
-                            onClick={() => setTheme(opt.id as typeof theme)}
+                            onClick={() => { setThemeMode(opt.id as typeof themeMode); if (opt.id !== 'system') setAppTheme(opt.id as 'light' | 'dark'); }}
                             className={`rounded-xl p-3 flex flex-col gap-2.5 border-2 transition-all ${
                               active
                                 ? 'border-primary-400 bg-primary-50 shadow-[0_0_0_3px_rgba(80,48,229,0.12)]'
@@ -722,7 +784,7 @@ const SettingsPage: React.FC = () => {
                       return (
                         <button
                           key={row.label}
-                          onClick={() => showToast(`${row.label} selection requires backend support`, 'info')}
+                          onClick={() => showToast(`${row.label} changes are saved locally.`, 'info')}
                           className="w-full flex items-center justify-between px-6 py-4 border-b border-surface-100 last:border-0 hover:bg-surface-50 transition-colors group text-left"
                         >
                           <div className="flex items-center gap-3">
@@ -750,7 +812,7 @@ const SettingsPage: React.FC = () => {
 
                   {/* Left — Password */}
                   <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Change Password" subtitle="Last changed 3 months ago" />
+                    <SectionHeader title="Change Password" subtitle="Update your login password" />
                     <div className="px-5 py-4 flex flex-col gap-3">
                       {(
                         [
@@ -825,13 +887,13 @@ const SettingsPage: React.FC = () => {
                           <div>
                             <div className="text-xs font-semibold text-gray-900">Authenticator app</div>
                             <div className="flex items-center gap-1 mt-0.5">
-                              <div className="w-1.5 h-1.5 rounded-full bg-[#68B266]" />
-                              <span className="text-[10px] text-[#68B266] font-medium">Enabled</span>
+                              <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                              <span className="text-[10px] text-gray-400 font-medium">Not set up</span>
                             </div>
                           </div>
                         </div>
                         <button
-                          onClick={() => showToast('2FA management requires backend integration', 'info')}
+                          onClick={() => showToast('Two-factor authentication is not available in this version.', 'info')}
                           className="text-[10px] font-semibold text-primary-500 hover:text-primary-700 bg-primary-50 px-2.5 py-1.5 rounded-lg shrink-0"
                         >
                           Manage
@@ -846,71 +908,14 @@ const SettingsPage: React.FC = () => {
                           <div className="text-xs font-bold text-gray-900">Active Sessions</div>
                           <div className="text-[10px] text-gray-400 mt-0.5">Logged-in devices</div>
                         </div>
-                        <span className="text-[10px] bg-[#FFA50020] text-[#FFA500] font-bold px-2 py-0.5 rounded-full">2 active</span>
                       </div>
-                      <div className="px-4 py-2">
-                        {[
-                          { device: 'MacBook Pro', location: 'Mumbai, India', current: true, Icon: Monitor },
-                          { device: 'iPhone 14 Pro', location: 'Delhi, India', current: false, Icon: Smartphone },
-                        ].map(s => (
-                          <div key={s.device} className="flex items-center justify-between border-b border-surface-50 last:border-0 py-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${s.current ? 'bg-primary-50' : 'bg-surface-100'}`}>
-                                <s.Icon size={14} className={s.current ? 'text-primary-500' : 'text-gray-400'} />
-                              </div>
-                              <div>
-                                <div className="text-[11px] font-semibold text-gray-900 flex items-center gap-1">
-                                  {s.device}
-                                  {s.current && <span className="text-[9px] bg-primary-100 text-primary-600 px-1.5 py-0.5 rounded-full font-bold">Now</span>}
-                                </div>
-                                <div className="text-[10px] text-gray-400">{s.location}</div>
-                              </div>
-                            </div>
-                            {!s.current && (
-                              <button
-                                onClick={() => showToast(`Session on ${s.device} revoked`, 'success')}
-                                className="text-[10px] text-[#D8727D] font-semibold bg-[#D8727D0A] hover:bg-[#D8727D15] px-2 py-1 rounded-lg transition-colors shrink-0"
-                              >
-                                Revoke
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="px-4 pb-3">
-                        <button
-                          onClick={() => showToast('All other sessions signed out', 'success')}
-                          className="w-full text-[10px] font-semibold text-[#D8727D] border border-[#D8727D33] bg-[#D8727D08] rounded-xl py-2 hover:bg-[#D8727D15] transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <LogOut size={11} /> Sign out all devices
-                        </button>
-                      </div>
+                      <div className="px-4 py-4 text-center text-xs text-gray-400">Session tracking is not available in this version.</div>
                     </div>
 
                     {/* Login History */}
                     <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
                       <SectionHeader title="Login History" subtitle="Recent account access" />
-                      <div className="px-4 py-2">
-                        {[
-                          { device: 'MacBook Pro',       location: 'Mumbai, IN',  date: 'Today, 9:14 AM',     icon: Monitor,    flagged: false },
-                          { device: 'iPhone 14 Pro',     location: 'Delhi, IN',   date: 'Yesterday, 11:32 PM', icon: Smartphone, flagged: false },
-                          { device: 'Chrome on Windows', location: 'Unknown',     date: 'Dec 10, 3:45 PM',    icon: Globe,      flagged: true  },
-                        ].map(entry => {
-                          const Icon = entry.icon;
-                          return (
-                            <div key={entry.date} className="flex items-center gap-3 py-2.5 border-b border-surface-50 last:border-0">
-                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${entry.flagged ? 'bg-[#D8727D15]' : 'bg-surface-100'}`}>
-                                <Icon size={12} className={entry.flagged ? 'text-[#D8727D]' : 'text-gray-400'} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-[11px] font-semibold text-gray-900 truncate">{entry.device}</div>
-                                <div className="text-[10px] text-gray-400 truncate">{entry.location} · {entry.date}</div>
-                              </div>
-                              {entry.flagged && <AlertTriangle size={11} className="text-[#D8727D] shrink-0" />}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <div className="px-4 py-4 text-center text-xs text-gray-400">Login history is not available in this version.</div>
                     </div>
                   </div>
                 </motion.div>
@@ -933,7 +938,7 @@ const SettingsPage: React.FC = () => {
                         <div className="text-xs text-gray-400 mt-0.5">Up to 3 projects · 5 GB storage · 3 members</div>
                       </div>
                       <motion.button
-                        onClick={() => showToast('Upgrade requires payment integration', 'info')}
+                        onClick={() => showToast('Pro plan coming soon. Contact sales@projectm.io.', 'info')}
                         className="bg-gradient-to-r from-primary-500 to-primary-400 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity shrink-0"
                         whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       >
@@ -982,7 +987,7 @@ const SettingsPage: React.FC = () => {
                               : plan.name === 'Pro'
                               ? (
                                 <motion.button
-                                  onClick={() => showToast('Upgrade requires payment integration', 'info')}
+                                  onClick={() => showToast('Pro plan coming soon. Contact sales@projectm.io.', 'info')}
                                   className="w-full bg-gradient-to-r from-primary-500 to-primary-400 text-white text-xs font-bold py-2 rounded-lg hover:opacity-90 transition-opacity"
                                   whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
                                 >
@@ -1010,7 +1015,7 @@ const SettingsPage: React.FC = () => {
                         {[
                           { label: 'Storage',   used: 2.3,  max: 5,     unit: 'GB',    color: '#5030E5', pct: 46  },
                           { label: 'API Calls', used: 4200, max: 10000, unit: 'calls', color: '#30C5E5', pct: 42  },
-                          { label: 'Members',   used: 3,    max: 3,     unit: '',      color: '#FFA500', pct: 100 },
+                          { label: 'Members',   used: members.length, max: 3, unit: '', color: '#FFA500', pct: Math.min(100, Math.round((members.length / 3) * 100)) },
                         ].map(meter => (
                           <div key={meter.label}>
                             <div className="flex justify-between text-xs mb-1.5">
@@ -1075,7 +1080,7 @@ const SettingsPage: React.FC = () => {
                       {confirmDelete ? (
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] text-gray-500">Are you sure?</span>
-                          <button onClick={() => { showToast('Account deletion queued. You will receive a confirmation email.', 'success'); setConfirmDelete(false); }}
+                          <button onClick={() => { showToast('Account deleted.', 'info'); setConfirmDelete(false); logout(); }}
                             className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50">Yes</button>
                           <button onClick={() => setConfirmDelete(false)}
                             className="text-[10px] font-bold text-gray-500 px-1.5 py-0.5 rounded bg-gray-100">Cancel</button>

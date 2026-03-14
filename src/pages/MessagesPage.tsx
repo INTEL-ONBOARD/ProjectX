@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Send, Search, Phone, Video, MoreVertical, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X, MessageSquare } from 'lucide-react';
+import { Plus, Send, Search, Phone, Video, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X, MessageSquare } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AppContext } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useToast } from '../components/ui/Toast';
+import { useAuth } from '../context/AuthContext';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
@@ -19,6 +20,11 @@ const MessagesPage: React.FC = () => {
   const { currentUser } = useContext(AppContext);
   const myId = currentUser?.id ?? '';
   const { showToast } = useToast();
+  const { user: authUser } = useAuth();
+  const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dbApi = () => (window as any).electronAPI.db;
+  const currentUserId = authUser?.id ?? 'local-user';
   const [activeId, setActiveId] = useState('');
   const [chats, setChats] = useState<Record<string, Msg[]>>({});
   const [input, setInput] = useState('');
@@ -28,7 +34,7 @@ const MessagesPage: React.FC = () => {
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
-  const [openedIds, setOpenedIds] = useState<Set<string>>(new Set(['u2']));
+  const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
   const [msgFilter, setMsgFilter] = useState<'all' | 'unread' | 'pinned'>('all');
   const [showCallBanner, setShowCallBanner] = useState(false);
   const [showNewConvo, setShowNewConvo] = useState(false);
@@ -47,7 +53,7 @@ const MessagesPage: React.FC = () => {
       setActiveId(memberId);
       setChats(prev => ({ [memberId]: [], ...prev }));
     }
-  }, []);
+  }, [location.state]);
 
   const activeMember = members.find(m => m.id === activeId) ?? members[0] ?? null;
   const activeColor = getMemberColor(activeId);
@@ -66,6 +72,34 @@ const MessagesPage: React.FC = () => {
     }));
   }, [activeId]);
 
+  // Load messages from DB when active peer changes
+  useEffect(() => {
+    if (isMock || !activeMember) return;
+    dbApi().getMessagesBetween(currentUserId, activeMember.id)
+        .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [activeMember.id]: msgs })))
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
+  }, [activeMember?.id, isMock, currentUserId]);
+
+  // Load conv meta (pin/star/archive) on mount
+  useEffect(() => {
+    if (isMock) return;
+    dbApi().getConvMeta(currentUserId)
+        .then((metas: Array<{ peerId: string; pinned: boolean; starred: boolean; archived: boolean }>) => {
+            const pinned: string[] = [];
+            const starred: string[] = [];
+            const archived = new Set<string>();
+            metas.forEach(m => {
+                if (m.pinned) pinned.push(m.peerId);
+                if (m.starred) starred.push(m.peerId);
+                if (m.archived) archived.add(m.peerId);
+            });
+            setPinnedIds(pinned);
+            setStarredIds(starred);
+            setArchivedIds(archived);
+        })
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to load conv meta:', err));
+  }, [isMock, currentUserId]);
+
   const totalUnread = conversations.reduce((sum, m) => {
     const msgs = chats[m.id] ?? [];
     return sum + msgs.filter(msg => !msg.read && msg.from !== myId).length;
@@ -82,6 +116,10 @@ const MessagesPage: React.FC = () => {
       read: false,
     };
     setChats(prev => ({ ...prev, [activeId]: [...(prev[activeId] ?? []), newMsg] }));
+    if (!isMock) {
+        dbApi().sendMessage({ fromId: currentUserId, toId: activeMember!.id, text: input.trim(), timestamp: newMsg.time })
+            .catch((err: unknown) => console.error('[MessagesPage] Failed to send message:', err));
+    }
     setInput('');
     inputRef.current?.focus();
   };
@@ -153,11 +191,10 @@ const MessagesPage: React.FC = () => {
               {callType === 'video' ? <Video size={16} className="text-white" /> : <Phone size={16} className="text-white" />}
             </div>
             <div className="flex-1">
-              <div className="text-white font-semibold text-sm">Calling {activeMember.name} via {callType === 'video' ? 'Video' : 'Phone'}…</div>
-              <div className="text-white/70 text-xs">{callType === 'video' ? 'Video' : 'Voice'} call · Ringing…</div>
+              <div className="text-white font-semibold text-sm">{callType === 'video' ? 'Video' : 'Voice'} call not available</div>
+              <div className="text-white/70 text-xs">Calls require a WebRTC backend</div>
             </div>
-            <button onClick={() => setShowCallBanner(false)} className="bg-[#D8727D] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#c25f6b] transition-colors">Decline</button>
-            <button onClick={() => { setShowCallBanner(false); showToast('Joining call… (WebRTC backend required)', 'info'); }} className="bg-[#68B266] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#55a053] transition-colors">Accept</button>
+            <button onClick={() => setShowCallBanner(false)} className="bg-[#D8727D] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#c25f6b] transition-colors">Dismiss</button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -245,7 +282,7 @@ const MessagesPage: React.FC = () => {
               const isActive = member.id === activeId;
               const isPinned = pinnedIds.includes(member.id);
               const isStarred = starredIds.includes(member.id);
-              const status = 'online';
+              const status: 'online' | 'offline' = member.status === 'active' ? 'online' : 'offline';
               return (
                 <motion.button
                   key={member.id}
@@ -286,11 +323,11 @@ const MessagesPage: React.FC = () => {
           <div className="flex items-center gap-3 px-5 py-3.5 border-b border-surface-100 shrink-0">
             <div className="relative">
               <Avatar name={activeMember.name} color={activeColor} size="md" />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor['online'] }} />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[activeMember.status === 'active' ? 'online' : 'offline'] }} />
             </div>
             <div className="flex-1">
               <div className="font-bold text-sm text-gray-900">{activeMember.name}</div>
-              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor['online'] }}>{statusLabel['online']}</span></div>
+              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor[activeMember.status === 'active' ? 'online' : 'offline'] }}>{statusLabel[activeMember.status === 'active' ? 'online' : 'offline']}</span></div>
             </div>
             {/* Action icons */}
             <div className="flex items-center gap-1">
@@ -311,7 +348,7 @@ const MessagesPage: React.FC = () => {
                 <Video size={16} />
               </motion.button>
               <motion.button
-                onClick={e => { e.stopPropagation(); setPinnedIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); }}
+                onClick={e => { e.stopPropagation(); setPinnedIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (!isMock && activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: !pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${pinnedIds.includes(activeId) ? 'text-primary-500 bg-primary-50' : 'text-gray-400 hover:bg-surface-100'}`}
                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
                 title="Pin conversation"
@@ -319,20 +356,14 @@ const MessagesPage: React.FC = () => {
                 <Pin size={16} />
               </motion.button>
               <motion.button
-                onClick={e => { e.stopPropagation(); setStarredIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); }}
+                onClick={e => { e.stopPropagation(); setStarredIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (!isMock && activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: !starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${starredIds.includes(activeId) ? 'text-[#FFA500] bg-[#FFA50015]' : 'text-gray-400 hover:bg-surface-100'}`}
                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
                 title="Star conversation"
               >
                 <Star size={16} fill={starredIds.includes(activeId) ? '#FFA500' : 'none'} />
               </motion.button>
-              <motion.button
-                onClick={e => { e.stopPropagation(); showToast('More options coming soon', 'info'); }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 transition-colors"
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
-              >
-                <MoreVertical size={16} />
-              </motion.button>
+
             </div>
           </div>
 
@@ -447,9 +478,21 @@ const MessagesPage: React.FC = () => {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
               />
-              <button onClick={() => showToast('Emoji picker coming soon', 'info')} className="text-gray-400 hover:text-primary-500 transition-colors shrink-0">
-                <Smile size={16} />
-              </button>
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setShowEmojiPicker(p => p === 'input' ? null : 'input')}
+                  className="text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  <Smile size={16} />
+                </button>
+                {showEmojiPicker === 'input' && (
+                  <div className="absolute bottom-full mb-1 right-0 bg-white rounded-xl shadow-lg border border-surface-100 flex gap-1 px-2 py-1.5 z-10">
+                    {emojis.map(e => (
+                      <button key={e} onClick={() => { setInput(p => p + e); setShowEmojiPicker(null); inputRef.current?.focus(); }} className="text-base hover:scale-125 transition-transform">{e}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <motion.button
                 onClick={sendMessage}
                 disabled={!input.trim()}
@@ -484,7 +527,7 @@ const MessagesPage: React.FC = () => {
             {[
               { icon: Phone, label: 'Voice Call', action: () => { setCallType('phone'); setShowCallBanner(true); } },
               { icon: Video, label: 'Video Call', action: () => { setCallType('video'); setShowCallBanner(true); } },
-              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); return next; }); } },
+              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); if (!isMock && activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
               { icon: Trash2, label: 'Clear Chat', action: () => setChats(p => ({ ...p, [activeId]: [] })) },
             ].map(({ icon: Icon, label, action }) => (
               <button
