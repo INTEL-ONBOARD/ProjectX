@@ -264,6 +264,11 @@ function registerDbHandlers() {
         return true;
     });
 
+    ipcMain.handle('db:auth:updateName', async (_e, userId, newName) => {
+        await AuthUserModel.findOneAndUpdate({ appId: userId }, { name: newName });
+        return true;
+    });
+
     ipcMain.handle('db:auth:seedDefault', async () => {
         const existing = await AuthUserModel.findOne({ email: 'admin@projectm.com' }).lean();
         if (!existing) {

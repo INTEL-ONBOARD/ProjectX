@@ -132,11 +132,19 @@ const MessagesPage: React.FC = () => {
       ),
     }));
     setShowEmojiPicker(null);
+    if (!isMock) {
+      dbApi().reactToMessage(msgId, myId, emoji)
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to save reaction:', err));
+    }
   };
 
   const deleteMessage = (msgId: string) => {
     setChats(prev => ({ ...prev, [activeId]: prev[activeId].filter(m => m.id !== msgId) }));
     setShowContextMenu(null);
+    if (!isMock) {
+      dbApi().deleteMessage(msgId)
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to delete message:', err));
+    }
   };
 
   const filteredConvos = conversations.filter(m => {

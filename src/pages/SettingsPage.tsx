@@ -23,6 +23,7 @@ const win = () => window as any;
 const isMock = typeof window === 'undefined' || !win().electronAPI?.notifPrefs;
 const notifPrefsApi  = () => win().electronAPI.notifPrefs  as { get: (uid: string) => Promise<NotifPrefs | null>; set: (p: NotifPrefs & { userId: string }) => Promise<void> };
 const appearApi      = () => win().electronAPI.appearancePrefs as { get: (uid: string) => Promise<AppearPrefs | null>; set: (p: AppearPrefs & { userId: string }) => Promise<void> };
+const authApi        = () => win().electronAPI.auth as { updateName: (userId: string, newName: string) => Promise<void> };
 
 // ── Notification defaults ────────────────────────────────────────────────────
 
@@ -278,12 +279,17 @@ const SettingsPage: React.FC = () => {
   const handleSave = async () => {
     if (currentUser?.id) {
       try {
+        const newName = nameValue.trim() || currentUser.name;
         await updateMember(currentUser.id, {
-          name: nameValue.trim() || currentUser.name,
+          name: newName,
           email: emailValue.trim() || currentUser.email,
           location: locationValue.trim() || undefined,
           designation: roleValue.trim() || undefined,
         });
+        if (!isMock) {
+          authApi().updateName(currentUser.id, newName)
+            .catch((err: unknown) => console.error('[SettingsPage] Failed to sync auth name:', err));
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         showToast('Profile saved!', 'success');

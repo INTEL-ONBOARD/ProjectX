@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         login:          (email, password)                    => ipcRenderer.invoke('db:auth:login', email, password),
         register:       (name, email, password, role)        => ipcRenderer.invoke('db:auth:register', name, email, password, role),
         updatePassword: (userId, currentPassword, newPassword) => ipcRenderer.invoke('db:auth:updatePassword', userId, currentPassword, newPassword),
+        updateName:     (userId, newName)                    => ipcRenderer.invoke('db:auth:updateName', userId, newName),
         seedDefault:    ()                                   => ipcRenderer.invoke('db:auth:seedDefault'),
     },
 
