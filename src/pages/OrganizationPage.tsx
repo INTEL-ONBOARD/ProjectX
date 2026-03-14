@@ -282,14 +282,25 @@ const OrganizationPage: React.FC = () => {
   const memberCount  = authUsers.filter(u => u.role === 'member').length;
 
   // ── Permissions tab state ──
-  const [saving, setSaving] = useState<'manager' | 'member' | null>(null);
+  const [savingManager, setSavingManager] = useState(false);
+  const [savingMember, setSavingMember]   = useState(false);
+  const saving = (role: 'manager' | 'member') => role === 'manager' ? savingManager : savingMember;
+  const setSaving = (role: 'manager' | 'member', val: boolean) =>
+    role === 'manager' ? setSavingManager(val) : setSavingMember(val);
+
+  // Stable ref to latest perms to avoid stale closure race on rapid toggling
+  const permsRef = React.useRef(perms);
+  useEffect(() => { permsRef.current = perms; }, [perms]);
+
   const togglePerm = async (role: 'manager' | 'member', routeId: string) => {
     if (routeId === '/settings') return;
-    const current = perms.find(p => p.role === role)?.allowedRoutes ?? ['/settings'];
+    const current = permsRef.current.find(p => p.role === role)?.allowedRoutes ?? ['/settings'];
     const next = current.includes(routeId) ? current.filter(r => r !== routeId) : [...current, routeId];
-    setSaving(role);
+    // Enforce /settings invariant in data
+    if (!next.includes('/settings')) next.push('/settings');
+    setSaving(role, true);
     try { await setRolePerms(role, next); }
-    finally { setSaving(null); }
+    finally { setSaving(role, false); }
   };
 
   const visibleNavItems = NAV_ITEMS.filter(n => !n.adminOnly || isAdmin);
@@ -504,7 +515,7 @@ const OrganizationPage: React.FC = () => {
                           <span className="bg-surface-100 text-gray-500 text-xs rounded-full px-2 py-0.5 font-medium">{count}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          {saving === role.key && <span className="text-xs text-gray-400 animate-pulse">Saving…</span>}
+                          {saving(role.key) && <span className="text-xs text-gray-400 animate-pulse">Saving…</span>}
                           {/* Progress */}
                           <div className="flex items-center gap-1.5">
                             <div className="w-16 h-1.5 bg-surface-200 rounded-full overflow-hidden">
