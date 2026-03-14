@@ -322,7 +322,71 @@ const OrganizationPage: React.FC = () => {
 
       {/* ── Right content panel ── */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        {null /* section content goes here in Task 2 */}
+        <AnimatePresence mode="wait">
+          {section === 'overview' && (
+            <motion.div key="overview" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Overview</h2>
+                  <p className="text-sm text-gray-400 mt-0.5">Team structure & metrics</p>
+                </div>
+                {isAdmin && (
+                  <motion.button
+                    onClick={() => setShowAddDept(true)}
+                    className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors"
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  >
+                    <Plus size={15} /> New Department
+                  </motion.button>
+                )}
+              </div>
+
+              {/* Stat cards */}
+              <div className="grid grid-cols-4 gap-5 mt-6">
+                {metrics.map((m, i) => {
+                  const Icon = m.icon;
+                  return (
+                    <motion.div
+                      key={m.label}
+                      className={`rounded-2xl p-5 ${m.accent ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white' : 'bg-white border border-surface-200'}`}
+                      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: i * 0.08 }}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${m.accent ? 'bg-white/15' : ''}`} style={!m.accent ? { background: m.color + '20' } : {}}>
+                          <Icon size={16} className={m.accent ? 'text-white' : ''} style={!m.accent ? { color: m.color } : {}} />
+                        </div>
+                        <span className={`text-xs font-semibold ${m.accent ? 'text-white/70' : 'text-[#68B266]'}`}>{m.trend}</span>
+                      </div>
+                      <div className={`text-3xl font-extrabold tracking-tight ${m.accent ? 'text-white' : ''}`} style={!m.accent ? { color: m.color } : {}}>{m.value}</div>
+                      <div className={`text-xs mt-1 ${m.accent ? 'text-white/70' : 'text-gray-400'}`}>{m.label}</div>
+                      <div className={`mt-3 h-1 rounded-full overflow-hidden ${m.accent ? 'bg-white/20' : 'bg-surface-200'}`}>
+                        <div className="h-full rounded-full" style={{ width: `${m.barPct}%`, background: m.accent ? 'rgba(255,255,255,0.6)' : m.color }} />
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Department Directory */}
+              <div className="mt-6">
+                <DepartmentDirectory
+                  deptRoster={deptRoster}
+                  members={members}
+                  getMemberColor={getMemberColor}
+                  onAddMember={setAddMemberToDept}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {section === 'users' && isAdmin && (
+            <div key="users">{null /* Task 3 */}</div>
+          )}
+
+          {section === 'permissions' && isAdmin && (
+            <div key="permissions">{null /* Task 4 */}</div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* ── Add Dept Modal ── */}
