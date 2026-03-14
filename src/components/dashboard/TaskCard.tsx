@@ -15,6 +15,9 @@ const priorityStyles: Record<string, { bg: string; text: string; label: string }
 const statusLabels: Record<TaskStatus, string> = {
   'todo': 'To Do',
   'in-progress': 'In Progress',
+  'ready-for-qa': 'Ready for QA',
+  'deployment-pending': 'Deployment Pending',
+  'blocker': 'Blocker',
   'done': 'Done',
 };
 

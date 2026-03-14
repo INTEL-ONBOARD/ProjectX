@@ -125,10 +125,21 @@ const AppearancePrefSchema = new Schema({
     compactMode: { type: Boolean, default: false },
 });
 
+const OrgSchema = new Schema({
+    orgId:     { type: String, required: true, unique: true },
+    name:      { type: String, required: true },
+    logo:      { type: String, default: '' },
+    address:   { type: String, default: '' },
+    workStart: { type: String, default: '09:00' },
+    workEnd:   { type: String, default: '18:00' },
+    createdAt: { type: String, default: () => new Date().toISOString() },
+});
+
 const AuthUserModel = mongoose.model('AuthUser', AuthUserSchema);
 const UserPrefModel = mongoose.model('UserPref', UserPrefSchema);
 const NotifPrefModel = mongoose.model('NotifPref', NotifPrefSchema);
 const AppearancePrefModel = mongoose.model('AppearancePref', AppearancePrefSchema);
+const OrgModel = mongoose.model('Org', OrgSchema);
 const UserModel = mongoose.model('User', UserSchema);
 const TaskModel = mongoose.model('Task', TaskSchema);
 const ProjectModel = mongoose.model('Project', ProjectSchema);
@@ -273,10 +284,32 @@ function registerDbHandlers() {
     });
 
     ipcMain.handle('db:auth:seedDefault', async () => {
+        // Legacy default account
         const existing = await AuthUserModel.findOne({ email: 'admin@projectm.com' }).lean();
         if (!existing) {
             await AuthUserModel.create({ appId: 'auth-default', name: 'Admin User', email: 'admin@projectm.com', password: 'password123', role: 'admin' });
         }
+        // Toursurv admin account
+        const adminExists = await AuthUserModel.findOne({ email: 'admin@gmail.com' }).lean();
+        if (!adminExists) {
+            await AuthUserModel.create({ appId: 'auth-toursurv-admin', name: 'Admin', email: 'admin@gmail.com', password: 'Admin@123', role: 'admin' });
+        }
+        // Toursurv organization
+        const orgExists = await OrgModel.findOne({ orgId: 'org-toursurv' }).lean();
+        if (!orgExists) {
+            await OrgModel.create({ orgId: 'org-toursurv', name: 'Toursurv', workStart: '09:00', workEnd: '18:00', createdAt: new Date().toISOString() });
+        }
+    });
+
+    // Organization
+    const toOrg = d => ({ id: d.orgId, name: d.name, logo: d.logo ?? '', address: d.address ?? '', workStart: d.workStart ?? '09:00', workEnd: d.workEnd ?? '18:00', createdAt: d.createdAt ?? '' });
+    ipcMain.handle('db:org:get', async () => {
+        const d = await OrgModel.findOne().lean();
+        return d ? safe(toOrg(d)) : null;
+    });
+    ipcMain.handle('db:org:set', async (_e, data) => {
+        const d = await OrgModel.findOneAndUpdate({ orgId: data.id ?? 'org-toursurv' }, { ...data, orgId: data.id ?? 'org-toursurv' }, { upsert: true, new: true }).lean();
+        return safe(toOrg(d));
     });
 
     // User preferences

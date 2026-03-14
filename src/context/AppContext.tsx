@@ -131,6 +131,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             .finally(() => setPrefLoadedFor(currentUser.id));
     }, [currentUser, prefLoadedFor]);
 
+    // Load org from MongoDB on mount
+    useEffect(() => {
+        dbApi().getOrg()
+            .then((o: Organization | null) => { if (o) setOrg(o); })
+            .catch((err: unknown) => console.error('[AppContext] Failed to load org:', err));
+    }, []);
+
     // Load attendance from MongoDB on mount
     useEffect(() => {
         dbApi().getAttendance()

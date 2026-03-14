@@ -16,15 +16,21 @@ const ReportsPage: React.FC = () => {
   const doneTasks = allTasks.filter(t => t.status === 'done');
   const todoTasks = allTasks.filter(t => t.status === 'todo');
   const inProgressTasks = allTasks.filter(t => t.status === 'in-progress');
+  const readyForQaTasks = allTasks.filter(t => t.status === 'ready-for-qa');
+  const deploymentPendingTasks = allTasks.filter(t => t.status === 'deployment-pending');
+  const blockerTasks = allTasks.filter(t => t.status === 'blocker');
   const completionRate = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
   const completionTrend = completionRate >= 80 ? '↑ On track' : completionRate >= 50 ? '→ In progress' : completionRate > 0 ? '↓ Needs focus' : 'No tasks yet';
   const completionTrendUp = completionRate >= 50;
   const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY && t.status !== 'done').length;
 
   const bars = [
-    { label: 'To Do', count: todoTasks.length, color: '#5030E5' },
-    { label: 'In Progress', count: inProgressTasks.length, color: '#FFA500' },
-    { label: 'Done', count: doneTasks.length, color: '#68B266' },
+    { label: 'To Do',               count: todoTasks.length,              color: '#5030E5' },
+    { label: 'In Progress',         count: inProgressTasks.length,        color: '#FFA500' },
+    { label: 'Ready for QA',        count: readyForQaTasks.length,        color: '#30C5E5' },
+    { label: 'Deployment Pending',  count: deploymentPendingTasks.length, color: '#9C27B0' },
+    { label: 'Blocker',             count: blockerTasks.length,           color: '#D8727D' },
+    { label: 'Done',                count: doneTasks.length,              color: '#68B266' },
   ];
 
   const projectTaskCounts: Record<string, number> = {};

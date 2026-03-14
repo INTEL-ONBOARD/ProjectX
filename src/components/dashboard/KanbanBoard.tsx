@@ -14,10 +14,13 @@ const TODAY = new Date().toISOString().split('T')[0];
 const WEEK_START = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })();
 const WEEK_END   = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().split('T')[0]; })();
 
-const statusStyles: Record<TaskStatus, { bg: string; text: string; label: string }> = {
-  'todo':        { bg: 'bg-primary-50',     text: 'text-primary-600',  label: 'To Do' },
-  'in-progress': { bg: 'bg-[#FFA50020]',    text: 'text-[#FFA500]',   label: 'In Progress' },
-  'done':        { bg: 'bg-[#83C29D33]',    text: 'text-[#68B266]',   label: 'Done' },
+const statusStyles: Record<TaskStatus, { bg: string; text: string; label: string; dot: string }> = {
+  'todo':               { bg: 'bg-primary-50',     text: 'text-primary-600',  label: 'To Do',              dot: 'bg-primary-500' },
+  'in-progress':        { bg: 'bg-[#FFA50020]',    text: 'text-[#FFA500]',   label: 'In Progress',        dot: 'bg-[#FFA500]' },
+  'ready-for-qa':       { bg: 'bg-[#30C5E520]',    text: 'text-[#30C5E5]',   label: 'Ready for QA',       dot: 'bg-[#30C5E5]' },
+  'deployment-pending': { bg: 'bg-[#9C27B020]',    text: 'text-[#9C27B0]',   label: 'Deployment Pending', dot: 'bg-[#9C27B0]' },
+  'blocker':            { bg: 'bg-[#D8727D22]',    text: 'text-[#D8727D]',   label: 'Blocker',            dot: 'bg-[#D8727D]' },
+  'done':               { bg: 'bg-[#83C29D33]',    text: 'text-[#68B266]',   label: 'Done',               dot: 'bg-[#68B266]' },
 };
 const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
   low:       { bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]', label: 'Low' },
@@ -101,8 +104,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
   };
 
   const handleAddComment = () => {
-    if (!commentInput.trim()) return;
+    if (!commentInput.trim() || !selectedTask) return;
     setComments(prev => [...prev, { id: String(Date.now()), author: 'You', text: commentInput.trim(), time: 'Now' }]);
+    const newCount = (selectedTask.comments ?? 0) + 1;
+    updateTask(selectedTask.id, { comments: newCount }).catch(console.error);
+    setSelectedTask(prev => prev ? { ...prev, comments: newCount } : prev);
     setCommentInput('');
   };
 
@@ -127,9 +133,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
   };
 
   const columns: { title: string; status: TaskStatus; dotColor: string; lineColor: string }[] = [
-    { title: 'To Do',       status: 'todo',        dotColor: '#5030E5', lineColor: '#5030E5' },
-    { title: 'On Progress', status: 'in-progress', dotColor: '#FFA500', lineColor: '#FFA500' },
-    { title: 'Done',        status: 'done',         dotColor: '#8BC34A', lineColor: '#8BC34A' },
+    { title: 'To Do',               status: 'todo',               dotColor: '#5030E5', lineColor: '#5030E5' },
+    { title: 'In Progress',         status: 'in-progress',        dotColor: '#FFA500', lineColor: '#FFA500' },
+    { title: 'Ready for QA',        status: 'ready-for-qa',       dotColor: '#30C5E5', lineColor: '#30C5E5' },
+    { title: 'Deployment Pending',  status: 'deployment-pending', dotColor: '#9C27B0', lineColor: '#9C27B0' },
+    { title: 'Blocker',             status: 'blocker',            dotColor: '#D8727D', lineColor: '#D8727D' },
+    { title: 'Done',                status: 'done',               dotColor: '#8BC34A', lineColor: '#8BC34A' },
   ];
 
   const currentStatus = selectedTask ? (selectedTask.status) : 'todo';
@@ -159,6 +168,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
               onDeleteTask={(taskId) => deleteTask(taskId).catch(console.error)}
             />
           ))}
+          {/* Right-edge spacer so last column has breathing room */}
+          <div className="shrink-0 w-8 h-full" />
         </div>
       </motion.div>
 
@@ -167,7 +178,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
         {showTaskForm && (
           <TaskFormModal
             onClose={() => setShowTaskForm(false)}
-            onSubmit={task => createTask(task).catch(console.error)}
+            onSubmit={task => createTask(task)}
             defaultStatus={formDefaultStatus}
           />
         )}
@@ -243,11 +254,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
                     <AnimatePresence>
                       {showStatusDrop && (
                         <motion.div
-                          className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-surface-100 overflow-hidden z-10 w-40"
+                          className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-surface-100 overflow-hidden z-10 w-52"
                           initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.15 }}
                         >
-                          {(['todo', 'in-progress', 'done'] as TaskStatus[]).map(s => {
+                          {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
                             const st = statusStyles[s];
                             return (
                               <button key={s}
@@ -258,7 +269,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
                                 }}
                                 className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold hover:bg-surface-50 transition-colors"
                               >
-                                <span className={`w-2 h-2 rounded-full ${s === 'todo' ? 'bg-primary-500' : s === 'in-progress' ? 'bg-[#FFA500]' : 'bg-[#68B266]'}`} />
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
                                 <span className={st.text}>{st.label}</span>
                                 {selectedTask.status === s && <Check size={11} className="ml-auto text-primary-500" />}
                               </button>

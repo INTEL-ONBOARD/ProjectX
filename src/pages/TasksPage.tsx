@@ -17,13 +17,16 @@ const priorityStyles: Record<string, { bg: string; text: string; label: string }
   high: { bg: 'bg-[#D8727D33]', text: 'text-[#D8727D]', label: 'High' },
   completed: { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]', label: 'Done' },
 };
-const statusStyles: Record<string, { bg: string; text: string; label: string }> = {
-  'todo': { bg: 'bg-primary-50', text: 'text-primary-600', label: 'To Do' },
-  'in-progress': { bg: 'bg-[#FFA50020]', text: 'text-[#FFA500]', label: 'In Progress' },
-  'done': { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]', label: 'Done' },
+const statusStyles: Record<string, { bg: string; text: string; label: string; dot: string }> = {
+  'todo':               { bg: 'bg-primary-50',     text: 'text-primary-600',  label: 'To Do',              dot: 'bg-primary-500' },
+  'in-progress':        { bg: 'bg-[#FFA50020]',    text: 'text-[#FFA500]',   label: 'In Progress',        dot: 'bg-[#FFA500]' },
+  'ready-for-qa':       { bg: 'bg-[#30C5E520]',    text: 'text-[#30C5E5]',   label: 'Ready for QA',       dot: 'bg-[#30C5E5]' },
+  'deployment-pending': { bg: 'bg-[#9C27B020]',    text: 'text-[#9C27B0]',   label: 'Deployment Pending', dot: 'bg-[#9C27B0]' },
+  'blocker':            { bg: 'bg-[#D8727D22]',    text: 'text-[#D8727D]',   label: 'Blocker',            dot: 'bg-[#D8727D]' },
+  'done':               { bg: 'bg-[#83C29D33]',    text: 'text-[#68B266]',   label: 'Done',               dot: 'bg-[#68B266]' },
 };
 
-const tabs = ['All', 'To Do', 'In Progress', 'Done'];
+const tabs = ['All', 'To Do', 'In Progress', 'Ready for QA', 'Deployment Pending', 'Blocker', 'Done'];
 
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
@@ -57,36 +60,17 @@ const TasksPage: React.FC = () => {
 
   const totalTasks = allTasks.length;
 
-  const tabTasks = activeTab === 0 ? allTasks
-    : activeTab === 1 ? allTasks.filter(t => t.status === 'todo')
-    : activeTab === 2 ? allTasks.filter(t => t.status === 'in-progress')
-    : allTasks.filter(t => t.status === 'done');
+  const tabStatusMap: (TaskStatus | null)[] = [null, 'todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'done'];
+  const tabTasks = activeTab === 0 ? allTasks : allTasks.filter(t => t.status === tabStatusMap[activeTab]);
 
   const filteredTasks = searchQuery.trim()
     ? tabTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : tabTasks;
 
-  const assigneeCounts: Record<string, number> = {};
-  allTasks.forEach(t => t.assignees.forEach(id => { assigneeCounts[id] = (assigneeCounts[id] ?? 0) + 1; }));
-  const topAssignees = Object.entries(assigneeCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
-
   const doneCount = allTasks.filter(t => t.status === 'done').length;
   const todoCount = allTasks.filter(t => t.status === 'todo').length;
   const inProgCount = allTasks.filter(t => t.status === 'in-progress').length;
 
-  const donutItems = [
-    { label: 'High', count: allTasks.filter(t => t.priority === 'high').length, color: '#D8727D' },
-    { label: 'Low', count: allTasks.filter(t => t.priority === 'low').length, color: '#D58D49' },
-    { label: 'Done', count: doneCount, color: '#68B266' },
-  ];
-  const donutGradient = (() => {
-    const high = donutItems[0].count; const low = donutItems[1].count;
-    if (totalTasks === 0) return '#e5e7eb';
-    const h = (high / totalTasks) * 100; const l = (low / totalTasks) * 100;
-    return `conic-gradient(#D8727D 0% ${h}%, #D58D49 ${h}% ${h + l}%, #68B266 ${h + l}% 100%)`;
-  })();
-
-  const sprintPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
   const TODAY_STR = new Date().toISOString().split('T')[0];
   const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY_STR && t.status !== 'done').length;
   const completionPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
@@ -194,10 +178,10 @@ const TasksPage: React.FC = () => {
           })}
         </div>
 
-        {/* Two-column body */}
-        <div className="grid grid-cols-[1fr_300px] gap-5 flex-1 min-h-0 pb-6">
+        {/* Full-width table body */}
+        <div className="flex-1 min-h-0 pb-6">
           {/* Main: Tasks table */}
-          <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col min-h-0">
+          <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col h-full">
             <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
               <h2 className="font-bold text-gray-900 text-sm">All Tasks</h2>
               <button onClick={() => navigate('/')} className="text-xs text-primary-500 font-semibold hover:text-primary-700 transition-colors">Board view →</button>
@@ -206,7 +190,8 @@ const TasksPage: React.FC = () => {
             <div className="px-5 pt-3 flex items-center justify-between gap-3">
               <div className="flex gap-1 bg-surface-100 rounded-lg p-1 mb-3 w-fit">
                 {tabs.map((t, i) => {
-                  const count = i === 0 ? totalTasks : i === 1 ? todoCount : i === 2 ? inProgCount : doneCount;
+                  const s = tabStatusMap[i];
+                  const count = s === null ? totalTasks : allTasks.filter(task => task.status === s).length;
                   return (
                     <button key={t} onClick={() => setActiveTab(i)} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === i ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                       {t} ({count})
@@ -283,74 +268,6 @@ const TasksPage: React.FC = () => {
               </tbody>
             </table>
             </div>
-          </div>
-
-          {/* Side panels */}
-          <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
-            {/* Sprint Summary */}
-            <motion.div className="bg-white rounded-2xl border border-surface-200 p-4"
-              initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.35, delay: 0, ease: [0.4, 0, 0.2, 1] }}>
-              <h3 className="font-bold text-gray-900 text-sm mb-3">Sprint Summary</h3>
-              <div className="mb-3">
-                <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                  <span>Progress</span><span className="font-bold text-primary-500">{sprintPct}%</span>
-                </div>
-                <div className="h-2 bg-surface-200 rounded-full overflow-hidden">
-                  <motion.div className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full"
-                    initial={{ width: 0 }} animate={{ width: `${sprintPct}%` }}
-                    transition={{ duration: 0.6, delay: 0.3, ease: [0.4, 0, 0.2, 1] }} />
-                </div>
-              </div>
-              {[['Total Tasks', String(totalTasks)], ['Completed', String(doneCount)], ['Remaining', String(todoCount + inProgCount)]].map(([label, val]) => (
-                <div key={label} className="flex justify-between py-2 border-b border-surface-100 last:border-0 text-xs">
-                  <span className="text-gray-500">{label}</span>
-                  <span className={`font-bold ${label === 'Blockers' ? 'text-[#D8727D]' : 'text-gray-900'}`}>{val}</span>
-                </div>
-              ))}
-            </motion.div>
-
-            {/* Priority Breakdown donut */}
-            <motion.div className="bg-white rounded-2xl border border-surface-200 p-4"
-              initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.35, delay: 0.08, ease: [0.4, 0, 0.2, 1] }}>
-              <h3 className="font-bold text-gray-900 text-sm mb-3">Priority Breakdown</h3>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full shrink-0" style={{ background: donutGradient }} />
-                <div className="flex flex-col gap-1.5">
-                  {donutItems.map(d => (
-                    <div key={d.label} className="flex items-center gap-2 text-xs">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: d.color }} />
-                      <span className="text-gray-500 flex-1">{d.label}</span>
-                      <span className="font-bold text-gray-900">{d.count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Top Assignees */}
-            <motion.div className="bg-white rounded-2xl border border-surface-200 p-4"
-              initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.35, delay: 0.16, ease: [0.4, 0, 0.2, 1] }}>
-              <h3 className="font-bold text-gray-900 text-sm mb-3">Top Assignees</h3>
-              {topAssignees.map(([id, count]) => {
-                const member = members.find(m => m.id === id);
-                if (!member) return null;
-                const color = getMemberColor(id);
-                const pct = totalTasks > 0 ? (count / totalTasks) * 100 : 0;
-                return (
-                  <div key={id} className="flex items-center gap-2 py-2 border-b border-surface-100 last:border-0">
-                    <Avatar name={member.name} color={color} size="sm" />
-                    <span className="text-xs text-gray-700 flex-1 truncate">{member.name.split(' ')[0]}</span>
-                    <div className="w-16 h-1.5 bg-surface-200 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                    </div>
-                    <span className="text-xs font-bold text-gray-900 w-4 text-right">{count}</span>
-                  </div>
-                );
-              })}
-            </motion.div>
           </div>
         </div>
       </div>
@@ -450,11 +367,11 @@ const TasksPage: React.FC = () => {
                     <AnimatePresence>
                       {showStatusDrop && (
                         <motion.div
-                          className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-card-hover border border-surface-100 overflow-hidden z-10 w-40"
+                          className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-card-hover border border-surface-100 overflow-hidden z-10 w-52"
                           initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.15 }}
                         >
-                          {(['todo', 'in-progress', 'done'] as TaskStatus[]).map(s => {
+                          {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
                             const st = statusStyles[s];
                             return (
                               <button
@@ -466,7 +383,7 @@ const TasksPage: React.FC = () => {
                                 }}
                                 className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold hover:bg-surface-50 transition-colors"
                               >
-                                <span className={`w-2 h-2 rounded-full ${s === 'todo' ? 'bg-primary-500' : s === 'in-progress' ? 'bg-[#FFA500]' : 'bg-[#68B266]'}`} />
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
                                 <span className={st.text}>{st.label}</span>
                                 {selectedTask.status === s && <span className="ml-auto text-primary-500">✓</span>}
                               </button>
@@ -653,7 +570,7 @@ const TasksPage: React.FC = () => {
         {showTaskForm && (
           <TaskFormModal
             onClose={() => setShowTaskForm(false)}
-            onSubmit={task => createTask(task).catch(console.error)}
+            onSubmit={task => createTask(task)}
             defaultStatus="todo"
           />
         )}

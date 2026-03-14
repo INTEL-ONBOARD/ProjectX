@@ -12,7 +12,7 @@ import { Avatar, AvatarGroup } from '../components/ui/Avatar';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useAuth } from '../context/AuthContext';
-import NewProjectModal from '../components/modals/NewProjectModal';
+import NewProjectModal, { ProjectRichFields } from '../components/modals/NewProjectModal';
 import { Project } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -761,11 +761,26 @@ const TeamsPage: React.FC = () => {
         {showProjectModal && (
           <NewProjectModal
             onClose={() => setShowProjectModal(false)}
-            onSubmit={(name, color) => {
-              if (editingProject) updateProject(editingProject.id, { name, color }).catch(console.error);
-              else createProject(name, color).catch(console.error);
+            onSubmit={async (name, color, rich: ProjectRichFields) => {
+              if (editingProject) {
+                await updateProject(editingProject.id, { name, color });
+                const richPayload = { projectId: editingProject.id, ...rich, memberIds: localRichData[editingProject.id]?.memberIds ?? [], starred: localRichData[editingProject.id]?.starred ?? false };
+                setLocalRichData(prev => ({ ...prev, [editingProject.id]: { ...prev[editingProject.id], ...rich } }));
+                dbApi().setProjectRich(richPayload)
+                  .catch((err: unknown) => console.error('[TeamsPage] Failed to persist project rich:', err));
+              } else {
+                const newProject = await createProject(name, color);
+                const richPayload = { projectId: newProject.id, ...rich, memberIds: [], starred: false };
+                setLocalRichData(prev => ({ ...prev, [newProject.id]: rich }));
+                dbApi().setProjectRich(richPayload)
+                  .catch((err: unknown) => console.error('[TeamsPage] Failed to persist project rich:', err));
+              }
             }}
-            initial={editingProject ? { name: editingProject.name, color: editingProject.color } : undefined}
+            initial={editingProject ? {
+              name: editingProject.name,
+              color: editingProject.color,
+              ...(localRichData[editingProject.id] ?? {}),
+            } : undefined}
           />
         )}
       </AnimatePresence>

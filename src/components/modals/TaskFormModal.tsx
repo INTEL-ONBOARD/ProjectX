@@ -8,7 +8,7 @@ import { Avatar } from '../ui/Avatar';
 
 interface Props {
   onClose: () => void;
-  onSubmit: (task: Omit<Task, 'id'>) => void;
+  onSubmit: (task: Omit<Task, 'id'>) => Promise<void> | void;
   initial?: Partial<Task>;
   defaultStatus?: TaskStatus;
 }
@@ -25,27 +25,34 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [assignees, setAssignees] = useState<string[]>(initial?.assignees ?? []);
   const [projectId, setProjectId] = useState(initial?.projectId ?? '');
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? '');
+  const [loading, setLoading] = useState(false);
   const status: TaskStatus = initial?.status ?? defaultStatus ?? 'todo';
 
   const toggleAssignee = (id: string) =>
     setAssignees(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onSubmit({
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-      status,
-      assignees,
-      projectId: projectId || undefined,
-      dueDate: dueDate || undefined,
-      comments: initial?.comments ?? 0,
-      files: initial?.files ?? 0,
-      images: initial?.images ?? [],
-    });
-    onClose();
+    setLoading(true);
+    try {
+      await onSubmit({
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        status,
+        assignees,
+        projectId: projectId || undefined,
+        dueDate: dueDate || undefined,
+        comments: initial?.comments ?? 0,
+        files: initial?.files ?? 0,
+        images: initial?.images ?? [],
+      });
+      onClose();
+    } catch (err) {
+      console.error('[TaskFormModal] Failed to save task:', err);
+      setLoading(false);
+    }
   };
 
   return (
@@ -152,10 +159,11 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
           </div>
           <motion.button
             type="submit"
-            className="w-full bg-primary-500 text-white font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors mt-1"
+            disabled={loading}
+            className="w-full bg-primary-500 text-white font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
             whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
           >
-            {initial?.id ? 'Save Changes' : 'Create Task'}
+            {loading ? 'Saving...' : (initial?.id ? 'Save Changes' : 'Create Task')}
           </motion.button>
         </form>
       </motion.div>

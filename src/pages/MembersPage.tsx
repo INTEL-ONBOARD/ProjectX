@@ -6,6 +6,7 @@ import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
+import { useAuth } from '../context/AuthContext';
 import InviteMemberModal from '../components/modals/InviteMemberModal';
 import { downloadCsv } from '../utils/exportCsv';
 import { User } from '../types';
@@ -20,7 +21,9 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
 };
 
 const MembersPage: React.FC = () => {
-  const { members, getMemberColor, addMember, removeMember } = useMembersContext();
+  const { members, getMemberColor, addMember, updateMember, removeMember } = useMembersContext();
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === 'admin';
   const { scrubAssignee, allTasks } = useProjects();
 
   const totalTasks = allTasks.length;
@@ -302,9 +305,25 @@ const MembersPage: React.FC = () => {
                     <span className="text-xs text-gray-400">Email</span>
                     <span className="text-xs font-semibold text-gray-700">{selectedMember.email ?? '—'}</span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-surface-100">
+                  <div className="flex justify-between items-center py-2 border-b border-surface-100">
                     <span className="text-xs text-gray-400">Role</span>
-                    <span className="text-xs font-semibold text-gray-700 capitalize">{selectedMember.role}</span>
+                    {isAdmin ? (
+                      <select
+                        value={selectedMember.role}
+                        onChange={e => {
+                          const newRole = e.target.value as User['role'];
+                          updateMember(selectedMember.id, { role: newRole }).catch(console.error);
+                          setSelectedMember(prev => prev ? { ...prev, role: newRole } : prev);
+                        }}
+                        className="text-xs font-semibold text-gray-700 border border-surface-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-primary-400"
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="member">Member</option>
+                      </select>
+                    ) : (
+                      <span className="text-xs font-semibold text-gray-700 capitalize">{selectedMember.role}</span>
+                    )}
                   </div>
                   <div className="flex justify-between py-2 border-b border-surface-100">
                     <span className="text-xs text-gray-400">Status</span>
@@ -329,7 +348,7 @@ const MembersPage: React.FC = () => {
         {showInvite && (
           <InviteMemberModal
             onClose={() => setShowInvite(false)}
-            onSubmit={member => addMember(member).catch(console.error)}
+            onSubmit={member => addMember(member)}
           />
         )}
       </AnimatePresence>

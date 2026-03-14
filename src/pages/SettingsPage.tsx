@@ -2,10 +2,10 @@ import React, { useState, useContext, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Save, User, Bell, Palette, Shield, CreditCard, Key, LogOut,
-  Camera, Check, Globe, Clock, Moon, Sun, Monitor,
+  Check, Globe, Clock, Moon, Sun, Monitor,
   Smartphone, Mail, Eye, EyeOff, AlertTriangle,
-  Download, Trash2, Edit3, MapPin, Briefcase,
-  Link, Zap, Star, TrendingUp, Activity, X,
+  Download, Trash2, Edit3, Briefcase,
+  Link, Zap, Star, X,
   Lock, ChevronRight, Info, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { useAppUpdater } from '../hooks/useAppUpdater';
@@ -182,7 +182,7 @@ const ACCENT_COLORS = [
 
 const SettingsPage: React.FC = () => {
   const { currentUser, theme, setTheme: setAppTheme } = useContext(AppContext);
-  const { logout, updatePassword } = useAuth();
+  const { user: authUser, logout, updatePassword } = useAuth();
   const { updateMember, members } = useMembersContext();
   const { projects, allTasks } = useProjects();
   const { showToast } = useToast();
@@ -196,8 +196,17 @@ const SettingsPage: React.FC = () => {
   const [nameValue,     setNameValue]     = useState(() => currentUser?.name        || '');
   const [emailValue,    setEmailValue]    = useState(() => currentUser?.email       || '');
   const [locationValue, setLocationValue] = useState(() => currentUser?.location   || '');
-  const [timezoneValue, setTimezoneValue] = useState('');
+  const [timezoneValue] = useState('UTC');
   const [roleValue,     setRoleValue]     = useState(() => currentUser?.designation || '');
+
+  // Sync profile fields when currentUser loads (it may be null on first render)
+  useEffect(() => {
+    if (!currentUser) return;
+    setNameValue(prev => prev || currentUser.name || '');
+    setEmailValue(prev => prev || currentUser.email || '');
+    setLocationValue(prev => prev || currentUser.location || '');
+    setRoleValue(prev => prev || currentUser.designation || '');
+  }, [currentUser?.id]);
 
   // Notifications — persisted to MongoDB (localStorage fallback in mock mode)
   const [notifications, setNotifications] = useState<NotifPrefs>(defaultNotifications);
@@ -427,169 +436,69 @@ const SettingsPage: React.FC = () => {
                   initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2 }}>
 
-                  {/* Hero card */}
-                  <div className="rounded-2xl overflow-hidden border border-surface-200" style={{ background: '#fff' }}>
-                    {/* Banner */}
-                    <div className="relative h-36 overflow-hidden" style={{
-                      background: 'linear-gradient(120deg, #0f0c29 0%, #302b63 40%, #24243e 100%)',
-                    }}>
-                      {/* Mesh orbs */}
-                      <div className="absolute inset-0" style={{
-                        backgroundImage: `
-                          radial-gradient(ellipse 60% 80% at 10% 50%, rgba(80,48,229,0.55) 0%, transparent 70%),
-                          radial-gradient(ellipse 40% 60% at 80% 20%, rgba(219,39,119,0.45) 0%, transparent 65%),
-                          radial-gradient(ellipse 35% 55% at 95% 85%, rgba(245,158,11,0.35) 0%, transparent 60%)
-                        `,
-                      }} />
-                      {/* Fine grid overlay */}
-                      <div className="absolute inset-0 opacity-[0.07]" style={{
-                        backgroundImage: 'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)',
-                        backgroundSize: '24px 24px',
-                      }} />
-                      {/* Diagonal accent line */}
-                      <div className="absolute inset-0 opacity-10" style={{
-                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.15) 40px, rgba(255,255,255,0.15) 41px)',
-                      }} />
-                      <button
-                        onClick={() => showToast('Cover photo upload is not available in this version.', 'info')}
-                        className="absolute bottom-3 right-3 flex items-center gap-1.5 text-white/80 hover:text-white text-[11px] font-medium px-3 py-1.5 rounded-lg transition-all"
-                        style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.18)' }}
-                      >
-                        <Camera size={11} /> Change cover
-                      </button>
-                    </div>
+                  {/* Profile card */}
+                  <div className="rounded-2xl border border-surface-200 overflow-hidden">
+                    {/* Slim accent bar */}
+                    <div className="h-1.5 w-full bg-gradient-to-r from-primary-500 via-primary-400 to-[#30C5E5]" />
 
-                    {/* Content area */}
-                    <div className="px-6 pb-5">
-                      {/* Avatar row */}
-                      <div className="flex items-end justify-between" style={{ marginTop: -28 }}>
-                        <div className="relative">
-                          <div className="rounded-full p-[3px]" style={{
-                            background: 'linear-gradient(135deg, #5030E5, #DB2777, #F59E0B)',
-                          }}>
-                            <div className="rounded-full p-[2px] bg-white">
-                              <Avatar name={nameValue} color={userColor} size="xl" />
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => showToast('Avatar upload is not available in this version.', 'info')}
-                            className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center text-white border-2 border-white transition-all hover:scale-110"
-                            style={{ background: '#5030E5' }}
-                          >
-                            <Camera size={10} />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 pb-1">
-                          <span className="text-[11px] font-bold px-3 py-1 rounded-full text-white" style={{
-                            background: 'linear-gradient(135deg, #5030E5 0%, #7C3AED 100%)',
-                            letterSpacing: '0.04em',
-                          }}>ADMIN</span>
-                          <button
-                            onClick={handleShareProfile}
-                            className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-700 px-3 py-1 rounded-full border border-surface-200 hover:border-surface-300 transition-all"
-                          >
-                            <Link size={10} /> Share profile
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Name + meta + stats */}
-                      <div className="mt-3 flex items-end justify-between gap-6">
-                        <div>
-                          <h2 className="text-lg font-bold text-gray-900 tracking-tight leading-none">{nameValue}</h2>
-                          <div className="flex items-center gap-4 mt-1.5">
-                            <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                              <Briefcase size={10} className="text-gray-300" /> {roleValue}
-                            </span>
-                            <span className="w-px h-3 bg-surface-200" />
-                            <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                              <MapPin size={10} className="text-gray-300" /> {locationValue}
-                            </span>
+                    <div className="p-6 flex items-center gap-5">
+                      {/* Avatar */}
+                      <div className="relative shrink-0">
+                        <div className="rounded-full p-[2.5px]" style={{ background: 'linear-gradient(135deg, #5030E5, #30C5E5)' }}>
+                          <div className="rounded-full p-[2px] bg-white">
+                            <Avatar name={nameValue} color={userColor} size="xl" />
                           </div>
                         </div>
-
-                        {/* Stat pills */}
-                        <div className="flex items-center gap-4 shrink-0">
-                          {stats.map((s) => {
-                            const Icon = s.icon;
-                            return (
-                              <div key={s.label} className="flex items-center gap-1.5">
-                                <Icon size={13} style={{ color: s.color }} strokeWidth={2.2} />
-                                <span className="text-sm font-bold text-gray-900">{s.value}</span>
-                                <span className="text-xs text-gray-400">{s.label}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#68B266] border-2 border-white" />
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Two-column: personal info + activity */}
-                  <div className="grid grid-cols-[1fr_auto] gap-4">
-                    {/* Personal info */}
-                    <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                      <SectionHeader
-                        title="Personal Information"
-                        subtitle="Hover over a field and click the pencil to edit"
-                        action={
-                          <button
-                            onClick={() => showToast('Click the pencil icon on any field to edit it', 'info')}
-                            className="text-xs text-primary-500 font-semibold hover:text-primary-700 flex items-center gap-1 bg-primary-50 px-3 py-1.5 rounded-lg"
-                          >
-                            <Edit3 size={11} /> Edit all
-                          </button>
-                        }
-                      />
-                      <FieldRow icon={User} label="Full Name" value={nameValue} editable onSave={setNameValue} />
-                      <FieldRow icon={Mail} label="Email" value={emailValue} editable onSave={setEmailValue} />
-                      <FieldRow icon={MapPin} label="Location" value={locationValue} editable onSave={setLocationValue} />
-                      <FieldRow icon={Clock} label="Timezone" value={timezoneValue} editable onSave={setTimezoneValue} />
-                      <FieldRow icon={Briefcase} label="Role" value={roleValue} editable onSave={setRoleValue} />
-                      <FieldRow icon={Globe} label="Member since" value="—" />
-                    </div>
+                      {/* Name + role */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h2 className="text-lg font-bold text-gray-900 tracking-tight">{nameValue}</h2>
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full text-primary-600 bg-primary-50 border border-primary-100 tracking-wider uppercase">
+                            {authUser?.role ?? 'Member'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-400 mt-0.5">{emailValue}</div>
+                      </div>
 
-                    {/* Activity */}
-                    <div className="bg-white rounded-2xl overflow-hidden w-52 border border-surface-200">
-                      <SectionHeader title="Activity" subtitle="This month" />
-                      <div className="px-4 py-3 flex flex-col gap-3">
-                        {(() => {
-                          const myDone = currentUser ? allTasks.filter(t => t.status === 'done' && t.assignees?.includes(currentUser.id)).length : 0;
-                          const myAll = currentUser ? allTasks.filter(t => t.assignees?.includes(currentUser.id)).length : 0;
-                          const myInProg = currentUser ? allTasks.filter(t => t.status === 'in-progress' && t.assignees?.includes(currentUser.id)).length : 0;
-                          return [
-                            { label: 'Tasks completed', value: myDone, max: Math.max(myAll, 1), color: '#68B266', icon: TrendingUp },
-                            { label: 'Tasks assigned', value: myAll, max: Math.max(allTasks.length, 1), color: '#5030E5', icon: Activity },
-                            { label: 'In progress', value: myInProg, max: Math.max(myAll, 1), color: '#30C5E5', icon: Zap },
-                          ];
-                        })().map(item => {
-                          const Icon = item.icon;
-                          const pct = Math.round((item.value / item.max) * 100);
+                      {/* Stats */}
+                      <div className="flex items-center gap-5 shrink-0">
+                        {stats.map((s) => {
+                          const Icon = s.icon;
                           return (
-                            <div key={item.label} className="flex flex-col gap-1.5 p-3 bg-gradient-to-br from-surface-50 to-surface-100 rounded-xl border border-surface-100">
-                              <div className="flex items-center justify-between">
-                                <Icon size={12} style={{ color: item.color }} />
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[9px] text-gray-300 font-mono">{pct}%</span>
-                                  <span className="text-xs font-bold text-gray-900">{item.value}</span>
-                                </div>
+                            <div key={s.label} className="flex flex-col items-center gap-0.5">
+                              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: s.bg }}>
+                                <Icon size={14} style={{ color: s.color }} strokeWidth={2} />
                               </div>
-                              <div className="h-1.5 bg-surface-200 rounded-full overflow-hidden">
-                                <motion.div
-                                  className="h-full rounded-full"
-                                  style={{ backgroundColor: item.color }}
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${pct}%` }}
-                                  transition={{ duration: 0.7, delay: 0.2 }}
-                                />
-                              </div>
-                              <div className="text-[10px] text-gray-400 leading-tight">{item.label}</div>
+                              <span className="text-base font-bold text-gray-900 leading-none">{s.value}</span>
+                              <span className="text-[10px] text-gray-400 whitespace-nowrap">{s.label}</span>
                             </div>
                           );
                         })}
                       </div>
+
+                      {/* Share */}
+                      <button
+                        onClick={handleShareProfile}
+                        className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-primary-600 px-3 py-1.5 rounded-xl border border-surface-200 hover:border-primary-200 hover:bg-primary-50 transition-all shrink-0"
+                      >
+                        <Link size={11} /> Share
+                      </button>
                     </div>
+                  </div>
+
+                  {/* Personal info */}
+                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
+                    <SectionHeader
+                      title="Personal Information"
+                      subtitle="Hover over a field and click the pencil to edit"
+                    />
+                    <FieldRow icon={User} label="Full Name" value={nameValue} editable onSave={setNameValue} />
+                    <FieldRow icon={Mail} label="Email" value={emailValue} editable onSave={setEmailValue} />
+                    <FieldRow icon={Briefcase} label="Role" value={authUser?.role ? authUser.role.charAt(0).toUpperCase() + authUser.role.slice(1) : ''} />
+                    <FieldRow icon={Globe} label="Member since" value="—" />
                   </div>
 
                 </motion.div>

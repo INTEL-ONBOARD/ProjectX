@@ -91,5 +91,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Project rich data
         getProjectRich: () => ipcRenderer.invoke('db:projectrich:getAll'),
         setProjectRich: (data) => ipcRenderer.invoke('db:projectrich:set', data),
+
+        // Organization
+        getOrg: () => ipcRenderer.invoke('db:org:get'),
+        setOrg: (data) => ipcRenderer.invoke('db:org:set', data),
     },
 });

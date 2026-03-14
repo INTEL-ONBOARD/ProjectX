@@ -5,7 +5,7 @@ import { User } from '../../types';
 
 interface Props {
   onClose: () => void;
-  onSubmit: (member: Omit<User, 'id'>) => void;
+  onSubmit: (member: Omit<User, 'id'>) => Promise<void> | void;
 }
 
 const InviteMemberModal: React.FC<Props> = ({ onClose, onSubmit }) => {
@@ -13,12 +13,21 @@ const InviteMemberModal: React.FC<Props> = ({ onClose, onSubmit }) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<User['role']>('member');
   const [designation, setDesignation] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
-    onSubmit({ name: name.trim(), email: email.trim(), role, designation: designation.trim(), status: 'active' });
-    onClose();
+    setLoading(true);
+    setError('');
+    try {
+      await onSubmit({ name: name.trim(), email: email.trim(), role, designation: designation.trim(), status: 'active' });
+      onClose();
+    } catch (err) {
+      setError('Failed to add member. Please try again.');
+      setLoading(false);
+    }
   };
 
   return (
@@ -80,12 +89,14 @@ const InviteMemberModal: React.FC<Props> = ({ onClose, onSubmit }) => {
               className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
             />
           </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
           <motion.button
             type="submit"
-            className="w-full bg-primary-500 text-white font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors mt-1"
+            disabled={loading}
+            className="w-full bg-primary-500 text-white font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
             whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
           >
-            Send Invite
+            {loading ? 'Adding...' : 'Send Invite'}
           </motion.button>
         </form>
       </motion.div>

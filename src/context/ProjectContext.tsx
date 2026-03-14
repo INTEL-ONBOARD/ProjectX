@@ -9,7 +9,7 @@ interface ProjectContextValue {
   allTasks: Task[];
   activeProject: string;
   setActiveProject: (id: string) => void;
-  createProject: (name: string, color: string) => Promise<void>;
+  createProject: (name: string, color: string) => Promise<Project>;
   updateProject: (id: string, changes: Partial<Pick<Project, 'name' | 'color'>>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   createTask: (task: Omit<Task, 'id'> & { projectId?: string }) => Promise<void>;
@@ -47,9 +47,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .finally(() => setLoading(false));
   }, []);
 
-  const createProject = async (name: string, color: string) => {
+  const createProject = async (name: string, color: string): Promise<Project> => {
     const newProject = await api().createProject(name, color) as Project;
     setProjects(prev => [...prev, newProject]);
+    return newProject;
   };
 
   const updateProject = async (id: string, changes: Partial<Pick<Project, 'name' | 'color'>>) => {

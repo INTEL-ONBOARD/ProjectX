@@ -206,7 +206,13 @@ const MessagesPage: React.FC = () => {
           <p className="text-sm font-medium">No team members yet.</p>
           <p className="text-xs">Invite members from the Members page to start messaging.</p>
         </div>
-      ) : !activeMember ? null : (
+      ) : !activeMember ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 text-gray-400">
+          <MessageSquare size={40} className="opacity-30" />
+          <p className="text-sm font-medium">No conversations yet.</p>
+          <p className="text-xs">Click <strong>New Message</strong> to start a conversation.</p>
+        </div>
+      ) : (
       <div className="flex flex-1 min-h-0 bg-white border border-surface-200 rounded-2xl overflow-hidden">
 
         {/* Left sidebar */}
@@ -246,35 +252,6 @@ const MessagesPage: React.FC = () => {
 
           {/* Conversation list */}
           <div className="flex-1 overflow-y-auto relative">
-            <AnimatePresence>
-              {showNewConvo && (
-                <motion.div
-                  className="absolute inset-0 bg-white z-10 flex flex-col overflow-y-auto"
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                >
-                  <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-100 shrink-0">
-                    <button onClick={() => setShowNewConvo(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
-                    <span className="font-semibold text-sm text-gray-900">New Conversation</span>
-                  </div>
-                  {members.filter(m => !Object.keys(chats).includes(m.id)).map(m => (
-                    <button key={m.id} onClick={() => {
-                      setChats(prev => ({ ...prev, [m.id]: [] }));
-                      setActiveId(m.id);
-                      setShowNewConvo(false);
-                    }} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-50 transition-colors">
-                      <Avatar name={m.name} color={getMemberColor(m.id)} size="md" />
-                      <div className="text-left">
-                        <div className="text-sm font-semibold text-gray-900">{m.name}</div>
-                        <div className="text-xs text-gray-400">{m.designation ?? ''}</div>
-                      </div>
-                    </button>
-                  ))}
-                  {members.filter(m => !Object.keys(chats).includes(m.id)).length === 0 && (
-                    <div className="px-4 py-6 text-xs text-gray-400 text-center">All members already have conversations.</div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
             {filteredConvos.map((member, i) => {
               const color = getMemberColor(member.id);
               const lastMsg = getLastMsg(member.id);
@@ -559,6 +536,49 @@ const MessagesPage: React.FC = () => {
       </div>
 
       )}
+
+      {/* New Conversation modal — shown regardless of whether there are existing convos */}
+      <AnimatePresence>
+        {showNewConvo && (
+          <motion.div
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setShowNewConvo(false)}
+          >
+            <motion.div
+              className="bg-white rounded-2xl w-full max-w-sm mx-4 overflow-hidden max-h-[70vh] flex flex-col"
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }} transition={{ duration: 0.2 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-surface-100 shrink-0">
+                <button onClick={() => setShowNewConvo(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                <span className="font-semibold text-sm text-gray-900">New Conversation</span>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {members.length === 0 && (
+                  <div className="px-4 py-8 text-xs text-gray-400 text-center">
+                    No team members yet. Invite members from the Members page first.
+                  </div>
+                )}
+                {members.map(m => (
+                  <button key={m.id} onClick={() => {
+                    setChats(prev => ({ ...prev, [m.id]: [] }));
+                    setActiveId(m.id);
+                    setShowNewConvo(false);
+                  }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-50 transition-colors">
+                    <Avatar name={m.name} color={getMemberColor(m.id)} size="md" />
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-gray-900">{m.name}</div>
+                      <div className="text-xs text-gray-400">{m.designation ?? ''}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Right-click context menu */}
       <AnimatePresence>

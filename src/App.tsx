@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
@@ -26,6 +26,25 @@ import WalkthroughScreen from './pages/auth/WalkthroughScreen';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+
+// ── Sync AuthContext.user → AppContext.currentUser ────────────────────────────
+const AuthAppSync: React.FC = () => {
+    const { user: authUser } = useAuth();
+    const { setCurrentUser } = useContext(AppContext);
+    useEffect(() => {
+        if (authUser) {
+            setCurrentUser({
+                id: authUser.id,
+                orgId: 'org-toursurv',
+                name: authUser.name,
+                email: authUser.email,
+                role: authUser.role,
+                status: 'active',
+            });
+        }
+    }, [authUser?.id, authUser?.name, authUser?.email, authUser?.role]);
+    return null;
+};
 
 // ── Layout wrapper ────────────────────────────────────────────────────────────
 const Layout: React.FC<{
@@ -159,6 +178,7 @@ const Root: React.FC = () => {
 const App: React.FC = () => (
     <AuthProvider>
         <AppProvider>
+            <AuthAppSync />
             <MembersProvider>
                 <ProjectProvider>
                     <ToastProvider>

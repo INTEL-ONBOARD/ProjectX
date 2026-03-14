@@ -14,20 +14,12 @@ const fi = (i: number) => ({
   transition: { delay: i * 0.055 + 0.08, duration: 0.36, ease: 'easeOut' as const },
 });
 
-type Role = 'admin' | 'manager' | 'member';
-const roles: { value: Role; label: string; desc: string }[] = [
-  { value: 'admin', label: 'Admin', desc: 'Full access' },
-  { value: 'manager', label: 'Manager', desc: 'Manage teams' },
-  { value: 'member', label: 'Member', desc: 'View & edit' },
-];
-
 const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [role, setRole] = useState<Role>('member');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,7 +54,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
     setGlobalError('');
     setLoading(true);
     try {
-      await register(name.trim(), email.trim(), password, role);
+      await register(name.trim(), email.trim(), password, 'member');
     } catch (err: unknown) {
       setGlobalError(err instanceof Error ? err.message : 'Registration failed.');
     } finally {
@@ -119,20 +111,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
             {errors.confirm && <p className="text-xs text-red-500 mt-1.5">{errors.confirm}</p>}
           </motion.div>
 
-          <motion.div {...fi(5)}>
-            <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Role</label>
-            <div className="grid grid-cols-3 gap-2">
-              {roles.map(r => (
-                <button key={r.value} type="button" onClick={() => setRole(r.value)}
-                  className="flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl border-2 text-center transition-all"
-                  style={{ background: role === r.value ? '#F0EDFF' : '#F5F5F5', borderColor: role === r.value ? '#5030E5' : 'transparent' }}>
-                  <span className="text-xs font-bold" style={{ color: role === r.value ? '#5030E5' : '#374151' }}>{r.label}</span>
-                  <span className="text-[10px] font-medium" style={{ color: role === r.value ? '#5030E5' : '#9CA3AF' }}>{r.desc}</span>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-
           <AnimatePresence>
             {globalError && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
@@ -145,7 +123,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
             )}
           </AnimatePresence>
 
-          <motion.div {...fi(6)} className="pt-1">
+          <motion.div {...fi(5)} className="pt-1">
             <motion.button type="submit" disabled={loading}
               whileHover={!loading ? { scale: 1.015, boxShadow: '0 8px 28px rgba(80,48,229,0.35)' } : {}}
               whileTap={!loading ? { scale: 0.985 } : {}}
@@ -161,7 +139,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
           </motion.div>
         </form>
 
-        <motion.p {...fi(7)} className="text-center mt-5 text-sm text-gray-500">
+        <motion.p {...fi(6)} className="text-center mt-5 text-sm text-gray-500">
           Already have an account?{' '}
           <button onClick={onNavigateLogin} className="font-semibold text-primary-500 hover:text-primary-600 transition-colors">Sign in</button>
         </motion.p>
