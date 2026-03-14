@@ -166,11 +166,24 @@ const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?
 async function connectDB() {
     const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectx?retryWrites=true&w=majority';
     if (!uri) { console.error('MONGODB_URI not set'); return; }
-    try {
-        await mongoose.connect(uri);
-        console.log('MongoDB connected');
-    } catch (err) {
-        console.error('MongoDB connection failed:', err);
+    const opts = { serverSelectionTimeoutMS: 30000, connectTimeoutMS: 30000, socketTimeoutMS: 45000 };
+    for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+            await mongoose.connect(uri, opts);
+            console.log('MongoDB connected');
+            if (mainWindow) mainWindow.webContents.send('db:connected');
+            return;
+        } catch (err) {
+            console.error(`MongoDB connection attempt ${attempt} failed:`, err.message);
+            if (attempt < 5) {
+                const delay = attempt * 3000;
+                console.log(`Retrying in ${delay / 1000}s...`);
+                await new Promise(r => setTimeout(r, delay));
+            } else {
+                console.error('MongoDB connection failed after 5 attempts.');
+                if (mainWindow) mainWindow.webContents.send('db:connection-failed', err.message);
+            }
+        }
     }
 }
 
@@ -315,15 +328,20 @@ function registerDbHandlers() {
         if (!orgExists) {
             await OrgModel.create({ orgId: 'org-toursurv', name: 'Toursurv', workStart: '09:00', workEnd: '18:00', createdAt: new Date().toISOString() });
         }
-        // Default role permissions
+        // Default role permissions — always upsert admin to ensure new routes are included
         const defaultPerms = [
-            { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings'] },
+            { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings', '/admin'] },
             { role: 'manager', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/attendance', '/settings'] },
             { role: 'member',  allowedRoutes: ['/settings'] },
         ];
         for (const p of defaultPerms) {
-            const exists = await RolePermsModel.findOne({ role: p.role }).lean();
-            if (!exists) await RolePermsModel.create(p);
+            if (p.role === 'admin') {
+                // Always update admin to include any newly added routes
+                await RolePermsModel.findOneAndUpdate({ role: 'admin' }, { allowedRoutes: p.allowedRoutes }, { upsert: true });
+            } else {
+                const exists = await RolePermsModel.findOne({ role: p.role }).lean();
+                if (!exists) await RolePermsModel.create(p);
+            }
         }
     });
 

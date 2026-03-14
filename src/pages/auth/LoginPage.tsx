@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { BrandPanel, FormPanel, LogoMark } from './AuthBackground';
+
+const ipc = () => (window as any).electronAPI ?? null;
 
 interface LoginPageProps {
   onNavigateRegister: () => void;
@@ -24,6 +26,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focus, setFocus] = useState<Record<string, boolean>>({});
+  const [dbStatus, setDbStatus] = useState<'connecting' | 'connected' | 'failed'>('connecting');
+
+  useEffect(() => {
+    const api = ipc();
+    if (!api) { setDbStatus('connected'); return; }
+    const onConnected = () => setDbStatus('connected');
+    const onFailed = () => setDbStatus('failed');
+    api.on?.('db:connected', onConnected);
+    api.on?.('db:connection-failed', onFailed);
+    // If already connected (app loaded fast), check after short delay
+    const t = setTimeout(() => setDbStatus(s => s === 'connecting' ? 'connected' : s), 5000);
+    return () => {
+      api.removeListener?.('db:connected', onConnected);
+      api.removeListener?.('db:connection-failed', onFailed);
+      clearTimeout(t);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +52,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
     try {
       await login(email, password);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Login failed.');
+      const msg = err instanceof Error ? err.message : 'Login failed.';
+      if (msg.toLowerCase().includes('buffering timed out') || msg.toLowerCase().includes('timeout')) {
+        setError('Connection to the server is slow. Please wait a moment and try again.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -60,6 +84,28 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
           <h1 className="text-[1.75rem] font-bold text-gray-900 tracking-tight leading-tight">Welcome back</h1>
           <p className="text-gray-500 text-sm mt-1.5">Sign in to continue to your workspace.</p>
         </motion.div>
+
+        {/* DB connection status banner */}
+        <AnimatePresence>
+          {dbStatus !== 'connected' && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm mt-4 ${
+                dbStatus === 'failed'
+                  ? 'bg-red-50 text-red-600 border border-red-100'
+                  : 'bg-blue-50 text-blue-600 border border-blue-100'
+              }`}
+            >
+              {dbStatus === 'failed' ? <WifiOff size={15} className="shrink-0" /> : <Wifi size={15} className="shrink-0 animate-pulse" />}
+              {dbStatus === 'failed'
+                ? 'Could not connect to the server. Please check your internet and restart the app.'
+                : 'Connecting to server… this may take a moment on slow connections.'}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-4">
           {/* Email */}

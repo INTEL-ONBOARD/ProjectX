@@ -16,7 +16,6 @@ import {
     Bug,
     X,
     Shield,
-    UserCheck,
 } from 'lucide-react';
 import { useProjects } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
@@ -40,8 +39,7 @@ const ALL_NAV_ITEMS = [
     { id: '/reports', label: 'Reports', icon: BarChart3 },
     { id: '/organization', label: 'Organization', icon: Building2 },
     { id: '/settings', label: 'Settings', icon: Settings },
-    { id: '/roles', label: 'Roles', icon: Shield, adminOnly: true },
-    { id: '/user-requests', label: 'User Access', icon: UserCheck, adminOnly: true },
+    { id: '/admin', label: 'Admin', icon: Shield, adminOnly: true },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({

@@ -14,8 +14,7 @@ import OrganizationPage from './pages/OrganizationPage';
 import MessagesPage from './pages/MessagesPage';
 import TasksPage from './pages/TasksPage';
 import MembersPage from './pages/MembersPage';
-import RolesPage from './pages/RolesPage';
-import UserRequestsPage from './pages/UserRequestsPage';
+import AdminPage from './pages/AdminPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AppProvider, AppContext } from './context/AppContext';
 import { MembersProvider } from './context/MembersContext';
@@ -123,11 +122,14 @@ const ProtectedRoute: React.FC<{ path: string; children: React.ReactNode }> = ({
     const { user } = useAuth();
     const { getAllowedRoutes } = useRolePerms();
     const navigate = useNavigate();
-    const allowed = getAllowedRoutes(user?.role ?? 'member');
+    // Admins always have full access — never restrict them
+    const isAdmin = user?.role === 'admin';
+    const allowed = isAdmin ? null : getAllowedRoutes(user?.role ?? 'member');
+    const blocked = !isAdmin && allowed !== null && !allowed.includes(path);
     useEffect(() => {
-        if (!allowed.includes(path)) navigate('/settings', { replace: true });
-    }, [path, allowed, navigate]);
-    if (!allowed.includes(path)) return null;
+        if (blocked) navigate('/settings', { replace: true });
+    }, [blocked, navigate]);
+    if (blocked) return null;
     return <>{children}</>;
 };
 
@@ -144,8 +146,7 @@ const MainApp: React.FC = () => (
         <Route path="/reports" element={<ProtectedRoute path="/reports"><Layout><ReportsPage /></Layout></ProtectedRoute>} />
         <Route path="/organization" element={<ProtectedRoute path="/organization"><Layout><OrganizationPage /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<Layout><SettingsPage /></Layout>} />
-        <Route path="/roles" element={<ProtectedRoute path="/roles"><Layout><RolesPage /></Layout></ProtectedRoute>} />
-        <Route path="/user-requests" element={<ProtectedRoute path="/user-requests"><Layout><UserRequestsPage /></Layout></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute path="/admin"><Layout><AdminPage /></Layout></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
     </Routes>
 );

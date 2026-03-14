@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserCheck, RefreshCw, Search, Check, ChevronDown } from 'lucide-react';
+import { RefreshCw, Search, Check, ChevronDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { useAuth } from '../context/AuthContext';
