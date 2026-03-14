@@ -75,6 +75,7 @@ export interface AttendanceRecord {
     checkOut?: string;
     status: 'present' | 'absent' | 'half-day' | 'on-leave' | 'holiday' | 'wfh';
     notes?: string;
+    breakSessions?: { start: string; end: string | null }[];
 }
 
 interface AppContextType {
@@ -87,7 +88,7 @@ interface AppContextType {
     sidebarCollapsed: boolean;
     setSidebarCollapsed: (collapsed: boolean) => void;
     attendanceRecords: AttendanceRecord[];
-    setAttendanceRecord: (record: Omit<AttendanceRecord, 'id'>) => void;
+    setAttendanceRecord: (record: Omit<AttendanceRecord, 'id'>) => Promise<void>;
     selectedWeekStart: string;
     setSelectedWeekStart: (date: string) => void;
 }
@@ -102,7 +103,7 @@ export const AppContext = createContext<AppContextType>({
     sidebarCollapsed: false,
     setSidebarCollapsed: () => { },
     attendanceRecords: [],
-    setAttendanceRecord: () => {},
+    setAttendanceRecord: () => Promise.resolve(),
     selectedWeekStart: currentWeekMonday(),
     setSelectedWeekStart: () => {},
 });
@@ -176,7 +177,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     }, [currentUser]);
 
-    const setAttendanceRecord = useCallback((record: Omit<AttendanceRecord, 'id'>) => {
+    const setAttendanceRecord = useCallback((record: Omit<AttendanceRecord, 'id'>): Promise<void> => {
         const id = `${record.userId}-${record.date}`;
         setAttendanceRecords(prev => {
             const idx = prev.findIndex(r => r.id === id);
@@ -187,8 +188,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             return [...prev, { ...record, id }];
         });
-        dbApi().setAttendance({ ...record })
-            .catch((err: unknown) => console.error('[AppContext] Failed to persist attendance record:', err));
+        return dbApi().setAttendance({ ...record })
+            .then(() => {})
+            .catch((err: unknown) => { console.error('[AppContext] Failed to persist attendance record:', err); });
     }, []);
 
     const value = useMemo(
