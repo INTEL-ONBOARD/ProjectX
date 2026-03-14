@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import path from 'path';
 import dotenv from 'dotenv';
 import mongoose, { Schema, Document } from 'mongoose';
@@ -252,8 +252,12 @@ function createWindow() {
         titleBarStyle: 'hiddenInset',
         trafficLightPosition: { x: 15, y: 15 },
         backgroundColor: '#F5F5F5',
+        autoHideMenuBar: true,
         show: false,
     });
+
+    // Remove native menu bar on all platforms (Windows/Linux)
+    Menu.setApplicationMenu(null);
 
     if (process.env.VITE_DEV_SERVER_URL) {
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);

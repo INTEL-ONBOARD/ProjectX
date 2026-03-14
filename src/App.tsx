@@ -14,7 +14,6 @@ import OrganizationPage from './pages/OrganizationPage';
 import MessagesPage from './pages/MessagesPage';
 import TasksPage from './pages/TasksPage';
 import MembersPage from './pages/MembersPage';
-import AdminPage from './pages/AdminPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AppProvider, AppContext } from './context/AppContext';
 import { MembersProvider } from './context/MembersContext';
@@ -146,7 +145,6 @@ const MainApp: React.FC = () => (
         <Route path="/reports" element={<ProtectedRoute path="/reports"><Layout><ReportsPage /></Layout></ProtectedRoute>} />
         <Route path="/organization" element={<ProtectedRoute path="/organization"><Layout><OrganizationPage /></Layout></ProtectedRoute>} />
         <Route path="/settings" element={<Layout><SettingsPage /></Layout>} />
-        <Route path="/admin" element={<ProtectedRoute path="/admin"><Layout><AdminPage /></Layout></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
     </Routes>
 );
