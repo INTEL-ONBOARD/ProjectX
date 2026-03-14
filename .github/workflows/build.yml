@@ -83,3 +83,19 @@ jobs:
           name: dist-${{ matrix.os }}
           path: release/
           retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Publish the draft release after all platform builds succeed
+  # ─────────────────────────────────────────────────────────────────────────────
+  publish-release:
+    name: Publish release
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mark release as published (non-draft, latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit ${{ github.ref_name }} --draft=false --latest

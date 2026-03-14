@@ -139,7 +139,13 @@ const AuthUserModel = mongoose.model('AuthUser', AuthUserSchema);
 const UserPrefModel = mongoose.model('UserPref', UserPrefSchema);
 const NotifPrefModel = mongoose.model('NotifPref', NotifPrefSchema);
 const AppearancePrefModel = mongoose.model('AppearancePref', AppearancePrefSchema);
+const RolePermsSchema = new Schema({
+    role:           { type: String, required: true, unique: true },
+    allowedRoutes:  { type: [String], default: [] },
+});
+
 const OrgModel = mongoose.model('Org', OrgSchema);
+const RolePermsModel = mongoose.model('RolePerms', RolePermsSchema);
 const UserModel = mongoose.model('User', UserSchema);
 const TaskModel = mongoose.model('Task', TaskSchema);
 const ProjectModel = mongoose.model('Project', ProjectSchema);
@@ -299,6 +305,16 @@ function registerDbHandlers() {
         if (!orgExists) {
             await OrgModel.create({ orgId: 'org-toursurv', name: 'Toursurv', workStart: '09:00', workEnd: '18:00', createdAt: new Date().toISOString() });
         }
+        // Default role permissions
+        const defaultPerms = [
+            { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings'] },
+            { role: 'manager', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/attendance', '/settings'] },
+            { role: 'member',  allowedRoutes: ['/settings'] },
+        ];
+        for (const p of defaultPerms) {
+            const exists = await RolePermsModel.findOne({ role: p.role }).lean();
+            if (!exists) await RolePermsModel.create(p);
+        }
     });
 
     // Organization
@@ -310,6 +326,17 @@ function registerDbHandlers() {
     ipcMain.handle('db:org:set', async (_e, data) => {
         const d = await OrgModel.findOneAndUpdate({ orgId: data.id ?? 'org-toursurv' }, { ...data, orgId: data.id ?? 'org-toursurv' }, { upsert: true, new: true }).lean();
         return safe(toOrg(d));
+    });
+
+    // Role permissions
+    ipcMain.handle('db:roleperms:getAll', async () => {
+        const docs = await RolePermsModel.find().lean();
+        return safe(docs.map(d => ({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] })));
+    });
+    ipcMain.handle('db:roleperms:set', async (_e, data) => {
+        // data: { role, allowedRoutes }
+        const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, new: true }).lean();
+        return safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] });
     });
 
     // User preferences

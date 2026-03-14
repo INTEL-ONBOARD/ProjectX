@@ -95,5 +95,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Organization
         getOrg: () => ipcRenderer.invoke('db:org:get'),
         setOrg: (data) => ipcRenderer.invoke('db:org:set', data),
+
+        // Role permissions
+        getRolePerms: () => ipcRenderer.invoke('db:roleperms:getAll'),
+        setRolePerms: (data) => ipcRenderer.invoke('db:roleperms:set', data),
     },
 });

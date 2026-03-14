@@ -17,6 +17,8 @@ import {
     X,
 } from 'lucide-react';
 import { useProjects } from '../../context/ProjectContext';
+import { useAuth } from '../../context/AuthContext';
+import { useRolePerms } from '../../context/RolePermsContext';
 
 interface SidebarProps {
     collapsed: boolean;
@@ -25,7 +27,7 @@ interface SidebarProps {
     onProjectSelect: (id: string) => void;
 }
 
-const navItems = [
+const ALL_NAV_ITEMS = [
     { id: '/', label: 'Task Board', icon: LayoutGrid },
     { id: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: '/messages', label: 'Messages', icon: MessageSquare },
@@ -51,6 +53,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     const [newProjName, setNewProjName] = useState('');
     const [newProjColor, setNewProjColor] = useState('#5030E5');
     const { projects, createProject } = useProjects();
+    const { user } = useAuth();
+    const { getAllowedRoutes } = useRolePerms();
+
+    const allowedRoutes = getAllowedRoutes(user?.role ?? 'member');
+    const navItems = ALL_NAV_ITEMS.filter(item => allowedRoutes.includes(item.id));
 
     return (
         <>
