@@ -381,7 +381,87 @@ const OrganizationPage: React.FC = () => {
 
           {section === 'users' && isAdmin && (
             <motion.div key="users" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              {null /* Task 3 */}
+    <div className="flex items-center justify-between mb-1">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Users</h2>
+        <p className="text-sm text-gray-400 mt-0.5">Manage registered users and assign roles</p>
+      </div>
+      <button
+        onClick={loadUsers}
+        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-surface-100 transition-colors"
+        title="Refresh"
+      >
+        <RefreshCw size={14} className={usersLoading ? 'animate-spin' : ''} />
+      </button>
+    </div>
+
+    {/* Stat pills */}
+    <div className="flex gap-3 mt-6">
+      {[
+        { label: 'Total',    value: authUsers.length, cls: 'bg-surface-100 text-gray-600 border-surface-200' },
+        { label: 'Admins',   value: adminCount,       cls: 'bg-primary-50 text-primary-600 border-primary-200' },
+        { label: 'Managers', value: managerCount,     cls: 'bg-[#FFFBEB] text-[#D97706] border-[#FCD34D]' },
+        { label: 'Members',  value: memberCount,      cls: 'bg-surface-100 text-gray-500 border-surface-200' },
+      ].map(s => (
+        <span key={s.label} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${s.cls}`}>
+          <span className="font-bold text-sm">{s.value}</span> {s.label}
+        </span>
+      ))}
+    </div>
+
+    {/* Toolbar */}
+    <div className="flex items-center gap-2.5 mt-4">
+      <div className="relative flex-1 max-w-sm">
+        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search name or email…"
+          className="w-full pl-9 pr-3 py-2 text-sm border border-surface-200 rounded-xl focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
+        />
+      </div>
+      <div className="flex items-center gap-1">
+        {(['all', 'admin', 'manager', 'member'] as const).map(f => (
+          <button
+            key={f} onClick={() => setRoleFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${roleFilter === f ? 'bg-primary-500 text-white' : 'bg-surface-100 text-gray-500 hover:bg-surface-200'}`}
+          >
+            {f === 'all' ? 'All' : f}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* Table */}
+    <div className="mt-4 rounded-2xl border border-surface-200 overflow-hidden">
+      <div className="grid grid-cols-[32px_1fr_1fr_140px] gap-4 px-5 py-3 bg-surface-50 border-b border-surface-100">
+        {['', 'Name', 'Email', 'Role'].map((h, i) => (
+          <div key={i} className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</div>
+        ))}
+      </div>
+      {usersLoading ? (
+        <div className="py-12 text-center text-sm text-gray-400">Loading users…</div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="py-12 text-center text-sm text-gray-400">No users found.</div>
+      ) : (
+        <div className="divide-y divide-surface-100">
+          {filteredUsers.map((u, i) => (
+            <motion.div
+              key={u.id}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.025 }}
+              className="grid grid-cols-[32px_1fr_1fr_140px] gap-4 px-5 py-3.5 items-center hover:bg-surface-50/60 transition-colors"
+            >
+              <Avatar name={u.name} color="#5030E5" size="sm" />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-gray-900 truncate">{u.name}</div>
+                {u.id === authUser?.id && <div className="text-[10px] text-primary-400 font-medium">You</div>}
+              </div>
+              <div className="text-sm text-gray-400 truncate">{u.email}</div>
+              <RoleDropdown userId={u.id} current={u.role} isSelf={u.id === authUser?.id} onChange={handleRoleChange} />
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
             </motion.div>
           )}
 
