@@ -49,6 +49,7 @@ const AttendanceSchema = new Schema({
     checkOut: String,
     status: { type: String, enum: ['present', 'absent', 'half-day', 'on-leave', 'holiday', 'wfh'], default: 'present' },
     notes: String,
+    breakSessions: { type: [{ start: String, end: String }], default: [] },
 });
 
 const MessageSchema = new Schema({
@@ -219,11 +220,11 @@ function registerDbHandlers() {
     ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toUser(d)) : null; });
     ipcMain.handle('db:members:remove', async (_e, id) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
 
-    ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map(d => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
+    ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map(d => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })) }))));
     ipcMain.handle('db:attendance:set', async (_e, record) => {
         const recordId = `${record.userId}-${record.date}`;
         const d = await AttendanceModel.findOneAndUpdate({ recordId }, { recordId, ...record }, { upsert: true, new: true }).lean();
-        return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null });
+        return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })) });
     });
     ipcMain.handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
 
