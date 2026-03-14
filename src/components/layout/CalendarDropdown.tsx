@@ -42,6 +42,14 @@ function toISODate(date: Date): string {
     return `${y}-${m}-${d}`;
 }
 
+function getMonday(dateStr: string): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const day = date.getDay(); // 0=Sun
+    date.setDate(date.getDate() - (day === 0 ? 6 : day - 1));
+    return toISODate(date);
+}
+
 function formatLabel(dateStr: string): string {
     const [y, m, d] = dateStr.split('-').map(Number);
     const date = new Date(y, m - 1, d);
@@ -49,7 +57,7 @@ function formatLabel(dateStr: string): string {
 }
 
 const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
-    const { attendanceRecords, setAttendanceRecord, currentUser } = useContext(AppContext);
+    const { attendanceRecords, setAttendanceRecord, currentUser, setSelectedWeekStart } = useContext(AppContext);
 
     // Hooks MUST come before any conditional return (Rules of Hooks)
     const today = new Date();
@@ -159,7 +167,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                     return (
                         <button
                             key={dateStr}
-                            onClick={() => setSelectedDate(dateStr)}
+                            onClick={() => { setSelectedDate(dateStr); setSelectedWeekStart(getMonday(dateStr)); }}
                             className={`
                                 w-7 h-7 mx-auto rounded-md text-[11px] font-medium transition-colors
                                 ${isSelected ? 'bg-primary-500 text-white' : ''}

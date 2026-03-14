@@ -3,22 +3,26 @@ import { motion } from 'framer-motion';
 import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { teamMembers, memberColors } from '../data/mockData';
 import { AppContext, AttendanceRecord } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
 import { downloadCsv } from '../utils/exportCsv';
 
+function addDays(dateStr: string, n: number): string {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() + n);
+    const yr = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, '0');
+    const dy = String(date.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${dy}`;
+}
+
 const AttendancePage: React.FC = () => {
-    const { attendanceRecords } = useContext(AppContext);
-    const { members } = useMembersContext();
+    const { attendanceRecords, selectedWeekStart } = useContext(AppContext);
+    const { members, getMemberColor } = useMembersContext();
 
-    const WEEK_DATES = ['2020-12-01', '2020-12-02', '2020-12-03', '2020-12-04', '2020-12-05'];
+    const WEEK_DATES = [0, 1, 2, 3, 4].map(i => addDays(selectedWeekStart, i));
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-
-    const designations: Record<string, string> = {
-        u1: 'Project Manager', u2: 'Frontend Developer', u3: 'UI Designer',
-        u4: 'Backend Developer', u5: 'QA Engineer', u6: 'DevOps Engineer',
-    };
 
     const rateStyles: Record<string, { bg: string; text: string }> = {
         '100%': { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]' },
@@ -39,22 +43,22 @@ const AttendancePage: React.FC = () => {
     }
 
     // Metrics
-    const totalPresent = teamMembers.reduce((sum, m) =>
+    const totalPresent = members.reduce((sum, m) =>
         sum + WEEK_DATES.filter(d => isPresent(getMemberStatus(m.id, d))).length, 0);
-    const totalAbsent = teamMembers.reduce((sum, m) =>
+    const totalAbsent = members.reduce((sum, m) =>
         sum + WEEK_DATES.filter(d => getMemberStatus(m.id, d) === 'absent').length, 0);
-    const perfectCount = teamMembers.filter(m =>
+    const perfectCount = members.filter(m =>
         WEEK_DATES.every(d => isPresent(getMemberStatus(m.id, d)))).length;
-    const avgRate = Math.round((totalPresent / (teamMembers.length * 5)) * 100);
+    const avgRate = members.length > 0 ? Math.round((totalPresent / (members.length * 5)) * 100) : 0;
 
     const dailyPresent = WEEK_DATES.map(date =>
-        teamMembers.filter(m => isPresent(getMemberStatus(m.id, date))).length
+        members.filter(m => isPresent(getMemberStatus(m.id, date))).length
     );
 
     const metrics = [
         { label: 'Team Avg Rate', value: `${avgRate}%`, trend: 'This week', trendUp: true, color: '', accent: true, icon: TrendingUp, barPct: avgRate },
-        { label: 'Perfect Attendance', value: String(perfectCount), trend: '100% rate', trendUp: true, color: '#68B266', accent: false, icon: CheckCircle, barPct: (perfectCount / teamMembers.length) * 100 },
-        { label: 'One Absence', value: String(teamMembers.length - perfectCount), trend: '80% rate', trendUp: false, color: '#D58D49', accent: false, icon: AlertCircle, barPct: ((teamMembers.length - perfectCount) / teamMembers.length) * 100 },
+        { label: 'Perfect Attendance', value: String(perfectCount), trend: '100% rate', trendUp: true, color: '#68B266', accent: false, icon: CheckCircle, barPct: members.length > 0 ? (perfectCount / members.length) * 100 : 0 },
+        { label: 'One Absence', value: String(members.length - perfectCount), trend: '80% rate', trendUp: false, color: '#D58D49', accent: false, icon: AlertCircle, barPct: members.length > 0 ? ((members.length - perfectCount) / members.length) * 100 : 0 },
         { label: 'Days Tracked', value: '5', trend: 'Mon–Fri', trendUp: true, color: '#30C5E5', accent: false, icon: Calendar, barPct: 100 },
     ];
 
@@ -120,7 +124,7 @@ const AttendancePage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col min-h-0">
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
             <h2 className="font-bold text-gray-900 text-sm">Weekly Attendance</h2>
-            <span className="text-xs text-gray-400">Dec 1–5, 2020</span>
+            <span className="text-xs text-gray-400">{WEEK_DATES[0]} – {WEEK_DATES[4]}</span>
           </div>
           <div className="flex-1 overflow-y-auto min-h-0">
           <table className="w-full">
@@ -135,8 +139,8 @@ const AttendancePage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {teamMembers.map((member, i) => {
-                const color = memberColors[i] ?? memberColors[0];
+              {members.map((member, i) => {
+                const color = getMemberColor(member.id);
                 const dayStatuses = WEEK_DATES.map(date => getMemberStatus(member.id, date));
                 const presentCount = dayStatuses.filter(isPresent).length;
                 const rate = `${Math.round((presentCount / 5) * 100)}%`;
@@ -154,7 +158,7 @@ const AttendancePage: React.FC = () => {
                         <span className="font-semibold text-xs text-gray-900">{member.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{designations[member.id] ?? '—'}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{member.designation ?? '—'}</td>
                     {dayStatuses.map((status, di) => (
                         <td key={days[di]} className="px-3 py-3 text-center">
                             <div className={`w-2.5 h-2.5 rounded-full mx-auto ${
@@ -197,15 +201,15 @@ const AttendancePage: React.FC = () => {
             <h3 className="font-bold text-gray-900 text-sm mb-3">Daily Breakdown</h3>
             {days.map((day, di) => {
               const present = dailyPresent[di];
-              const pct = (present / teamMembers.length) * 100;
-              const allPresent = present === teamMembers.length;
+              const pct = members.length > 0 ? (present / members.length) * 100 : 0;
+              const allPresent = members.length > 0 && present === members.length;
               return (
                 <div key={day} className="flex items-center gap-2 py-2 border-b border-surface-100 last:border-0 text-xs">
                   <span className="text-gray-500 w-8 shrink-0">{day}</span>
                   <div className="flex-1 h-1.5 bg-surface-200 rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: allPresent ? '#68B266' : '#FFA500' }} />
                   </div>
-                  <span className="font-bold text-gray-900 w-8 text-right">{present}/{teamMembers.length}</span>
+                  <span className="font-bold text-gray-900 w-8 text-right">{present}/{members.length}</span>
                 </div>
               );
             })}

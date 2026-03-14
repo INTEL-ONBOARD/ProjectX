@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
@@ -11,7 +11,6 @@ import { useMembersContext } from '../context/MembersContext';
 import TaskFormModal from '../components/modals/TaskFormModal';
 import { downloadCsv } from '../utils/exportCsv';
 
-const sprintMeta = { start: 'Dec 1, 2020', end: 'Dec 31, 2020', velocity: '2.3 tasks/day', blockers: 2 };
 
 const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
   low: { bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]', label: 'Low' },
@@ -28,9 +27,17 @@ const tabs = ['All', 'To Do', 'In Progress', 'Done'];
 
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { projects: contextProjects, allTasks, createTask, updateTask, deleteTask } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const [activeTab, setActiveTab] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Pre-populate search from header search navigation
+  useEffect(() => {
+    const s = (location.state as any)?.search;
+    if (s) setSearchQuery(s);
+  }, []);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
@@ -50,10 +57,14 @@ const TasksPage: React.FC = () => {
 
   const totalTasks = allTasks.length;
 
-  const filteredTasks = activeTab === 0 ? allTasks
+  const tabTasks = activeTab === 0 ? allTasks
     : activeTab === 1 ? allTasks.filter(t => t.status === 'todo')
     : activeTab === 2 ? allTasks.filter(t => t.status === 'in-progress')
     : allTasks.filter(t => t.status === 'done');
+
+  const filteredTasks = searchQuery.trim()
+    ? tabTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : tabTasks;
 
   const assigneeCounts: Record<string, number> = {};
   allTasks.forEach(t => t.assignees.forEach(id => { assigneeCounts[id] = (assigneeCounts[id] ?? 0) + 1; }));
@@ -189,7 +200,7 @@ const TasksPage: React.FC = () => {
               <button onClick={() => navigate('/')} className="text-xs text-primary-500 font-semibold hover:text-primary-700 transition-colors">Board view →</button>
             </div>
             {/* Tabs */}
-            <div className="px-5 pt-3">
+            <div className="px-5 pt-3 flex items-center justify-between gap-3">
               <div className="flex gap-1 bg-surface-100 rounded-lg p-1 mb-3 w-fit">
                 {tabs.map((t, i) => {
                   const count = i === 0 ? totalTasks : i === 1 ? todoCount : i === 2 ? inProgCount : doneCount;
@@ -199,6 +210,20 @@ const TasksPage: React.FC = () => {
                     </button>
                   );
                 })}
+              </div>
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  placeholder="Search tasks..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-3 pr-7 py-1.5 text-xs rounded-lg border border-surface-200 bg-surface-50 focus:outline-none focus:border-primary-300 focus:ring-1 focus:ring-primary-100 transition-all w-44"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X size={11} />
+                  </button>
+                )}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
@@ -274,7 +299,7 @@ const TasksPage: React.FC = () => {
                     transition={{ duration: 0.6, delay: 0.3, ease: [0.4, 0, 0.2, 1] }} />
                 </div>
               </div>
-              {[['Start date', sprintMeta.start], ['End date', sprintMeta.end], ['Velocity', sprintMeta.velocity], ['Blockers', String(sprintMeta.blockers)]].map(([label, val]) => (
+              {[['Total Tasks', String(totalTasks)], ['Completed', String(doneCount)], ['Remaining', String(todoCount + inProgCount)]].map(([label, val]) => (
                 <div key={label} className="flex justify-between py-2 border-b border-surface-100 last:border-0 text-xs">
                   <span className="text-gray-500">{label}</span>
                   <span className={`font-bold ${label === 'Blockers' ? 'text-[#D8727D]' : 'text-gray-900'}`}>{val}</span>

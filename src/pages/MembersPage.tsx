@@ -10,13 +10,6 @@ import InviteMemberModal from '../components/modals/InviteMemberModal';
 import { downloadCsv } from '../utils/exportCsv';
 import { User } from '../types';
 
-const locations: Record<string, string> = {
-  u1: 'U.P, India', u2: 'Mumbai', u3: 'Remote',
-  u4: 'Remote', u5: 'Bangalore', u6: 'Remote',
-};
-const onlineStatus: Record<string, 'online' | 'away' | 'offline'> = {
-  u1: 'online', u2: 'online', u3: 'away', u4: 'online', u5: 'online', u6: 'offline',
-};
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
 
@@ -45,7 +38,7 @@ const MembersPage: React.FC = () => {
   const adminCount = members.filter(m => m.role === 'admin').length;
   const managerCount = members.filter(m => m.role === 'manager').length;
   const memberCount = members.filter(m => m.role === 'member').length;
-  const onlineCount = members.filter(m => onlineStatus[m.id] === 'online').length;
+  const onlineCount = members.filter(m => m.status === 'active').length;
 
   const metrics = [
     { label: 'Total Members', value: String(members.length), trend: '↑ 1 new', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
@@ -60,7 +53,7 @@ const MembersPage: React.FC = () => {
 
   const locationCounts: Record<string, number> = {};
   members.forEach(m => {
-    const loc = locations[m.id] ?? m.location ?? 'Unknown';
+    const loc = m.location ?? 'Unknown';
     locationCounts[loc] = (locationCounts[loc] ?? 0) + 1;
   });
 
@@ -145,7 +138,7 @@ const MembersPage: React.FC = () => {
                   const role = roleStyles[member.role] ?? roleStyles.member;
                   const tc = memberTaskCounts[member.id] ?? { assigned: 0, total: 5 };
                   const pct = tc.total > 0 ? (tc.assigned / tc.total) * 100 : 0;
-                  const status = onlineStatus[member.id] ?? 'online';
+                  const status: 'online' | 'offline' = member.status === 'active' ? 'online' : 'offline';
                   const isConfirmingRemove = confirmRemoveId === member.id;
                   return (
                     <motion.tr
@@ -169,7 +162,7 @@ const MembersPage: React.FC = () => {
                           {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{member.location ?? locations[member.id] ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500">{member.location ?? '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className="w-16 h-1.5 bg-surface-200 rounded-full overflow-hidden">
@@ -267,8 +260,8 @@ const MembersPage: React.FC = () => {
               initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.35, delay: 0.16, ease: [0.4, 0, 0.2, 1] }}>
               <h3 className="font-bold text-gray-900 text-sm mb-3">Availability</h3>
-              {(['online', 'away', 'offline'] as const).map(s => {
-                const count = members.filter(m => (onlineStatus[m.id] ?? 'offline') === s).length;
+              {(['online', 'offline'] as const).map(s => {
+                const count = members.filter(m => (m.status === 'active' ? 'online' : 'offline') === s).length;
                 return (
                   <div key={s} className="flex items-center gap-2 py-2 border-b border-surface-100 last:border-0">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[s] }} />

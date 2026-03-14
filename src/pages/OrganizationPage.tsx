@@ -1,32 +1,18 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Building2, Users, MapPin, BarChart2, FolderKanban, Code2, Palette, Settings2, SearchCode, X, Plus } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { currentUser, teamMembers, memberColors } from '../data/mockData';
+import { AppContext } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
+import { useProjects } from '../context/ProjectContext';
 import { PROJECT_COLORS } from '../data/mockData';
 
-const designations: Record<string, string> = {
-  u1: 'Project Manager', u2: 'Frontend Developer', u3: 'UI Designer',
-  u4: 'Backend Developer', u5: 'QA Engineer', u6: 'DevOps Engineer',
-};
 const roleStyles: Record<string, { bg: string; text: string }> = {
   admin: { bg: 'bg-primary-50', text: 'text-primary-600' },
   manager: { bg: 'bg-[#FFFBEB]', text: 'text-[#D97706]' },
   member: { bg: 'bg-surface-200', text: 'text-gray-500' },
 };
-
-const subordinates = teamMembers.filter(m => m.id !== currentUser.id);
-const locationCount = 3;
-const avgWorkload = '2.3';
-
-const metrics = [
-  { label: 'Total Members', value: String(teamMembers.length), trend: 'In org', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
-  { label: 'Departments', value: '5', trend: 'Roles', trendUp: true, color: '#5030E5', accent: false, icon: Building2, barPct: 100 },
-  { label: 'Locations', value: String(locationCount), trend: 'Cities', trendUp: true, color: '#30C5E5', accent: false, icon: MapPin, barPct: (locationCount / 5) * 100 },
-  { label: 'Avg Workload', value: avgWorkload, trend: 'tasks/member', trendUp: true, color: '#FFA500', accent: false, icon: BarChart2, barPct: 46 },
-];
 
 interface DeptEntry {
   name: string;
@@ -36,15 +22,28 @@ interface DeptEntry {
 }
 
 const OrganizationPage: React.FC = () => {
+  const { currentUser } = useContext(AppContext);
   const { members, getMemberColor } = useMembersContext();
+  const { allTasks } = useProjects();
+
+  const subordinates = members.filter(m => m.id !== currentUser?.id);
+  const locationCount = new Set(members.map(m => m.location).filter(Boolean)).size || members.length;
+  const avgWorkload = members.length > 0 ? (allTasks.length / members.length).toFixed(1) : '0.0';
 
   const [deptRoster, setDeptRoster] = useState<DeptEntry[]>([
-    { icon: FolderKanban, name: 'Project Management', color: '#5030E5', memberIds: ['u1'] },
-    { icon: Code2,        name: 'Frontend',            color: '#30C5E5', memberIds: ['u2'] },
-    { icon: Palette,      name: 'Design',               color: '#FFA500', memberIds: ['u3'] },
-    { icon: Settings2,    name: 'Backend',              color: '#68B266', memberIds: ['u4'] },
-    { icon: SearchCode,   name: 'QA',                   color: '#D8727D', memberIds: ['u5'] },
+    { icon: FolderKanban, name: 'Project Management', color: '#5030E5', memberIds: [] },
+    { icon: Code2,        name: 'Frontend',            color: '#30C5E5', memberIds: [] },
+    { icon: Palette,      name: 'Design',               color: '#FFA500', memberIds: [] },
+    { icon: Settings2,    name: 'Backend',              color: '#68B266', memberIds: [] },
+    { icon: SearchCode,   name: 'QA',                   color: '#D8727D', memberIds: [] },
   ]);
+
+  const metrics = [
+    { label: 'Total Members', value: String(members.length), trend: 'In org', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
+    { label: 'Departments', value: String(deptRoster.length), trend: 'Roles', trendUp: true, color: '#5030E5', accent: false, icon: Building2, barPct: 100 },
+    { label: 'Locations', value: String(locationCount), trend: 'Cities', trendUp: true, color: '#30C5E5', accent: false, icon: MapPin, barPct: 100 },
+    { label: 'Avg Workload', value: avgWorkload, trend: 'tasks/member', trendUp: true, color: '#FFA500', accent: false, icon: BarChart2, barPct: Math.min(100, parseFloat(avgWorkload) * 10) },
+  ];
 
   const [showAddDept, setShowAddDept] = useState(false);
   const [addMemberToDept, setAddMemberToDept] = useState<number | null>(null);
@@ -111,9 +110,9 @@ const OrganizationPage: React.FC = () => {
               initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}>
               <div className="bg-gradient-to-br from-primary-50 to-primary-100 border-2 border-primary-200 rounded-2xl p-5 text-center w-44">
-                <Avatar name={currentUser.name} color={memberColors[0]} size="xl" className="mx-auto" />
-                <div className="font-bold text-gray-900 text-sm mt-2">{currentUser.name}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{designations[currentUser.id]}</div>
+                <Avatar name={currentUser?.name ?? ''} color={getMemberColor(currentUser?.id ?? '')} size="xl" className="mx-auto" />
+                <div className="font-bold text-gray-900 text-sm mt-2">{currentUser?.name ?? ''}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{currentUser?.designation ?? ''}</div>
                 <span className="bg-primary-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 inline-block">Admin</span>
               </div>
             </motion.div>
@@ -127,7 +126,7 @@ const OrganizationPage: React.FC = () => {
             {/* Subordinate nodes */}
             <div className="flex flex-wrap justify-center gap-3 mt-0">
               {subordinates.map((member, i) => {
-                const color = memberColors[teamMembers.findIndex(m => m.id === member.id)] ?? memberColors[0];
+                const color = getMemberColor(member.id);
                 const role = roleStyles[member.role] ?? roleStyles.member;
                 return (
                   <motion.div
@@ -139,7 +138,7 @@ const OrganizationPage: React.FC = () => {
                   >
                     <Avatar name={member.name} color={color} size="lg" className="mx-auto" />
                     <div className="font-semibold text-gray-800 text-xs mt-2">{member.name}</div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">{designations[member.id]}</div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">{member.designation ?? ''}</div>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md mt-1.5 inline-block ${role.bg} ${role.text}`}>
                       {member.role?.charAt(0).toUpperCase()}{member.role?.slice(1) ?? ''}
                     </span>
@@ -191,7 +190,7 @@ const OrganizationPage: React.FC = () => {
             initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.35, delay: 0.08, ease: [0.4, 0, 0.2, 1] }}>
             <h3 className="font-bold text-gray-900 text-sm mb-3">Reporting Lines</h3>
-            <div className="text-xs text-gray-700 font-semibold mb-2">{currentUser.name}</div>
+            <div className="text-xs text-gray-700 font-semibold mb-2">{currentUser?.name ?? ''}</div>
             <div className="flex flex-col gap-1.5 pl-3 border-l-2 border-primary-200">
               {subordinates.map(m => (
                 <div key={m.id} className="flex items-center gap-1.5 text-xs text-gray-500">

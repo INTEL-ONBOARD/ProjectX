@@ -1,68 +1,94 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Calendar, HelpCircle, Bell, ChevronDown, CalendarClock, CheckCircle2, MessageCircle, AlertTriangle, BookOpen, PlayCircle, Headphones, Bug, LogOut, Settings } from 'lucide-react';
+import { Search, Calendar, HelpCircle, Bell, ChevronDown, BookOpen, PlayCircle, Headphones, Bug, LogOut, Settings, CheckSquare, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { memberColors } from '../../data/mockData';
+import { useProjects } from '../../context/ProjectContext';
+import { useMembersContext } from '../../context/MembersContext';
 import { Avatar } from '../ui/Avatar';
 import CalendarDropdown from './CalendarDropdown';
+import { useToast } from '../ui/Toast';
 
-type NotifIcon = 'calendar' | 'check' | 'message' | 'alert';
 type HelpIcon = 'book' | 'play' | 'headphones' | 'bug';
-
-const NOTIFICATIONS: { id: string; icon: NotifIcon; iconColor: string; iconBg: string; title: string; desc: string; time: string; unread: boolean }[] = [
-    { id: 'n1', icon: 'calendar', iconColor: 'text-primary-500', iconBg: 'bg-primary-50', title: 'Sprint review today', desc: 'Dec 3 at 3:00 PM', time: '10m ago', unread: true },
-    { id: 'n2', icon: 'check', iconColor: 'text-[#68B266]', iconBg: 'bg-[#83C29D22]', title: 'Task "Moodboard" marked done', desc: 'by Priya Singh', time: '1h ago', unread: true },
-    { id: 'n3', icon: 'message', iconColor: 'text-[#30C5E5]', iconBg: 'bg-[#30C5E515]', title: 'New comment on "Auth Flow"', desc: 'Rohan: "Left a review"', time: '2h ago', unread: false },
-    { id: 'n4', icon: 'alert', iconColor: 'text-[#D8727D]', iconBg: 'bg-[#D8727D15]', title: '"API Integration" is overdue', desc: 'Due Dec 1, 2020', time: 'Yesterday', unread: false },
-];
-
-const HELP_ITEMS: { icon: HelpIcon; label: string; desc: string; action: () => void }[] = [
-    { icon: 'book', label: 'Documentation', desc: 'Guides & references', action: () => window.alert('Documentation coming soon.') },
-    { icon: 'play', label: 'Video Tutorials', desc: 'Learn by watching', action: () => window.alert('Video tutorials coming soon.') },
-    { icon: 'headphones', label: 'Live Chat Support', desc: 'Talk to the team', action: () => window.alert('Live chat requires backend integration.') },
-    { icon: 'bug', label: 'Report a Bug', desc: 'Something broken?', action: () => window.dispatchEvent(new CustomEvent('open-bug-report')) },
-];
-
-const NotifIconMap: Record<NotifIcon, React.ElementType> = { calendar: CalendarClock, check: CheckCircle2, message: MessageCircle, alert: AlertTriangle };
 const HelpIconMap: Record<HelpIcon, React.ElementType> = { book: BookOpen, play: PlayCircle, headphones: Headphones, bug: Bug };
+
+const priorityColors: Record<string, string> = {
+    high: 'text-[#D8727D] bg-[#D8727D15]',
+    low: 'text-[#D58D49] bg-[#DFA87420]',
+    completed: 'text-[#68B266] bg-[#83C29D20]',
+};
 
 const Header: React.FC = () => {
     const navigate = useNavigate();
     const { currentUser } = useContext(AppContext);
     const { logout, user: authUser } = useAuth();
+    const { allTasks } = useProjects();
+    const { members, getMemberColor } = useMembersContext();
+    const { showToast } = useToast();
+
     const [searchQuery, setSearchQuery] = useState('');
+    const [showResults, setShowResults] = useState(false);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
     const [isUserOpen, setIsUserOpen] = useState(false);
-    const [readIds, setReadIds] = useState<string[]>([]);
+
+    const searchRef = useRef<HTMLDivElement>(null);
     const calendarRef = useRef<HTMLDivElement>(null);
     const notifRef = useRef<HTMLDivElement>(null);
     const helpRef = useRef<HTMLDivElement>(null);
     const userRef = useRef<HTMLDivElement>(null);
 
+    // ── Search results ─────────────────────────────────────────────────────────
+    const q = searchQuery.toLowerCase().trim();
+    const matchedTasks = q.length >= 2
+        ? allTasks.filter(t => t.title.toLowerCase().includes(q)).slice(0, 5)
+        : [];
+    const matchedMembers = q.length >= 2
+        ? members.filter(m => m.name.toLowerCase().includes(q)).slice(0, 3)
+        : [];
+    const hasResults = matchedTasks.length > 0 || matchedMembers.length > 0;
+
+    // ── Help items (with toasts instead of alerts) ─────────────────────────────
+    const HELP_ITEMS: { icon: HelpIcon; label: string; desc: string; action: () => void }[] = [
+        { icon: 'book',      label: 'Documentation',    desc: 'Guides & references', action: () => showToast('Documentation coming soon', 'info') },
+        { icon: 'play',      label: 'Video Tutorials',  desc: 'Learn by watching',   action: () => showToast('Video tutorials coming soon', 'info') },
+        { icon: 'headphones',label: 'Live Chat Support', desc: 'Talk to the team',   action: () => showToast('Live chat requires backend integration', 'info') },
+        { icon: 'bug',       label: 'Report a Bug',     desc: 'Something broken?',   action: () => window.dispatchEvent(new CustomEvent('open-bug-report')) },
+    ];
+
+    // ── Outside click handler ──────────────────────────────────────────────────
     useEffect(() => {
         function handleMouseDown(e: MouseEvent) {
-            if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
-                setIsCalendarOpen(false);
-            }
-            if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-                setIsNotifOpen(false);
-            }
-            if (helpRef.current && !helpRef.current.contains(e.target as Node)) {
-                setIsHelpOpen(false);
-            }
-            if (userRef.current && !userRef.current.contains(e.target as Node)) {
-                setIsUserOpen(false);
-            }
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowResults(false);
+            if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) setIsCalendarOpen(false);
+            if (notifRef.current && !notifRef.current.contains(e.target as Node)) setIsNotifOpen(false);
+            if (helpRef.current && !helpRef.current.contains(e.target as Node)) setIsHelpOpen(false);
+            if (userRef.current && !userRef.current.contains(e.target as Node)) setIsUserOpen(false);
         }
         document.addEventListener('mousedown', handleMouseDown);
         return () => document.removeEventListener('mousedown', handleMouseDown);
     }, []);
 
-    const unreadCount = NOTIFICATIONS.filter(n => !readIds.includes(n.id) && n.unread).length;
+    const unreadCount = 0;
+
+    const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            if (matchedTasks.length > 0) {
+                navigate('/tasks', { state: { search: searchQuery } });
+                setShowResults(false);
+                setSearchQuery('');
+            } else if (matchedMembers.length > 0) {
+                navigate('/members');
+                setShowResults(false);
+                setSearchQuery('');
+            }
+        }
+        if (e.key === 'Escape') {
+            setShowResults(false);
+        }
+    };
 
     return (
         <motion.header
@@ -72,16 +98,81 @@ const Header: React.FC = () => {
             transition={{ duration: 0.3, delay: 0.1 }}
         >
             {/* Search */}
-            <div className="relative w-[340px]">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div ref={searchRef} className="relative w-[340px]">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                     type="text"
-                    placeholder="Search for anything..."
+                    placeholder="Search tasks, members..."
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && searchQuery.trim()) navigate('/tasks'); }}
+                    onChange={e => { setSearchQuery(e.target.value); setShowResults(e.target.value.trim().length >= 2); }}
+                    onFocus={() => { if (searchQuery.trim().length >= 2) setShowResults(true); }}
+                    onKeyDown={handleSearchKeyDown}
                     className="w-full pl-10 pr-4 py-2.5 bg-surface-100 rounded-xl border-none text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-200 transition-all"
                 />
+
+                {/* Search results dropdown */}
+                <AnimatePresence>
+                    {showResults && hasResults && (
+                        <motion.div
+                            className="absolute left-0 top-full mt-2 w-full bg-white rounded-2xl border border-surface-200 shadow-lg z-50 overflow-hidden"
+                            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                            transition={{ duration: 0.15 }}
+                        >
+                            {matchedTasks.length > 0 && (
+                                <>
+                                    <div className="px-4 py-2 border-b border-surface-100">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tasks</span>
+                                    </div>
+                                    {matchedTasks.map(task => (
+                                        <button
+                                            key={task.id}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-50 transition-colors text-left"
+                                            onClick={() => { navigate('/tasks', { state: { search: task.title } }); setShowResults(false); setSearchQuery(''); }}
+                                        >
+                                            <CheckSquare size={13} className="text-gray-400 shrink-0" />
+                                            <span className="text-xs text-gray-800 flex-1 truncate">{task.title}</span>
+                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 capitalize ${priorityColors[task.priority] ?? ''}`}>
+                                                {task.priority}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </>
+                            )}
+                            {matchedMembers.length > 0 && (
+                                <>
+                                    <div className={`px-4 py-2 border-b border-surface-100 ${matchedTasks.length > 0 ? 'border-t' : ''}`}>
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Members</span>
+                                    </div>
+                                    {matchedMembers.map(member => (
+                                        <button
+                                            key={member.id}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-50 transition-colors text-left"
+                                            onClick={() => { navigate('/members'); setShowResults(false); setSearchQuery(''); }}
+                                        >
+                                            <Avatar name={member.name} color={getMemberColor(member.id)} size="sm" />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-semibold text-gray-800 truncate">{member.name}</div>
+                                                <div className="text-[10px] text-gray-400 truncate">{member.designation ?? member.role}</div>
+                                            </div>
+                                            <Users size={12} className="text-gray-300 shrink-0" />
+                                        </button>
+                                    ))}
+                                </>
+                            )}
+                        </motion.div>
+                    )}
+                    {showResults && !hasResults && q.length >= 2 && (
+                        <motion.div
+                            className="absolute left-0 top-full mt-2 w-full bg-white rounded-2xl border border-surface-200 shadow-lg z-50 px-4 py-4 text-center"
+                            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.15 }}
+                        >
+                            <span className="text-xs text-gray-400">No results for "{searchQuery}"</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* Right section */}
@@ -102,6 +193,7 @@ const Header: React.FC = () => {
                         )}
                     </AnimatePresence>
                 </div>
+
                 {/* Help */}
                 <div ref={helpRef} className="relative">
                     <motion.button
@@ -147,7 +239,7 @@ const Header: React.FC = () => {
                     <motion.button
                         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors relative ${isNotifOpen ? 'bg-primary-50 text-primary-500' : 'text-gray-400 hover:text-gray-600 hover:bg-surface-100'}`}
                         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                        onClick={() => { setIsNotifOpen(o => !o); setIsHelpOpen(false); setReadIds(NOTIFICATIONS.filter(n => n.unread).map(n => n.id)); }}
+                        onClick={() => { setIsNotifOpen(o => !o); setIsHelpOpen(false); }}
                     >
                         <Bell size={20} />
                         {unreadCount > 0 && (
@@ -165,29 +257,8 @@ const Header: React.FC = () => {
                             >
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-surface-100">
                                     <span className="text-xs font-bold text-gray-900">Notifications</span>
-                                    <span onClick={() => setReadIds(NOTIFICATIONS.map(n => n.id))} className="text-[10px] text-primary-500 font-semibold cursor-pointer hover:text-primary-600">Mark all read</span>
                                 </div>
-                                <div className="max-h-72 overflow-y-auto">
-                                    {NOTIFICATIONS.map(n => {
-                                        const NIcon = NotifIconMap[n.icon];
-                                        const isUnread = !readIds.includes(n.id) && n.unread;
-                                        return (
-                                            <div key={n.id} className={`flex items-start gap-3 px-4 py-3 border-b border-surface-100 last:border-0 transition-colors hover:bg-surface-100 ${isUnread ? 'bg-primary-50' : ''}`}>
-                                                <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${n.iconBg}`}>
-                                                    <NIcon size={14} className={n.iconColor} />
-                                                </span>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className={`text-xs leading-snug ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>{n.title}</div>
-                                                    <div className="text-[10px] text-gray-400 mt-0.5">{n.desc}</div>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-1 shrink-0">
-                                                    <span className="text-[10px] text-gray-400">{n.time}</span>
-                                                    {isUnread && <div className="w-1.5 h-1.5 rounded-full bg-primary-500" />}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <div className="px-4 py-6 text-center text-xs text-gray-400">No notifications</div>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -210,7 +281,7 @@ const Header: React.FC = () => {
                                 {authUser?.role ?? currentUser?.designation ?? ''}
                             </div>
                         </div>
-                        <Avatar name={authUser?.name ?? currentUser?.name ?? ''} color={memberColors[0]} size="md" />
+                        <Avatar name={authUser?.name ?? currentUser?.name ?? ''} color={getMemberColor(currentUser?.id ?? '')} size="md" />
                         <motion.div animate={{ rotate: isUserOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
                             <ChevronDown size={14} className="text-gray-400" />
                         </motion.div>
@@ -224,12 +295,10 @@ const Header: React.FC = () => {
                                 exit={{ opacity: 0, y: -8, scale: 0.97 }}
                                 transition={{ duration: 0.15 }}
                             >
-                                {/* User info header */}
                                 <div className="px-4 py-3 border-b border-surface-100">
                                     <div className="text-sm font-semibold text-gray-800">{authUser?.name ?? currentUser?.name}</div>
                                     <div className="text-xs text-gray-400">{authUser?.email}</div>
                                 </div>
-                                {/* Settings */}
                                 <button
                                     onClick={() => { navigate('/settings'); setIsUserOpen(false); }}
                                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-100 transition-colors text-left"
@@ -239,7 +308,6 @@ const Header: React.FC = () => {
                                     </span>
                                     <span className="text-xs font-semibold text-gray-700">Settings</span>
                                 </button>
-                                {/* Sign out */}
                                 <button
                                     onClick={() => { logout(); setIsUserOpen(false); }}
                                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 transition-colors text-left"

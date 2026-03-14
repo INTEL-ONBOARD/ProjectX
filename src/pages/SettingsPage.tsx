@@ -11,8 +11,8 @@ import {
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { teamMembers, memberColors } from '../data/mockData';
 import { AppContext } from '../context/AppContext';
+import { useToast } from '../components/ui/Toast';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -151,19 +151,19 @@ const ACCENT_COLORS = [
 
 const SettingsPage: React.FC = () => {
   const { currentUser } = useContext(AppContext);
+  const { showToast } = useToast();
 
-  const userIdx   = teamMembers.findIndex(m => m.id === (currentUser?.id ?? 'u1'));
-  const userColor = memberColors[userIdx !== -1 ? userIdx : 0];
+  const userColor = '#5030E5';
 
   const [activeSection, setActiveSection] = useState('profile');
   const { state: updateState, checkForUpdate, installUpdate } = useAppUpdater();
 
   // Profile
-  const [nameValue,     setNameValue]     = useState(() => currentUser?.name        || 'Anima Agrawal');
-  const [emailValue,    setEmailValue]    = useState(() => currentUser?.email       || 'anima@projectm.io');
-  const [locationValue, setLocationValue] = useState('U.P, India');
-  const [timezoneValue, setTimezoneValue] = useState('IST +5:30');
-  const [roleValue,     setRoleValue]     = useState(() => currentUser?.designation || 'Project Manager');
+  const [nameValue,     setNameValue]     = useState(() => currentUser?.name        || '');
+  const [emailValue,    setEmailValue]    = useState(() => currentUser?.email       || '');
+  const [locationValue, setLocationValue] = useState(() => currentUser?.location   || '');
+  const [timezoneValue, setTimezoneValue] = useState('');
+  const [roleValue,     setRoleValue]     = useState(() => currentUser?.designation || '');
 
   // Notifications
   const [notifications, setNotifications] = useState({
@@ -197,31 +197,31 @@ const SettingsPage: React.FC = () => {
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const handleUpdatePassword = () => {
-    if (!passwords.current) { window.alert('Please enter your current password.'); return; }
-    if (passwords.next.length < 8) { window.alert('New password must be at least 8 characters.'); return; }
-    if (passwords.next !== passwords.confirm) { window.alert('New passwords do not match.'); return; }
+    if (!passwords.current) { showToast('Please enter your current password.', 'error'); return; }
+    if (passwords.next.length < 8) { showToast('New password must be at least 8 characters.', 'error'); return; }
+    if (passwords.next !== passwords.confirm) { showToast('New passwords do not match.', 'error'); return; }
     setPasswords({ current: '', next: '', confirm: '' });
-    window.alert('Password updated successfully.');
+    showToast('Password updated successfully!', 'success');
   };
 
   const handleShareProfile = () => {
     const url = `${window.location.origin}${window.location.pathname}#/members`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => window.alert('Profile link copied to clipboard!'));
+      navigator.clipboard.writeText(url).then(() => showToast('Profile link copied to clipboard!', 'success'));
     } else {
-      window.alert(`Share this link: ${url}`);
+      showToast(`Share: ${url}`, 'info');
     }
   };
 
   const handleExportData = () => {
-    window.alert('Full data export requires a backend. Use Tasks → Export to download your task data as CSV.');
+    showToast('Use Tasks → Export to download your task data as CSV.', 'info');
   };
 
   const handleDeleteAccount = () => {
-    if (window.confirm('Are you sure? This will permanently delete your account and all associated data.')) {
-      window.alert('Account deletion has been queued. You will receive a confirmation email within 24 hours.');
-    }
+    setConfirmDelete(true);
   };
 
   const stats = [
@@ -312,7 +312,7 @@ const SettingsPage: React.FC = () => {
               {/* Sign out */}
               <div className="p-2 border-t border-surface-100">
                 <button
-                  onClick={() => window.alert('Sign out requires auth integration.')}
+                  onClick={() => showToast('Sign out requires auth integration', 'info')}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#D8727D] hover:bg-[#D8727D08] transition-all"
                 >
                   <LogOut size={16} strokeWidth={1.8} />
@@ -356,7 +356,7 @@ const SettingsPage: React.FC = () => {
                         backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(255,255,255,0.15) 40px, rgba(255,255,255,0.15) 41px)',
                       }} />
                       <button
-                        onClick={() => window.alert('Cover photo upload requires cloud storage integration.')}
+                        onClick={() => showToast('Cover photo upload requires cloud storage integration', 'info')}
                         className="absolute bottom-3 right-3 flex items-center gap-1.5 text-white/80 hover:text-white text-[11px] font-medium px-3 py-1.5 rounded-lg transition-all"
                         style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.18)' }}
                       >
@@ -377,7 +377,7 @@ const SettingsPage: React.FC = () => {
                             </div>
                           </div>
                           <button
-                            onClick={() => window.alert('Avatar upload requires cloud storage integration.')}
+                            onClick={() => showToast('Avatar upload requires cloud storage integration', 'info')}
                             className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center text-white border-2 border-white transition-all hover:scale-110"
                             style={{ background: '#5030E5' }}
                           >
@@ -440,7 +440,7 @@ const SettingsPage: React.FC = () => {
                         subtitle="Hover over a field and click the pencil to edit"
                         action={
                           <button
-                            onClick={() => window.alert('Click the pencil icon on any field to edit it inline.')}
+                            onClick={() => showToast('Click the pencil icon on any field to edit it', 'info')}
                             className="text-xs text-primary-500 font-semibold hover:text-primary-700 flex items-center gap-1 bg-primary-50 px-3 py-1.5 rounded-lg"
                           >
                             <Edit3 size={11} /> Edit all
@@ -722,7 +722,7 @@ const SettingsPage: React.FC = () => {
                       return (
                         <button
                           key={row.label}
-                          onClick={() => window.alert(`${row.label} selection requires additional backend support.`)}
+                          onClick={() => showToast(`${row.label} selection requires backend support`, 'info')}
                           className="w-full flex items-center justify-between px-6 py-4 border-b border-surface-100 last:border-0 hover:bg-surface-50 transition-colors group text-left"
                         >
                           <div className="flex items-center gap-3">
@@ -831,7 +831,7 @@ const SettingsPage: React.FC = () => {
                           </div>
                         </div>
                         <button
-                          onClick={() => window.alert('Two-factor authentication management requires backend integration.')}
+                          onClick={() => showToast('2FA management requires backend integration', 'info')}
                           className="text-[10px] font-semibold text-primary-500 hover:text-primary-700 bg-primary-50 px-2.5 py-1.5 rounded-lg shrink-0"
                         >
                           Manage
@@ -868,7 +868,7 @@ const SettingsPage: React.FC = () => {
                             </div>
                             {!s.current && (
                               <button
-                                onClick={() => window.alert(`Session on ${s.device} has been revoked.`)}
+                                onClick={() => showToast(`Session on ${s.device} revoked`, 'success')}
                                 className="text-[10px] text-[#D8727D] font-semibold bg-[#D8727D0A] hover:bg-[#D8727D15] px-2 py-1 rounded-lg transition-colors shrink-0"
                               >
                                 Revoke
@@ -879,7 +879,7 @@ const SettingsPage: React.FC = () => {
                       </div>
                       <div className="px-4 pb-3">
                         <button
-                          onClick={() => window.alert('All other sessions have been signed out.')}
+                          onClick={() => showToast('All other sessions signed out', 'success')}
                           className="w-full text-[10px] font-semibold text-[#D8727D] border border-[#D8727D33] bg-[#D8727D08] rounded-xl py-2 hover:bg-[#D8727D15] transition-colors flex items-center justify-center gap-1.5"
                         >
                           <LogOut size={11} /> Sign out all devices
@@ -933,7 +933,7 @@ const SettingsPage: React.FC = () => {
                         <div className="text-xs text-gray-400 mt-0.5">Up to 3 projects · 5 GB storage · 3 members</div>
                       </div>
                       <motion.button
-                        onClick={() => window.alert('Pro plan upgrade requires payment integration. Contact sales@projectm.io for pricing.')}
+                        onClick={() => showToast('Upgrade requires payment integration', 'info')}
                         className="bg-gradient-to-r from-primary-500 to-primary-400 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity shrink-0"
                         whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       >
@@ -982,7 +982,7 @@ const SettingsPage: React.FC = () => {
                               : plan.name === 'Pro'
                               ? (
                                 <motion.button
-                                  onClick={() => window.alert('Pro plan upgrade requires payment integration.')}
+                                  onClick={() => showToast('Upgrade requires payment integration', 'info')}
                                   className="w-full bg-gradient-to-r from-primary-500 to-primary-400 text-white text-xs font-bold py-2 rounded-lg hover:opacity-90 transition-opacity"
                                   whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
                                 >
@@ -991,7 +991,7 @@ const SettingsPage: React.FC = () => {
                               )
                               : (
                                 <button
-                                  onClick={() => window.alert('Contact sales@projectm.io for Enterprise pricing.')}
+                                  onClick={() => showToast('Contact sales@projectm.io for pricing', 'info')}
                                   className="w-full bg-surface-100 text-gray-600 text-xs font-bold py-2 rounded-lg hover:bg-surface-200 transition-colors"
                                 >
                                   Contact Sales
@@ -1072,9 +1072,19 @@ const SettingsPage: React.FC = () => {
                           <div className="text-xs text-gray-400 mt-0.5">Permanently delete your account and all data</div>
                         </div>
                       </div>
-                      <button onClick={handleDeleteAccount} className="text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors text-[#D8727D] bg-[#D8727D0A] hover:bg-[#D8727D18] border border-[#D8727D33]">
-                        Delete
-                      </button>
+                      {confirmDelete ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-gray-500">Are you sure?</span>
+                          <button onClick={() => { showToast('Account deletion queued. You will receive a confirmation email.', 'success'); setConfirmDelete(false); }}
+                            className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50">Yes</button>
+                          <button onClick={() => setConfirmDelete(false)}
+                            className="text-[10px] font-bold text-gray-500 px-1.5 py-0.5 rounded bg-gray-100">Cancel</button>
+                        </div>
+                      ) : (
+                        <button onClick={handleDeleteAccount} className="text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors text-[#D8727D] bg-[#D8727D0A] hover:bg-[#D8727D18] border border-[#D8727D33]">
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>

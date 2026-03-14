@@ -186,12 +186,29 @@ const ReportsPage: React.FC = () => {
             initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.35, delay: 0.08, ease: [0.4, 0, 0.2, 1] }}>
             <h3 className="font-bold text-gray-900 text-sm mb-3">Team Velocity</h3>
-            {[['Tasks / day', '2.3'], ['Sprint days left', '26'], ['Projected done', 'Dec 31']].map(([label, val]) => (
-              <div key={String(label)} className="flex justify-between py-2 border-b border-surface-100 last:border-0 text-xs">
-                <span className="text-gray-500">{label}</span>
-                <span className="font-bold text-gray-900">{val}</span>
-              </div>
-            ))}
+            {(() => {
+              const sprintStart = new Date(TODAY.slice(0, 8) + '01');
+              const todayDate = new Date(TODAY);
+              const daysElapsed = Math.max(1, Math.round((todayDate.getTime() - sprintStart.getTime()) / 86400000) + 1);
+              const velocity = doneTasks.length / daysElapsed;
+              const lastDay = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
+              const daysLeft = Math.max(0, Math.round((lastDay.getTime() - todayDate.getTime()) / 86400000));
+              const remaining = totalTasks - doneTasks.length;
+              const projectedDays = velocity > 0 ? Math.ceil(remaining / velocity) : null;
+              const projectedDate = projectedDays !== null
+                ? new Date(todayDate.getTime() + projectedDays * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : '—';
+              return [
+                ['Tasks / day', velocity.toFixed(1)],
+                ['Sprint days left', String(daysLeft)],
+                ['Projected done', projectedDate],
+              ].map(([label, val]) => (
+                <div key={String(label)} className="flex justify-between py-2 border-b border-surface-100 last:border-0 text-xs">
+                  <span className="text-gray-500">{label}</span>
+                  <span className="font-bold text-gray-900">{val}</span>
+                </div>
+              ));
+            })()}
           </motion.div>
 
           {/* Member Contributions */}

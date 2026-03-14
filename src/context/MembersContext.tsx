@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { teamMembers, memberColors } from '../data/mockData';
+import { memberColors } from '../data/mockData';
 import { User } from '../types';
 
 const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
@@ -26,10 +26,7 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [members, setMembers] = useState<User[]>([]);
 
   useEffect(() => {
-    if (isMock) {
-      setMembers(teamMembers);
-      return;
-    }
+    if (isMock) return;
     api().getMembers()
       .then((docs: User[]) => setMembers(docs))
       .catch(console.error);

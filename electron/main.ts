@@ -3,10 +3,9 @@ import path from 'path';
 import dotenv from 'dotenv';
 import mongoose, { Schema, Document } from 'mongoose';
 
-// Load .env from app root (works in both dev and prod)
-dotenv.config({ path: path.join(app.getAppPath(), '.env') });
-// Also try adjacent to the binary during dev
+// Load .env — try project root relative to this file
 dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 // ─── Mongoose Schemas ──────────────────────────────────────────────────────────
 
@@ -97,72 +96,6 @@ const TaskModel = mongoose.model<ITask>('Task', TaskSchema);
 const ProjectModel = mongoose.model<IProject>('Project', ProjectSchema);
 const AttendanceModel = mongoose.model<IAttendance>('Attendance', AttendanceSchema);
 
-// ─── Seed Data ─────────────────────────────────────────────────────────────────
-
-async function seedIfEmpty() {
-    const userCount = await UserModel.countDocuments();
-    if (userCount === 0) {
-        await UserModel.insertMany([
-            { appId: 'u1', name: 'Anima Agrawal', avatar: '', email: 'anima@techcorp.com', role: 'admin', location: 'U.P, India', designation: 'Project Manager', status: 'active' },
-            { appId: 'u2', name: 'Rohan Kumar', avatar: '', email: 'rohan@techcorp.com', role: 'manager', designation: 'Frontend Developer', status: 'active' },
-            { appId: 'u3', name: 'Priya Singh', avatar: '', email: 'priya@techcorp.com', role: 'member', designation: 'UI Designer', status: 'active' },
-            { appId: 'u4', name: 'Arjun Patel', avatar: '', email: 'arjun@techcorp.com', role: 'member', designation: 'Backend Developer', status: 'active' },
-            { appId: 'u5', name: 'Neha Sharma', avatar: '', email: 'neha@techcorp.com', role: 'member', designation: 'QA Engineer', status: 'active' },
-            { appId: 'u6', name: 'Vikram Rao', avatar: '', email: 'vikram@techcorp.com', role: 'member', designation: 'DevOps Engineer', status: 'active' },
-        ]);
-    }
-
-    const projectCount = await ProjectModel.countDocuments();
-    if (projectCount === 0) {
-        await ProjectModel.insertMany([
-            { appId: 'p1', name: 'Mobile App', color: '#7AC555' },
-            { appId: 'p2', name: 'Website Redesign', color: '#FFA500' },
-            { appId: 'p3', name: 'Design System', color: '#E4CCFD' },
-            { appId: 'p4', name: 'Wireframes', color: '#76A5EA' },
-        ]);
-    }
-
-    const taskCount = await TaskModel.countDocuments();
-    if (taskCount === 0) {
-        await TaskModel.insertMany([
-            { appId: 't1', title: 'Brainstorming', description: "Brainstorming brings team members' diverse experience into play.", priority: 'low', status: 'todo', assignees: ['u1','u2','u3'], comments: 12, files: 0, dueDate: '2020-12-22', projectId: 'p2' },
-            { appId: 't2', title: 'Research', description: 'User research helps you to create an optimal product for users.', priority: 'high', status: 'todo', assignees: ['u1','u4'], comments: 10, files: 3, dueDate: '2020-12-15', projectId: 'p4' },
-            { appId: 't3', title: 'Wireframes', description: 'Low fidelity wireframes include the most basic content and visuals.', priority: 'high', status: 'todo', assignees: ['u2','u3','u5'], comments: 7, files: 2, dueDate: '2020-12-28', projectId: 'p4' },
-            { appId: 't4', title: 'Onboarding Illustrations', description: '', priority: 'low', status: 'in-progress', assignees: ['u1','u3','u4'], comments: 14, files: 15, dueDate: '2020-12-18', projectId: 'p1', images: ['https://images.unsplash.com/photo-1545239351-ef35f43d514b?w=200&h=120&fit=crop','https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=200&h=120&fit=crop'] },
-            { appId: 't5', title: 'Moodboard', description: '', priority: 'low', status: 'in-progress', assignees: ['u5'], comments: 9, files: 10, dueDate: '2020-12-20', projectId: 'p3', images: ['https://images.unsplash.com/photo-1487530811176-3780de880c2d?w=200&h=120&fit=crop','https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=200&h=120&fit=crop'] },
-            { appId: 't6', title: 'Mobile App Design', description: '', priority: 'completed', status: 'done', assignees: ['u1','u2'], comments: 12, files: 15, projectId: 'p1', images: ['https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=200&h=120&fit=crop','https://images.unsplash.com/photo-1551650975-87deedd944c3?w=200&h=120&fit=crop'] },
-            { appId: 't7', title: 'Design System', description: 'It just needs to adapt the UI from what you did before', priority: 'completed', status: 'done', assignees: ['u1','u3','u4'], comments: 12, files: 15, projectId: 'p3' },
-        ]);
-    }
-
-    const attendanceCount = await AttendanceModel.countDocuments();
-    if (attendanceCount === 0) {
-        const seedAttendance = [
-            { userId: 'u1', date: '2020-12-01', status: 'present' }, { userId: 'u1', date: '2020-12-02', status: 'present' },
-            { userId: 'u1', date: '2020-12-03', status: 'present' }, { userId: 'u1', date: '2020-12-04', status: 'present' },
-            { userId: 'u1', date: '2020-12-05', status: 'present' },
-            { userId: 'u2', date: '2020-12-01', status: 'present' }, { userId: 'u2', date: '2020-12-02', status: 'present' },
-            { userId: 'u2', date: '2020-12-03', status: 'absent' }, { userId: 'u2', date: '2020-12-04', status: 'present' },
-            { userId: 'u2', date: '2020-12-05', status: 'present' },
-            { userId: 'u3', date: '2020-12-01', status: 'present' }, { userId: 'u3', date: '2020-12-02', status: 'present' },
-            { userId: 'u3', date: '2020-12-03', status: 'present' }, { userId: 'u3', date: '2020-12-04', status: 'present' },
-            { userId: 'u3', date: '2020-12-05', status: 'absent' },
-            { userId: 'u4', date: '2020-12-01', status: 'present' }, { userId: 'u4', date: '2020-12-02', status: 'absent' },
-            { userId: 'u4', date: '2020-12-03', status: 'present' }, { userId: 'u4', date: '2020-12-04', status: 'present' },
-            { userId: 'u4', date: '2020-12-05', status: 'present' },
-            { userId: 'u5', date: '2020-12-01', status: 'present' }, { userId: 'u5', date: '2020-12-02', status: 'present' },
-            { userId: 'u5', date: '2020-12-03', status: 'present' }, { userId: 'u5', date: '2020-12-04', status: 'absent' },
-            { userId: 'u5', date: '2020-12-05', status: 'present' },
-            { userId: 'u6', date: '2020-12-01', status: 'absent' }, { userId: 'u6', date: '2020-12-02', status: 'present' },
-            { userId: 'u6', date: '2020-12-03', status: 'present' }, { userId: 'u6', date: '2020-12-04', status: 'present' },
-            { userId: 'u6', date: '2020-12-05', status: 'present' },
-        ];
-        await AttendanceModel.insertMany(
-            seedAttendance.map(r => ({ ...r, recordId: `${r.userId}-${r.date}` }))
-        );
-    }
-}
-
 // ─── DB helpers: lean docs mapped to plain app objects ─────────────────────────
 
 function toUser(doc: IUser) {
@@ -180,7 +113,7 @@ function toTask(doc: ITask) {
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
 async function connectDB() {
-    const uri = process.env.MONGODB_URI;
+    const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectx?retryWrites=true&w=majority';
     if (!uri) {
         console.error('MONGODB_URI not set — running in offline mode');
         return;
@@ -188,7 +121,6 @@ async function connectDB() {
     try {
         await mongoose.connect(uri);
         console.log('MongoDB connected');
-        await seedIfEmpty();
     } catch (err) {
         console.error('MongoDB connection failed:', err);
     }
@@ -374,14 +306,13 @@ function setupAutoUpdater() {
     });
 }
 
-ipcMain.handle('update:check', () => { checkForUpdates(); });
-ipcMain.handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
-ipcMain.handle('app:version', () => app.getVersion());
-
 // ─── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
     registerDbHandlers();
+    ipcMain.handle('update:check', () => { checkForUpdates(); });
+    ipcMain.handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
+    ipcMain.handle('app:version', () => app.getVersion());
     setupAutoUpdater();
     await connectDB();
     createWindow();

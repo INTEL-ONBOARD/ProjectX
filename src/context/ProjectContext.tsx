@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Project, Task, TaskStatus } from '../types';
 
-// Fallback mock data for when running without Electron (browser dev mode)
-import { projects as mockProjects, todoTasks, inProgressTasks, doneTasks } from '../data/mockData';
 
 const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
 
@@ -41,10 +39,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     if (isMock) {
-      // Running in browser without Electron — use mock data
-      setProjects(mockProjects);
-      setAllTasks([...todoTasks, ...inProgressTasks, ...doneTasks]);
-      setActiveProject(mockProjects[0]?.id ?? '');
       setLoading(false);
       return;
     }

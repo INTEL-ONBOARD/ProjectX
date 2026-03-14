@@ -5,7 +5,6 @@ import {
   Share2, LayoutGrid, List, X, Check,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { memberColors } from '../../data/mockData';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import { useProjects } from '../../context/ProjectContext';
 import { useMembersContext } from '../../context/MembersContext';
@@ -20,7 +19,7 @@ interface ProjectHeaderProps {
 const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayToggle }) => {
   const navigate = useNavigate();
   const { projects, activeProject, updateProject } = useProjects();
-  const { members, addMember } = useMembersContext();
+  const { members, addMember, getMemberColor } = useMembersContext();
   const { show, ToastEl } = useToast();
 
   const currentProject = projects.find(p => p.id === activeProject);
@@ -129,7 +128,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayTo
           >
             <UserPlus size={18} /> Invite
           </motion.button>
-          <AvatarGroup names={members.map(m => m.name)} colors={memberColors} size="md" max={4} />
+          <AvatarGroup names={members.map(m => m.name)} colors={members.map(m => getMemberColor(m.id))} size="md" max={4} />
         </div>
       </div>
 
@@ -222,8 +221,8 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayTo
             <div>
               <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Assignees</div>
               <div className="flex gap-1.5">
-                {members.map((m, i) => {
-                  const color = memberColors[i % memberColors.length];
+                {members.map((m) => {
+                  const color = getMemberColor(m.id);
                   const active = filterAssignees.includes(m.id);
                   return (
                     <button

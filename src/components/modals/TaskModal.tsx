@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, MessageCircle, Paperclip, Send } from 'lucide-react';
 import { Task } from '../../types';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
-import { teamMembers, memberColors } from '../../data/mockData';
+import { useMembersContext } from '../../context/MembersContext';
 
 interface TaskModalProps {
     task: Task | null;
@@ -11,15 +11,14 @@ interface TaskModalProps {
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
+    const { members, getMemberColor } = useMembersContext();
     const [comment, setComment] = useState('');
-    const [comments, setComments] = useState([
-        { id: '1', userId: 'u1', author: 'Rohan Kumar', text: 'Great progress on this!' },
-        { id: '2', userId: 'u2', author: 'Priya Singh', text: 'Need to review the designs' },
-    ]);
+    const [comments, setComments] = useState<{ id: string; userId: string; author: string; text: string }[]>([]);
 
     const assigneeNames = task?.assignees.map(
-        (id) => teamMembers.find((m) => m.id === id)?.name ?? 'Unknown'
+        (id) => members.find((m) => m.id === id)?.name ?? 'Unknown'
     ) ?? [];
+    const assigneeColors = task?.assignees.map(id => getMemberColor(id)) ?? [];
 
     const handleAddComment = () => {
         if (comment.trim()) {
@@ -76,7 +75,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                             <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-surface-50 rounded-lg">
                                 <div>
                                     <p className="text-xs text-gray-500 font-semibold mb-1">ASSIGNEES</p>
-                                    <AvatarGroup names={assigneeNames} colors={memberColors} size="sm" max={3} />
+                                    <AvatarGroup names={assigneeNames} colors={assigneeColors} size="sm" max={3} />
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 font-semibold mb-1">STATUS</p>
@@ -102,7 +101,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                 <div className="space-y-4 mb-6 max-h-48 overflow-y-auto">
                                     {comments.map((c) => (
                                         <div key={c.id} className="flex gap-3">
-                                            <Avatar name={c.author} color={memberColors[0]} size="sm" />
+                                            <Avatar name={c.author} color="#5030E5" size="sm" />
                                             <div>
                                                 <p className="font-semibold text-gray-900 text-sm">{c.author}</p>
                                                 <p className="text-gray-700 text-sm">{c.text}</p>

@@ -27,10 +27,6 @@ const priorityStyles: Record<string, { bg: string; text: string; label: string }
 
 type Comment = { id: string; author: string; text: string; time: string };
 
-const SEED_COMMENTS: Comment[] = [
-  { id: 'c1', author: 'Rohan Kumar',  text: 'Great progress on this!',      time: '10:32 AM' },
-  { id: 'c2', author: 'Priya Singh',  text: 'Need to review the designs.',   time: '10:45 AM' },
-];
 
 interface Filters {
   priority: string;
@@ -53,7 +49,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [formDefaultStatus, setFormDefaultStatus] = useState<TaskStatus>('todo');
-  const [comments, setComments] = useState<Comment[]>(SEED_COMMENTS);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [commentInput, setCommentInput] = useState('');
   const [detailImage, setDetailImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -70,7 +66,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
     setEditMode(false);
     setConfirmDelete(false);
     setShowStatusDrop(false);
-    setComments(SEED_COMMENTS);
+    setComments([]);
     setCommentInput('');
     setDetailImage(null);
   };

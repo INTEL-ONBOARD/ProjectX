@@ -44,12 +44,7 @@ const priorityConfig = {
 };
 
 // ─── Initial rich data for display (description, status, priority, etc.) ──────
-const initialRichData: Record<string, Partial<ProjectData>> = {
-  p1: { description: 'Redesign and rebuild the consumer mobile app with new onboarding flow and improved UX.', status: 'active', priority: 'high', memberIds: ['u1', 'u2', 'u3'], taskTotal: 7, taskDone: 2, dueDate: 'Mar 30, 2025', starred: true, category: 'Product' },
-  p2: { description: 'Full overhaul of the marketing site including new landing pages and blog.', status: 'active', priority: 'medium', memberIds: ['u4', 'u5'], taskTotal: 5, taskDone: 1, dueDate: 'Apr 15, 2025', starred: false, category: 'Marketing' },
-  p3: { description: 'Build a unified component library and token system across all products.', status: 'active', priority: 'medium', memberIds: ['u1', 'u6', 'u3'], taskTotal: 3, taskDone: 1, dueDate: 'May 1, 2025', starred: true, category: 'Design' },
-  p4: { description: 'Low-fidelity wireframes for the next quarter feature set.', status: 'on-hold', priority: 'low', memberIds: ['u2', 'u4', 'u5', 'u6'], taskTotal: 4, taskDone: 0, dueDate: 'Jun 10, 2025', starred: false, category: 'Design' },
-};
+const initialRichData: Record<string, Partial<ProjectData>> = {};
 
 // ─── Project Detail Panel ──────────────────────────────────────────────────────
 const ProjectDetail: React.FC<{

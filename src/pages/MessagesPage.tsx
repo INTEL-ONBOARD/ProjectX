@@ -1,55 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Send, Search, Phone, Video, MoreVertical, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X } from 'lucide-react';
+import { Plus, Send, Search, Phone, Video, MoreVertical, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X, MessageSquare } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { currentUser } from '../data/mockData';
+import { AppContext } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
+import { useToast } from '../components/ui/Toast';
 
-const designations: Record<string, string> = {
-  u1: 'Project Manager', u2: 'Frontend Developer', u3: 'UI Designer',
-  u4: 'Backend Developer', u5: 'QA Engineer', u6: 'DevOps Engineer',
-};
-const onlineStatus: Record<string, 'online' | 'away' | 'offline'> = {
-  u1: 'online', u2: 'online', u3: 'away', u4: 'online', u5: 'offline', u6: 'away',
-};
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
 
 type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: string[] };
 
-const initialChats: Record<string, Msg[]> = {
-  u2: [
-    { id: 'c1', from: 'u2', text: 'Hey, can you review the PR I just pushed?', time: '10:32 AM', read: true },
-    { id: 'c2', from: 'u1', text: 'Sure! Give me 10 minutes.', time: '10:35 AM', read: true },
-    { id: 'c3', from: 'u2', text: 'No rush, just the auth middleware changes.', time: '10:36 AM', read: true },
-    { id: 'c4', from: 'u1', text: 'Looks good overall. Left one comment on line 42.', time: '10:48 AM', read: true },
-    { id: 'c5', from: 'u2', text: 'Can you review the PR?', time: '10:50 AM', read: false },
-  ],
-  u3: [
-    { id: 'd1', from: 'u3', text: 'The design looks great! Really love the new color palette.', time: '9:15 AM', read: true },
-    { id: 'd2', from: 'u1', text: 'Thanks Priya! The team put in a lot of work.', time: '9:20 AM', read: true },
-    { id: 'd3', from: 'u3', text: 'Should we schedule a review session this week?', time: '9:22 AM', read: true },
-  ],
-  u4: [
-    { id: 'e1', from: 'u4', text: 'Meeting at 3pm?', time: '8:00 AM', read: false },
-    { id: 'e2', from: 'u1', text: 'Yes, I\'ll set up the call link.', time: '8:05 AM', read: true },
-  ],
-  u5: [
-    { id: 'f1', from: 'u5', text: 'Pushed the latest build to staging.', time: 'Yesterday', read: true },
-    { id: 'f2', from: 'u1', text: 'Great, I\'ll run the smoke tests.', time: 'Yesterday', read: true },
-  ],
-  u6: [
-    { id: 'g1', from: 'u6', text: 'Check the new wireframes I uploaded.', time: 'Mon', read: true },
-  ],
-};
-
 const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
 const MessagesPage: React.FC = () => {
-  const [activeId, setActiveId] = useState('u2');
-  const [chats, setChats] = useState(initialChats);
+  const { currentUser } = useContext(AppContext);
+  const myId = currentUser?.id ?? '';
+  const { showToast } = useToast();
+  const [activeId, setActiveId] = useState('');
+  const [chats, setChats] = useState<Record<string, Msg[]>>({});
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
@@ -68,7 +39,7 @@ const MessagesPage: React.FC = () => {
 
   const location = useLocation();
   const { members, getMemberColor } = useMembersContext();
-  const conversations = members.filter(m => m.id !== currentUser.id);
+  const conversations = members.filter(m => m.id !== myId);
 
   useEffect(() => {
     const memberId = (location.state as any)?.memberId;
@@ -78,7 +49,7 @@ const MessagesPage: React.FC = () => {
     }
   }, []);
 
-  const activeMember = members.find(m => m.id === activeId) ?? members[0]!;
+  const activeMember = members.find(m => m.id === activeId) ?? members[0] ?? null;
   const activeColor = getMemberColor(activeId);
   const activeChats = chats[activeId] ?? [];
 
@@ -97,7 +68,7 @@ const MessagesPage: React.FC = () => {
 
   const totalUnread = conversations.reduce((sum, m) => {
     const msgs = chats[m.id] ?? [];
-    return sum + msgs.filter(msg => !msg.read && msg.from !== currentUser.id).length;
+    return sum + msgs.filter(msg => !msg.read && msg.from !== myId).length;
   }, 0);
 
   const sendMessage = () => {
@@ -105,7 +76,7 @@ const MessagesPage: React.FC = () => {
     if (!text) return;
     const newMsg: Msg = {
       id: `m${Date.now()}`,
-      from: currentUser.id,
+      from: myId,
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: false,
@@ -144,7 +115,7 @@ const MessagesPage: React.FC = () => {
   };
 
   const getUnread = (userId: string) => {
-    return (chats[userId] ?? []).filter(m => !m.read && m.from !== currentUser.id).length;
+    return (chats[userId] ?? []).filter(m => !m.read && m.from !== myId).length;
   };
 
   return (
@@ -161,7 +132,7 @@ const MessagesPage: React.FC = () => {
           description={totalUnread > 0 ? `${totalUnread} unread messages` : 'Team conversations'}
           actions={
             <motion.button
-              onClick={() => window.alert('New conversation feature requires a contact directory.')}
+              onClick={() => setShowNewConvo(true)}
               className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors"
               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             >
@@ -186,12 +157,19 @@ const MessagesPage: React.FC = () => {
               <div className="text-white/70 text-xs">{callType === 'video' ? 'Video' : 'Voice'} call · Ringing…</div>
             </div>
             <button onClick={() => setShowCallBanner(false)} className="bg-[#D8727D] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#c25f6b] transition-colors">Decline</button>
-            <button onClick={() => { setShowCallBanner(false); window.alert('Joining call… (requires WebRTC backend)'); }} className="bg-[#68B266] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#55a053] transition-colors">Accept</button>
+            <button onClick={() => { setShowCallBanner(false); showToast('Joining call… (WebRTC backend required)', 'info'); }} className="bg-[#68B266] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#55a053] transition-colors">Accept</button>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Main chat layout — single unified card */}
+      {members.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 text-gray-400">
+          <MessageSquare size={40} className="opacity-30" />
+          <p className="text-sm font-medium">No team members yet.</p>
+          <p className="text-xs">Invite members from the Members page to start messaging.</p>
+        </div>
+      ) : !activeMember ? null : (
       <div className="flex flex-1 min-h-0 bg-white border border-surface-200 rounded-2xl overflow-hidden">
 
         {/* Left sidebar */}
@@ -267,7 +245,7 @@ const MessagesPage: React.FC = () => {
               const isActive = member.id === activeId;
               const isPinned = pinnedIds.includes(member.id);
               const isStarred = starredIds.includes(member.id);
-              const status = onlineStatus[member.id] ?? 'offline';
+              const status = 'online';
               return (
                 <motion.button
                   key={member.id}
@@ -287,7 +265,7 @@ const MessagesPage: React.FC = () => {
                       {isStarred && <Star size={10} className="text-[#FFA500] shrink-0" fill="#FFA500" />}
                     </div>
                     <div className={`text-xs truncate ${unread > 0 ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
-                      {lastMsg?.from === currentUser.id ? '✓ ' : ''}{lastMsg?.text ?? 'No messages yet'}
+                      {lastMsg?.from === myId ? '✓ ' : ''}{lastMsg?.text ?? 'No messages yet'}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
@@ -308,11 +286,11 @@ const MessagesPage: React.FC = () => {
           <div className="flex items-center gap-3 px-5 py-3.5 border-b border-surface-100 shrink-0">
             <div className="relative">
               <Avatar name={activeMember.name} color={activeColor} size="md" />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[onlineStatus[activeId] ?? 'offline'] }} />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor['online'] }} />
             </div>
             <div className="flex-1">
               <div className="font-bold text-sm text-gray-900">{activeMember.name}</div>
-              <div className="text-xs text-gray-400">{designations[activeId]} · <span style={{ color: statusColor[onlineStatus[activeId] ?? 'offline'] }}>{statusLabel[onlineStatus[activeId] ?? 'offline']}</span></div>
+              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor['online'] }}>{statusLabel['online']}</span></div>
             </div>
             {/* Action icons */}
             <div className="flex items-center gap-1">
@@ -349,7 +327,7 @@ const MessagesPage: React.FC = () => {
                 <Star size={16} fill={starredIds.includes(activeId) ? '#FFA500' : 'none'} />
               </motion.button>
               <motion.button
-                onClick={e => { e.stopPropagation(); window.alert('Conversation options coming soon.'); }}
+                onClick={e => { e.stopPropagation(); showToast('More options coming soon', 'info'); }}
                 className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 transition-colors"
                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
               >
@@ -361,7 +339,7 @@ const MessagesPage: React.FC = () => {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
             {activeChats.map((msg, i) => {
-              const isOwn = msg.from === currentUser.id;
+              const isOwn = msg.from === myId;
               const sender = members.find(m => m.id === msg.from) ?? { name: 'Unknown' };
               const senderColor = getMemberColor(msg.from);
               const showAvatar = !isOwn && (i === 0 || activeChats[i - 1]?.from !== msg.from);
@@ -452,7 +430,7 @@ const MessagesPage: React.FC = () => {
                   ...prev,
                   [activeId]: [...(prev[activeId] ?? []), {
                     id: String(Date.now()),
-                    from: currentUser.id,
+                    from: myId,
                     text: `📎 ${file.name}`,
                     time: now,
                     read: true,
@@ -469,7 +447,7 @@ const MessagesPage: React.FC = () => {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                 className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
               />
-              <button onClick={() => window.alert('Emoji picker for compose area coming soon.')} className="text-gray-400 hover:text-primary-500 transition-colors shrink-0">
+              <button onClick={() => showToast('Emoji picker coming soon', 'info')} className="text-gray-400 hover:text-primary-500 transition-colors shrink-0">
                 <Smile size={16} />
               </button>
               <motion.button
@@ -491,12 +469,12 @@ const MessagesPage: React.FC = () => {
           <div className="p-4 flex flex-col items-center text-center border-b border-surface-100">
             <div className="relative mb-3">
               <Avatar name={activeMember.name} color={activeColor} size="xl" />
-              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[onlineStatus[activeId] ?? 'offline'] }} />
+              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor['online'] }} />
             </div>
             <div className="font-bold text-gray-900 text-sm">{activeMember.name}</div>
-            <div className="text-xs text-gray-400 mt-0.5">{designations[activeId]}</div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor[onlineStatus[activeId] ?? 'offline'] + '20', color: statusColor[onlineStatus[activeId] ?? 'offline'] }}>
-              {statusLabel[onlineStatus[activeId] ?? 'offline']}
+            <div className="text-xs text-gray-400 mt-0.5">{activeMember?.designation ?? ''}</div>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor['online'] + '20', color: statusColor['online'] }}>
+              {statusLabel['online']}
             </span>
           </div>
 
@@ -536,6 +514,8 @@ const MessagesPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      )}
 
       {/* Right-click context menu */}
       <AnimatePresence>

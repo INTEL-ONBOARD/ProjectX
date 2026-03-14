@@ -20,6 +20,7 @@ import { MembersProvider } from './context/MembersContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import BugReportModal from './components/ui/BugReportModal';
 import UpdateBanner from './components/ui/UpdateBanner';
+import { ToastProvider } from './components/ui/Toast';
 import SplashScreen from './pages/auth/SplashScreen';
 import WalkthroughScreen from './pages/auth/WalkthroughScreen';
 import LoginPage from './pages/auth/LoginPage';
@@ -166,9 +167,11 @@ const App: React.FC = () => (
         <AppProvider>
             <MembersProvider>
                 <ProjectProvider>
-                    <HashRouter>
-                        <Root />
-                    </HashRouter>
+                    <ToastProvider>
+                        <HashRouter>
+                            <Root />
+                        </HashRouter>
+                    </ToastProvider>
                 </ProjectProvider>
             </MembersProvider>
         </AppProvider>

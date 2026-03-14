@@ -39,6 +39,7 @@ export interface User {
     role: 'admin' | 'manager' | 'member';
     pin?: string;
     designation?: string;
+    location?: string;
     status: 'active' | 'inactive';
 }
 
@@ -79,6 +80,8 @@ interface AppContextType {
     setSidebarCollapsed: (collapsed: boolean) => void;
     attendanceRecords: AttendanceRecord[];
     setAttendanceRecord: (record: Omit<AttendanceRecord, 'id'>) => void;
+    selectedWeekStart: string;
+    setSelectedWeekStart: (date: string) => void;
 }
 
 export const AppContext = createContext<AppContextType>({
@@ -92,68 +95,17 @@ export const AppContext = createContext<AppContextType>({
     setSidebarCollapsed: () => { },
     attendanceRecords: [],
     setAttendanceRecord: () => {},
+    selectedWeekStart: '2020-12-14',
+    setSelectedWeekStart: () => {},
 });
 
-const SEED_ATTENDANCE: Omit<AttendanceRecord, 'id'>[] = [
-    { userId: 'u1', date: '2020-12-01', status: 'present' },
-    { userId: 'u1', date: '2020-12-02', status: 'present' },
-    { userId: 'u1', date: '2020-12-03', status: 'present' },
-    { userId: 'u1', date: '2020-12-04', status: 'present' },
-    { userId: 'u1', date: '2020-12-05', status: 'present' },
-    { userId: 'u2', date: '2020-12-01', status: 'present' },
-    { userId: 'u2', date: '2020-12-02', status: 'present' },
-    { userId: 'u2', date: '2020-12-03', status: 'absent' },
-    { userId: 'u2', date: '2020-12-04', status: 'present' },
-    { userId: 'u2', date: '2020-12-05', status: 'present' },
-    { userId: 'u3', date: '2020-12-01', status: 'present' },
-    { userId: 'u3', date: '2020-12-02', status: 'present' },
-    { userId: 'u3', date: '2020-12-03', status: 'present' },
-    { userId: 'u3', date: '2020-12-04', status: 'present' },
-    { userId: 'u3', date: '2020-12-05', status: 'absent' },
-    { userId: 'u4', date: '2020-12-01', status: 'present' },
-    { userId: 'u4', date: '2020-12-02', status: 'absent' },
-    { userId: 'u4', date: '2020-12-03', status: 'present' },
-    { userId: 'u4', date: '2020-12-04', status: 'present' },
-    { userId: 'u4', date: '2020-12-05', status: 'present' },
-    { userId: 'u5', date: '2020-12-01', status: 'present' },
-    { userId: 'u5', date: '2020-12-02', status: 'present' },
-    { userId: 'u5', date: '2020-12-03', status: 'present' },
-    { userId: 'u5', date: '2020-12-04', status: 'absent' },
-    { userId: 'u5', date: '2020-12-05', status: 'present' },
-    { userId: 'u6', date: '2020-12-01', status: 'absent' },
-    { userId: 'u6', date: '2020-12-02', status: 'present' },
-    { userId: 'u6', date: '2020-12-03', status: 'present' },
-    { userId: 'u6', date: '2020-12-04', status: 'present' },
-    { userId: 'u6', date: '2020-12-05', status: 'present' },
-];
-
-const seedRecords: AttendanceRecord[] = SEED_ATTENDANCE.map(r => ({
-    ...r,
-    id: `${r.userId}-${r.date}`,
-}));
-
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [org, setOrg] = useState<Organization | null>({
-        id: 'org1',
-        name: 'TechCorp',
-        workStart: '09:00',
-        workEnd: '18:00',
-        createdAt: new Date().toISOString(),
-    });
-
-    const [currentUser, setCurrentUser] = useState<User | null>({
-        id: 'u1',
-        orgId: 'org1',
-        name: 'Anima Agrawal',
-        email: 'anima@techcorp.com',
-        role: 'admin',
-        status: 'active',
-        designation: 'Project Manager',
-    });
-
+    const [org, setOrg] = useState<Organization | null>(null);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(seedRecords);
+    const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+    const [selectedWeekStart, setSelectedWeekStart] = useState<string>('2020-12-14');
 
     // Load attendance from MongoDB when running in Electron
     useEffect(() => {
@@ -198,8 +150,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setSidebarCollapsed,
             attendanceRecords,
             setAttendanceRecord,
+            selectedWeekStart,
+            setSelectedWeekStart,
         }),
-        [org, currentUser, theme, sidebarCollapsed, attendanceRecords, setAttendanceRecord]
+        [org, currentUser, theme, sidebarCollapsed, attendanceRecords, setAttendanceRecord, selectedWeekStart]
     );
 
     return (

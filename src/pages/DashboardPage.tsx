@@ -8,13 +8,6 @@ import { AppContext } from '../context/AppContext';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 
-const designations: Record<string, string> = {
-  u1: 'Project Manager', u2: 'Frontend Developer', u3: 'UI Designer',
-  u4: 'Backend Developer', u5: 'QA Engineer', u6: 'DevOps Engineer',
-};
-const onlineStatus: Record<string, 'online' | 'away' | 'offline'> = {
-  u1: 'online', u2: 'online', u3: 'away', u4: 'online', u5: 'online', u6: 'offline',
-};
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 
 
@@ -240,15 +233,14 @@ const DashboardPage: React.FC = () => {
             </div>
             {members.map((member) => {
               const color = getMemberColor(member.id);
-              const status = onlineStatus[member.id] ?? 'online';
               return (
                 <div key={member.id} className="flex items-center gap-2.5 py-2 border-b border-surface-100 last:border-0">
                   <Avatar name={member.name} color={color} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-gray-900 truncate">{member.name}</div>
-                    <div className="text-[10px] text-gray-400 truncate">{designations[member.id]}</div>
+                    <div className="text-[10px] text-gray-400 truncate">{member.designation ?? ''}</div>
                   </div>
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[status] }} />
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor['online'] }} />
                 </div>
               );
             })}
