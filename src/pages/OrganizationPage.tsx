@@ -1,12 +1,10 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Building2, Users, MapPin, BarChart2, FolderKanban, Settings2, X, Plus,
   ChevronDown, Shield, Check, Search, RefreshCw, ChevronRight,
 } from 'lucide-react';
-import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
-import { AppContext } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
@@ -178,16 +176,15 @@ const PERM_ROLES: { key: 'manager' | 'member'; label: string; badgeCls: string; 
 ];
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-type TabId = 'overview' | 'users' | 'permissions';
-interface TabDef { id: TabId; label: string; icon: React.ElementType; adminOnly?: boolean }
-const TABS: TabDef[] = [
+type SectionId = 'overview' | 'users' | 'permissions';
+interface OrgNavItem { id: SectionId; label: string; icon: React.ElementType; adminOnly?: boolean; }
+const NAV_ITEMS: OrgNavItem[] = [
   { id: 'overview',     label: 'Overview',          icon: Building2 },
   { id: 'users',        label: 'Users',             icon: Users,   adminOnly: true },
   { id: 'permissions',  label: 'Role Permissions',  icon: Shield,  adminOnly: true },
 ];
 
 const OrganizationPage: React.FC = () => {
-  const { currentUser } = useContext(AppContext);
   const { members, getMemberColor } = useMembersContext();
   const { allTasks } = useProjects();
   const { user: authUser } = useAuth();
@@ -195,10 +192,9 @@ const OrganizationPage: React.FC = () => {
   const { showToast } = useToast();
   const isAdmin = authUser?.role === 'admin';
 
-  const [tab, setTab] = useState<TabId>('overview');
+  const [section, setSection] = useState<SectionId>('overview');
 
   // ── Overview state ──
-  const subordinates = members.filter(m => m.id !== currentUser?.id);
   const locationCount = new Set(members.map(m => m.location).filter(Boolean)).size || members.length;
   const avgWorkload = members.length > 0 ? (allTasks.length / members.length).toFixed(1) : '0.0';
   const [deptRoster, setDeptRoster] = useState<DeptEntry[]>([]);
@@ -225,17 +221,34 @@ const OrganizationPage: React.FC = () => {
   // ── Users tab state ──
   const [authUsers, setAuthUsers] = useState<AuthUserRow[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | AuthUserRow['role']>('all');
 
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
-    try { setAuthUsers(await authApi().getAll()); }
+    try {
+      setAuthUsers(await authApi().getAll());
+      setUsersLoaded(true);
+    }
     catch (err) { console.error('[OrganizationPage] Failed to load auth users:', err); }
     finally { setUsersLoading(false); }
   }, []);
 
-  useEffect(() => { if (tab === 'users' && isAdmin) loadUsers(); }, [tab, isAdmin, loadUsers]);
+  // Load users when Users section is visited (guarded by usersLoaded to prevent re-fetching on re-render)
+  useEffect(() => {
+    if (section === 'users' && isAdmin && !usersLoaded) loadUsers();
+  }, [section, isAdmin, usersLoaded, loadUsers]);
+
+  // Load users when Permissions section is first visited (needs user counts for badges)
+  useEffect(() => {
+    if (section === 'permissions' && isAdmin && !usersLoaded) loadUsers();
+  }, [section, isAdmin, usersLoaded, loadUsers]);
+
+  // Prevent non-admins from reaching admin-only sections via stale state
+  useEffect(() => {
+    if (!isAdmin && section !== 'overview') setSection('overview');
+  }, [isAdmin, section]);
 
   const handleRoleChange = async (userId: string, newRole: AuthUserRow['role']) => {
     try {
@@ -256,7 +269,7 @@ const OrganizationPage: React.FC = () => {
   const memberCount  = authUsers.filter(u => u.role === 'member').length;
 
   // ── Permissions tab state ──
-  const [saving, setSaving] = useState<string | null>(null);
+  const [saving, setSaving] = useState<'manager' | 'member' | null>(null);
   const togglePerm = async (role: 'manager' | 'member', routeId: string) => {
     if (routeId === '/settings') return;
     const current = perms.find(p => p.role === role)?.allowedRoutes ?? ['/settings'];
@@ -266,225 +279,51 @@ const OrganizationPage: React.FC = () => {
     finally { setSaving(null); }
   };
 
-  const visibleTabs = TABS.filter(t => !t.adminOnly || isAdmin);
+  const visibleNavItems = NAV_ITEMS.filter(n => !n.adminOnly || isAdmin);
 
   return (
-    <motion.div className="flex-1 flex flex-col overflow-hidden px-8 bg-white" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.1 }}>
-      <div className="pt-8 pb-0 shrink-0">
-        <div className="flex items-center justify-between mb-5">
-          <PageHeader eyebrow="Home / Organization" title="Organization" description="Team structure & access control" />
-          {tab === 'overview' && (
-            <motion.button onClick={() => setShowAddDept(true)} className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Plus size={16} /> New Department
-            </motion.button>
-          )}
-          {tab === 'users' && (
-            <button onClick={loadUsers} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-200 text-xs font-semibold text-gray-500 hover:bg-surface-50 transition-colors">
-              <RefreshCw size={12} className={usersLoading ? 'animate-spin' : ''} /> Refresh
-            </button>
-          )}
-        </div>
+    <div className="flex flex-row h-full overflow-hidden bg-white">
 
-        {/* Tab bar */}
-        <div className="flex gap-1 border-b border-surface-100">
-          {visibleTabs.map(t => {
-            const Icon = t.icon;
-            const active = tab === t.id;
+      {/* ── Left nav panel ── */}
+      <div className="w-56 shrink-0 h-full border-r border-surface-200 overflow-y-auto flex flex-col">
+        <div className="px-5 pt-6 pb-4 shrink-0">
+          <div className="text-sm font-bold text-gray-900">Organization</div>
+          <div className="text-xs text-gray-400 mt-0.5">Control Panel</div>
+        </div>
+        <nav className="px-3 space-y-1 flex-1">
+          {visibleNavItems.map(item => {
+            const Icon = item.icon;
+            const active = section === item.id;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors ${active ? 'text-primary-600' : 'text-gray-400 hover:text-gray-600'}`}>
-                <Icon size={14} strokeWidth={active ? 2.2 : 1.8} />
-                {t.label}
-                {active && <motion.div layoutId="org-tab-ind" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 rounded-full" />}
-              </button>
+              <div key={item.id} className="relative">
+                {active && (
+                  <motion.div
+                    layoutId="org-nav-ind"
+                    className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-500 rounded-r-full"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <button
+                  onClick={() => setSection(item.id)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg w-full text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-primary-50 text-primary-600'
+                      : 'text-gray-500 hover:bg-surface-100 hover:text-gray-700'
+                  }`}
+                >
+                  <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+                  {item.label}
+                </button>
+              </div>
             );
           })}
-        </div>
+        </nav>
       </div>
 
-      {/* ── Tab content ── */}
-      <AnimatePresence mode="wait">
-
-        {/* ── Overview ── */}
-        {tab === 'overview' && (
-          <motion.div key="overview" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="flex flex-col flex-1 min-h-0 overflow-y-auto pb-6">
-            <div className="grid grid-cols-4 gap-5 my-4 shrink-0">
-              {metrics.map((m, i) => {
-                const Icon = m.icon;
-                return (
-                  <motion.div key={m.label} className={`rounded-2xl p-5 ${m.accent ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white' : 'bg-white border border-surface-200'}`}
-                    initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, delay: i * 0.08 }}>
-                    <div className="flex justify-between items-start mb-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${m.accent ? 'bg-white/15' : ''}`} style={!m.accent ? { background: m.color + '20' } : {}}>
-                        <Icon size={16} className={m.accent ? 'text-white' : ''} style={!m.accent ? { color: m.color } : {}} />
-                      </div>
-                      <span className={`text-xs font-semibold ${m.accent ? 'text-white/70' : 'text-[#68B266]'}`}>{m.trend}</span>
-                    </div>
-                    <div className={`text-3xl font-extrabold tracking-tight ${m.accent ? 'text-white' : ''}`} style={!m.accent ? { color: m.color } : {}}>{m.value}</div>
-                    <div className={`text-xs mt-1 ${m.accent ? 'text-white/70' : 'text-gray-400'}`}>{m.label}</div>
-                    <div className={`mt-3 h-1 rounded-full overflow-hidden ${m.accent ? 'bg-white/20' : 'bg-surface-200'}`}>
-                      <div className="h-full rounded-full" style={{ width: `${m.barPct}%`, background: m.accent ? 'rgba(255,255,255,0.6)' : m.color }} />
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            <div className="grid grid-cols-[1fr_300px] gap-5 flex-1 min-h-0">
-              <DepartmentDirectory deptRoster={deptRoster} members={members} getMemberColor={getMemberColor} onAddMember={setAddMemberToDept} />
-              <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
-                <motion.div className="bg-white rounded-2xl border border-surface-200 p-4" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35 }}>
-                  <h3 className="font-bold text-gray-900 text-sm mb-3">Department Roster</h3>
-                  {deptRoster.map((d, deptIndex) => {
-                    const Icon = d.icon;
-                    const deptMembers = d.memberIds.map(id => members.find(m => m.id === id)).filter((m): m is NonNullable<typeof m> => m !== undefined);
-                    return (
-                      <div key={deptIndex} className="flex items-center gap-2.5 py-2 border-b border-surface-100 last:border-0">
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: d.color + '18' }}><Icon size={14} style={{ color: d.color }} /></div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] text-gray-400">{d.name}</div>
-                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">{deptMembers.map(m => <Avatar key={m.id} name={m.name} color={getMemberColor(m.id)} size="sm" />)}</div>
-                        </div>
-                        <button onClick={() => setAddMemberToDept(deptIndex)} className="w-6 h-6 rounded-full flex items-center justify-center bg-surface-100 hover:bg-primary-50 text-gray-400 hover:text-primary-500 transition-colors shrink-0"><Plus size={12} /></button>
-                      </div>
-                    );
-                  })}
-                </motion.div>
-                <motion.div className="bg-white rounded-2xl border border-surface-200 p-4" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35, delay: 0.08 }}>
-                  <h3 className="font-bold text-gray-900 text-sm mb-3">Reporting Lines</h3>
-                  <div className="text-xs text-gray-700 font-semibold mb-2">{currentUser?.name ?? ''}</div>
-                  <div className="flex flex-col gap-1.5 pl-3 border-l-2 border-primary-200">
-                    {subordinates.map(m => <div key={m.id} className="flex items-center gap-1.5 text-xs text-gray-500"><span className="text-primary-300">→</span> {m.name}</div>)}
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── Users (admin only) ── */}
-        {tab === 'users' && isAdmin && (
-          <motion.div key="users" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="flex-1 overflow-y-auto py-5">
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-3 mb-5">
-              {[
-                { label: 'Total',    value: authUsers.length, cls: 'text-gray-800',    bg: 'bg-surface-50 border-surface-200' },
-                { label: 'Admins',   value: adminCount,       cls: 'text-primary-600', bg: 'bg-primary-50 border-primary-100' },
-                { label: 'Managers', value: managerCount,     cls: 'text-[#D97706]',   bg: 'bg-[#FFFBEB] border-[#FCD34D]/40' },
-                { label: 'Members',  value: memberCount,      cls: 'text-gray-500',    bg: 'bg-surface-100 border-surface-200' },
-              ].map(s => (
-                <div key={s.label} className={`rounded-2xl px-4 py-3 border ${s.bg}`}>
-                  <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{s.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Search + filter */}
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="relative flex-1 max-w-sm">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or email…"
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-surface-200 rounded-xl focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all" />
-              </div>
-              <div className="flex items-center gap-1">
-                {(['all', 'admin', 'manager', 'member'] as const).map(f => (
-                  <button key={f} onClick={() => setRoleFilter(f)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${roleFilter === f ? 'bg-primary-500 text-white' : 'bg-surface-100 text-gray-500 hover:bg-surface-200'}`}>
-                    {f === 'all' ? 'All' : f}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="rounded-2xl border border-surface-200 overflow-hidden">
-              <div className="grid grid-cols-[36px_1fr_1fr_130px_130px] gap-3 px-4 py-2.5 bg-surface-50 border-b border-surface-100">
-                {['', 'Name', 'Email', 'Current Role', 'Change Role'].map((h, i) => (
-                  <div key={i} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{h}</div>
-                ))}
-              </div>
-              {usersLoading ? (
-                <div className="py-12 text-center text-sm text-gray-400">Loading users…</div>
-              ) : filteredUsers.length === 0 ? (
-                <div className="py-12 text-center text-sm text-gray-400">No users found.</div>
-              ) : (
-                <div className="divide-y divide-surface-100">
-                  {filteredUsers.map((u, i) => {
-                    const rs = roleStyles[u.role];
-                    return (
-                      <motion.div key={u.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.025 }}
-                        className="grid grid-cols-[36px_1fr_1fr_130px_130px] gap-3 px-4 py-3 items-center hover:bg-surface-50/60 transition-colors">
-                        <Avatar name={u.name} color="#5030E5" size="sm" />
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 truncate">{u.name}</div>
-                          {u.id === authUser?.id && <div className="text-[10px] text-primary-400 font-medium">You</div>}
-                        </div>
-                        <div className="text-sm text-gray-400 truncate">{u.email}</div>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border w-fit ${rs.bg} ${rs.text} border-current/20`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${rs.dot}`} />{u.role}
-                        </span>
-                        <RoleDropdown userId={u.id} current={u.role} isSelf={u.id === authUser?.id} onChange={handleRoleChange} />
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ── Permissions (admin only) ── */}
-        {tab === 'permissions' && isAdmin && (
-          <motion.div key="permissions" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="flex-1 overflow-y-auto py-5 flex flex-col gap-5">
-            {PERM_ROLES.map((role, ri) => {
-              const allowed = perms.find(p => p.role === role.key)?.allowedRoutes ?? ['/settings'];
-              const pct = Math.round((allowed.length / ALL_PERM_ROUTES.length) * 100);
-              return (
-                <motion.div key={role.key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ri * 0.06 }}
-                  className="rounded-2xl border border-surface-200 overflow-hidden">
-                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-100 bg-surface-50/50">
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${role.badgeCls}`}>{role.label}</span>
-                      {saving === role.key && <span className="text-[11px] text-gray-400 animate-pulse">Saving…</span>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 bg-surface-200 rounded-full overflow-hidden">
-                        <motion.div className="h-full rounded-full" style={{ backgroundColor: role.barColor }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
-                      </div>
-                      <span className="text-[11px] text-gray-400 font-medium">{allowed.length}/{ALL_PERM_ROUTES.length}</span>
-                    </div>
-                  </div>
-                  <div className="p-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-                    {ALL_PERM_ROUTES.map(route => {
-                      const RouteIcon = route.icon;
-                      const isChecked = allowed.includes(route.id);
-                      const isLocked  = route.id === '/settings';
-                      return (
-                        <button key={route.id} type="button" disabled={isLocked} onClick={() => togglePerm(role.key, route.id)}
-                          className={`group relative flex flex-col items-center gap-2 px-3 py-3.5 rounded-xl border text-center transition-all ${isChecked ? 'border-primary-300 bg-primary-50 shadow-sm' : 'border-surface-200 hover:border-surface-300 hover:bg-surface-50'} ${isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                          <div className={`absolute top-2 right-2 w-3.5 h-3.5 rounded-full flex items-center justify-center transition-all ${isChecked ? 'bg-primary-500 opacity-100' : 'bg-surface-200 opacity-0 group-hover:opacity-50'}`}>
-                            <Check size={8} className="text-white" strokeWidth={3} />
-                          </div>
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isChecked ? 'bg-primary-100' : 'bg-surface-100'}`}>
-                            <RouteIcon size={15} className={isChecked ? 'text-primary-500' : 'text-gray-400'} strokeWidth={1.8} />
-                          </div>
-                          <div>
-                            <div className={`text-[11px] font-semibold leading-tight ${isChecked ? 'text-primary-700' : 'text-gray-600'}`}>{route.label}</div>
-                            {isLocked && <div className="text-[9px] text-gray-300 mt-0.5">always on</div>}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              );
-            })}
-            <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-primary-50 border border-primary-100">
-              <Shield size={13} className="text-primary-400 shrink-0" />
-              <p className="text-xs text-primary-600"><span className="font-bold">Admin</span> always has full access and cannot be restricted.</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Right content panel ── */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        {null /* section content goes here in Task 2 */}
+      </div>
 
       {/* ── Add Dept Modal ── */}
       <AnimatePresence>
@@ -515,7 +354,7 @@ const OrganizationPage: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Add Member to Dept ── */}
+      {/* ── Add Member to Dept Modal ── */}
       <AnimatePresence>
         {addMemberToDept !== null && (
           <motion.div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setAddMemberToDept(null)}>
@@ -540,7 +379,8 @@ const OrganizationPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+
+    </div>
   );
 };
 
