@@ -198,7 +198,7 @@ const NAV_ITEMS: OrgNavItem[] = [
 ];
 
 const OrganizationPage: React.FC = () => {
-  const { members, getMemberColor } = useMembersContext();
+  const { members, getMemberColor, updateMember } = useMembersContext();
   const { allTasks } = useProjects();
   const { user: authUser } = useAuth();
   const { perms, setRolePerms } = useRolePerms();
@@ -208,7 +208,7 @@ const OrganizationPage: React.FC = () => {
   const [section, setSection] = useState<SectionId>('overview');
 
   // ── Overview state ──
-  const locationCount = new Set(members.map(m => m.location).filter(Boolean)).size || members.length;
+  const locationCount = new Set(members.map(m => m.location).filter(Boolean)).size;
   const avgWorkload = members.length > 0 ? (allTasks.length / members.length).toFixed(1) : '0.0';
   const [deptRoster, setDeptRoster] = useState<DeptEntry[]>([]);
   const [showAddDept, setShowAddDept] = useState(false);
@@ -267,6 +267,8 @@ const OrganizationPage: React.FC = () => {
     try {
       await authApi().updateRole(userId, newRole);
       setAuthUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      // Sync role into MembersContext so the rest of the app (Members page, task assignees) sees the updated role
+      await updateMember(userId, { role: newRole });
       showToast(`Role updated to ${newRole}.`, 'success');
     } catch { showToast('Failed to update role.', 'error'); }
   };
