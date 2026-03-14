@@ -28,25 +28,23 @@ breakSessions: {
 
 ### Mapper update
 
-The `toAttendance` inline mapper used in `db:attendance:getAll` and `db:attendance:set` must include `breakSessions`:
+Both IPC handlers (`db:attendance:getAll` and `db:attendance:set`) contain **inline** object literals that map Mongoose documents to API responses. There is no shared `toAtt` function — each handler's inline mapper must be updated independently.
 
+In `db:attendance:getAll`, the `.map(d => ({ ... }))` lambda currently ends with `status: d.status, notes: d.notes ?? null`. Append:
 ```js
-const toAtt = d => ({
-  id: d.recordId,
-  userId: d.userId,
-  date: d.date ?? null,
-  checkIn: d.checkIn ?? null,
-  checkOut: d.checkOut ?? null,
-  status: d.status,
-  notes: d.notes ?? null,
-  breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })),
-});
+breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })),
+```
+
+In `db:attendance:set`, the `return safe({ ... })` literal currently ends with `status: d.status, notes: d.notes ?? null`. Append the same field:
+```js
+breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })),
 ```
 
 `end` is nullable — an open break session has `end: null`.
 
-### `AttendanceRecord` interface (`src/context/AppContext.tsx`)
+### `AttendanceRecord` interface and `setAttendanceRecord` (`src/context/AppContext.tsx`)
 
+Update `AttendanceRecord`:
 ```ts
 export interface AttendanceRecord {
   id: string;
@@ -60,9 +58,34 @@ export interface AttendanceRecord {
 }
 ```
 
+Update `AppContextType` interface (the declaration):
+```ts
+setAttendanceRecord: (record: Omit<AttendanceRecord, 'id'>) => Promise<void>;
+```
+
+Update the default context stub (currently `setAttendanceRecord: () => {}`):
+```ts
+setAttendanceRecord: () => Promise.resolve(),
+```
+
+Update the `useCallback` implementation to **return the DB promise** (resolves after DB write, not just the optimistic update). The `saving` flag in the component will clear only after the DB confirms the write:
+```ts
+const setAttendanceRecord = useCallback((record: Omit<AttendanceRecord, 'id'>): Promise<void> => {
+  const id = `${record.userId}-${record.date}`;
+  setAttendanceRecords(prev => {
+    // ... existing optimistic update logic unchanged ...
+  });
+  return dbApi().setAttendance({ ...record })
+    .then(() => {})
+    .catch((err: unknown) => { console.error('[AppContext] Failed to persist attendance record:', err); });
+}, []);
+```
+
+This way `await setAttendanceRecord(...)` in the component resolves after the DB write (or silently after error), and `saving` is set to `false` correctly.
+
 ### `ElectronDB` type (`src/vite-env.d.ts`)
 
-`setAttendance` and `getAttendance` already use `AttendanceRecord` — no signature change needed. The new field flows through automatically.
+`setAttendance` and `getAttendance` signatures reference `AttendanceRecord` from `AppContext.tsx` via import. Once `breakSessions` is added to `AttendanceRecord` in `AppContext.tsx`, the type flows through those signatures automatically — **no edits to `vite-env.d.ts` are required**. Remove it from the Files Changed table.
 
 ---
 
@@ -98,6 +121,17 @@ State is **derived** from the today's `AttendanceRecord`, never stored separatel
 
 Location: defined locally inside `src/pages/AttendancePage.tsx`, rendered in the **right-side panel as the first card** (above Attendance Summary).
 
+**Context**: Pull `currentUser` from `AppContext` (not `AuthContext`):
+```ts
+const { currentUser, attendanceRecords, setAttendanceRecord } = useContext(AppContext);
+```
+If `currentUser` is `null`, render nothing (`return null`).
+
+**`todayRecord`**: derived inside the component:
+```ts
+const todayRecord = attendanceRecords.find(r => r.userId === currentUser.id && r.date === TODAY) ?? null;
+```
+
 ### Layout
 
 ```
@@ -109,17 +143,37 @@ Location: defined locally inside `src/pages/AttendancePage.tsx`, rendered in the
 │                                     │
 │  [  Break Out  ]                    │  ← single action button
 │                                     │
-│  In: 09:00 AM   Break: 12m   Out: — │  ← summary row
+│  In: 09:00 AM   Break: 12m   Out: — │  ← summary row (see formatting spec below)
 └─────────────────────────────────────┘
 ```
 
-When `ON_BREAK`, a secondary amber timer appears below the main timer:
-```
-│         00:04:12                    │  ← break duration (ticking up)
-│         On Break                    │
-```
+**Per-state card content:**
+
+| State | Timer area | Button area |
+|---|---|---|
+| `NOT_STARTED` | Shows `"00:00:00"` static (no ticking) | "Punch In" button |
+| `WORKING` | Shows net work timer ticking (`fmt(workMs)`) + label "Net Work Time" | "Break Out" + "Punch Out" side-by-side |
+| `ON_BREAK` | Shows net work timer (frozen/paused) above; `fmt(openBreakMs)` + "On Break" label in amber below | "Break In" button |
+| `DONE` | Shows final net work time frozen (computed from `checkOut` as `now`) + label "Total Work Time" | No buttons |
+
+**Status badge** (top-right of card header):
+
+| State | Label | Color |
+|---|---|---|
+| `NOT_STARTED` | Not Started | Gray |
+| `WORKING` | Working | Green (`#68B266`) |
+| `ON_BREAK` | On Break | Amber (`#D58D49`) |
+| `DONE` | Done | Blue-gray |
 
 When `DONE`, no button is shown; the summary row shows punch-out time.
+
+### Summary row formatting
+
+The summary row always shows three values: **In**, **Break**, **Out**.
+
+- **In**: `new Date(todayRecord.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })` → e.g. `"09:00 AM"`. Shows `"—"` when not punched in.
+- **Break**: total closed break minutes = `Math.round(closedBreakMs / 60000)`. Display as `"Xm"` (e.g. `"12m"`). Shows `"0m"` when no breaks taken. Does **not** include the currently-open break.
+- **Out**: same locale format as In, from `todayRecord.checkOut`. Shows `"—"` until punched out.
 
 ### Timer logic
 
@@ -146,15 +200,42 @@ const fmt = (ms: number) => {
 };
 ```
 
-Interval is started only when `state === 'WORKING' || state === 'ON_BREAK'` and cleared on `DONE` or unmount.
+The break duration display (shown only in `ON_BREAK`) uses `openBreakMs`:
+```ts
+// When ON_BREAK, show the current break duration above the "On Break" label:
+fmt(openBreakMs)  // e.g. "00:04:12"
+```
+
+The interval `useEffect` depends on `state` (the derived string) and `todayRecord?.checkIn`:
+```ts
+useEffect(() => {
+  if (state !== 'WORKING' && state !== 'ON_BREAK') return;
+  const id = setInterval(() => setNow(Date.now()), 1000);
+  return () => clearInterval(id);
+}, [state, todayRecord?.checkIn]);
+```
+`state` here is a `const` computed each render from `todayRecord` — it is stable as a string value and safe to use as a dependency.
+
+In `NOT_STARTED` and `DONE`, the interval is never started (early return).
 
 ### Action handlers
 
 All times stored as ISO strings (`new Date().toISOString()`).
 
-**Punch In:**
+**`TODAY` constant** — defined as a **module-level constant** outside the component function (evaluated once at module load, not per render). This avoids recalculation on every render and is stable across re-renders during the same day. Midnight crossover is an accepted non-issue for a desktop app (user would reopen the app the next day):
 ```ts
-setAttendanceRecord({
+const TODAY = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+```
+This matches the `date` field format used across all existing `AttendanceRecord` queries.
+
+**Punch In:**
+
+Merge with any existing record (to preserve `notes` etc.), or create fresh if none exists. Strip `id` from the spread to satisfy `Omit<AttendanceRecord, 'id'>`:
+```ts
+const existing = attendanceRecords.find(r => r.userId === currentUser.id && r.date === TODAY);
+const { id: _id, ...existingRest } = existing ?? { id: '' };
+await setAttendanceRecord({
+  ...existingRest,
   userId: currentUser.id,
   date: TODAY,
   status: 'present',
@@ -163,35 +244,49 @@ setAttendanceRecord({
 });
 ```
 
+All handlers use `await setAttendanceRecord(...)` for the `saving` guard. `todayRecord` is guaranteed non-null in `WORKING`/`ON_BREAK` states. Strip `id` from spreads:
+
+```ts
+const { id: _id, ...rec } = todayRecord!;
+```
+
 **Break Out:**
 ```ts
-const updated = { ...todayRecord, breakSessions: [...(todayRecord.breakSessions ?? []), { start: new Date().toISOString(), end: null }] };
-setAttendanceRecord(updated);
+const { id: _id, ...rec } = todayRecord!;
+await setAttendanceRecord({ ...rec, breakSessions: [...(rec.breakSessions ?? []), { start: new Date().toISOString(), end: null }] });
 ```
 
 **Break In:**
 ```ts
-const sessions = [...(todayRecord.breakSessions ?? [])];
+const { id: _id, ...rec } = todayRecord!;
+const sessions = [...(rec.breakSessions ?? [])];
 sessions[sessions.length - 1] = { ...sessions[sessions.length - 1], end: new Date().toISOString() };
-setAttendanceRecord({ ...todayRecord, breakSessions: sessions });
+await setAttendanceRecord({ ...rec, breakSessions: sessions });
 ```
 
 **Punch Out:**
+
+The Punch Out button is **only shown when `state === 'WORKING'`** (not when `ON_BREAK`). There is no `ON_BREAK → DONE` transition. If the user is on break, they must Break In first.
+
+Punch Out closes any accidentally-open break session as a safety measure:
 ```ts
-setAttendanceRecord({ ...todayRecord, checkOut: new Date().toISOString() });
+const { id: _id, ...rec } = todayRecord!;
+const sessions = [...(rec.breakSessions ?? [])];
+// Close any open break (defensive)
+if (sessions.length > 0 && !sessions[sessions.length - 1].end) {
+  sessions[sessions.length - 1] = { ...sessions[sessions.length - 1], end: new Date().toISOString() };
+}
+await setAttendanceRecord({ ...rec, checkOut: new Date().toISOString(), breakSessions: sessions });
 ```
 
 ### Button styles
 
-| State | Button label | Button style |
-|---|---|---|
-| `NOT_STARTED` | Punch In | Primary green |
-| `WORKING` | Break Out | Amber outlined |
-| `WORKING` | Punch Out | Red outlined (secondary) |
-| `ON_BREAK` | Break In | Amber filled |
-| `DONE` | — | Hidden |
-
-When `WORKING`, two buttons are shown side-by-side: **Break Out** and **Punch Out**.
+| State | Buttons shown |
+|---|---|
+| `NOT_STARTED` | "Punch In" (green, full-width) |
+| `WORKING` | "Break Out" (amber outlined) + "Punch Out" (red outlined), side-by-side |
+| `ON_BREAK` | "Break In" (amber filled, full-width). Punch Out is **hidden**. |
+| `DONE` | No buttons |
 
 ---
 
@@ -200,8 +295,7 @@ When `WORKING`, two buttons are shown side-by-side: **Break Out** and **Punch Ou
 | File | Change |
 |---|---|
 | `electron/main.js` | Add `breakSessions` to `AttendanceSchema`; update inline mapper |
-| `src/context/AppContext.tsx` | Add `breakSessions` to `AttendanceRecord` interface |
-| `src/vite-env.d.ts` | Add `breakSessions` to `AttendanceRecord` in `ElectronDB` comments (type flows through existing signature) |
+| `src/context/AppContext.tsx` | Add `breakSessions` to `AttendanceRecord` interface; update `setAttendanceRecord` return type in both `AppContextType` interface and implementation to `Promise<void>` |
 | `src/pages/AttendancePage.tsx` | Add `TodaySessionCard` local component; render it first in right panel |
 
 No new files. No new IPC handlers.
@@ -213,4 +307,5 @@ No new files. No new IPC handlers.
 - **App reopened mid-day**: State is re-derived from persisted record on load — timer resumes correctly.
 - **Punch In on a day already marked absent/on-leave**: `setAttendanceRecord` overwrites status to `'present'` — acceptable self-service behaviour.
 - **Break Out without Punch In**: Button is disabled (state is `NOT_STARTED`).
-- **Multiple rapid clicks**: Buttons should be disabled during the `setAttendanceRecord` async call (add a `saving` boolean flag).
+- **Multiple rapid clicks**: Add a `saving` boolean state in `TodaySessionCard`. Set it to `true` before calling `setAttendanceRecord`, then back to `false` in a `finally` block. All action buttons are `disabled={saving}` while true. Since `setAttendanceRecord` in `AppContext` is currently fire-and-forget (returns `void`), wrap the DB call directly in the component using `window.electronAPI.db.setAttendance(...)` returning a Promise, or update `setAttendanceRecord` to return the Promise. **Recommended**: update `setAttendanceRecord` signature in `AppContext` to return `Promise<void>` so components can await it.
+- **`breakSessions` omitted from payload**: The IPC handler uses `d.breakSessions ?? []` — this guard is intentional and must not be removed. A missing field in the payload is valid (e.g., existing records without this field).
