@@ -231,7 +231,7 @@ const OrganizationPage: React.FC = () => {
       setAuthUsers(await authApi().getAll());
       setUsersLoaded(true);
     }
-    catch (err) { console.error('[OrganizationPage] Failed to load auth users:', err); }
+    catch (err) { console.error('[OrganizationPage] Failed to load auth users:', err); showToast('Failed to load users.', 'error'); }
     finally { setUsersLoading(false); }
   }, []);
 
@@ -450,7 +450,7 @@ const OrganizationPage: React.FC = () => {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.025 }}
               className="grid grid-cols-[32px_1fr_1fr_140px] gap-4 px-5 py-3.5 items-center hover:bg-surface-50 transition-colors"
             >
-              <Avatar name={u.name} color="#5030E5" size="sm" />
+              <Avatar name={u.name} color={getMemberColor(u.id)} size="sm" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 truncate">{u.name}</div>
                 {u.id === authUser?.id && <div className="text-[10px] text-primary-400 font-medium">You</div>}
