@@ -153,6 +153,13 @@ const AppearancePrefModel = mongoose.model('AppearancePref', AppearancePrefSchem
 const OrgModel            = mongoose.model('Org', OrgSchema);
 const RolePermsModel      = mongoose.model('RolePerms', RolePermsSchema);
 
+const RoleSchema = new Schema({
+    appId: { type: String, required: true, unique: true },
+    name:  { type: String, required: true, unique: true },
+    color: { type: String, default: '#9CA3AF' },
+});
+const RoleModel = mongoose.model('Role', RoleSchema);
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 // Safe serialization — strips Mongoose internals before IPC transfer
@@ -347,6 +354,15 @@ function registerDbHandlers() {
                 const exists = await RolePermsModel.findOne({ role: p.role }).lean();
                 if (!exists) await RolePermsModel.create(p);
             }
+        }
+        // Seed default roles if none exist
+        const roleCount = await RoleModel.countDocuments();
+        if (roleCount === 0) {
+            await RoleModel.insertMany([
+                { appId: 'role_admin',   name: 'admin',   color: '#5030E5' },
+                { appId: 'role_manager', name: 'manager', color: '#D97706' },
+                { appId: 'role_member',  name: 'member',  color: '#9CA3AF' },
+            ]);
         }
     });
 
