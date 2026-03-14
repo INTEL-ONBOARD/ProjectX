@@ -17,13 +17,14 @@ type Msg = { id: string; from: string; text: string; time: string; read: boolean
 const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
 const MessagesPage: React.FC = () => {
-  const { currentUser } = useContext(AppContext);
-  const myId = currentUser?.id ?? '';
+  useContext(AppContext); // keep context subscription for future use
   const { showToast } = useToast();
   const { user: authUser } = useAuth();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dbApi = () => (window as any).electronAPI.db;
-  const currentUserId = authUser?.id ?? 'local-user';
+  // Single source of truth: authUser.id is always available after login
+  const myId = authUser?.id ?? '';
+  const currentUserId = myId;
   const [activeId, setActiveId] = useState('');
   const [chats, setChats] = useState<Record<string, Msg[]>>({});
   const [input, setInput] = useState('');
@@ -50,7 +51,7 @@ const MessagesPage: React.FC = () => {
     const memberId = (location.state as any)?.memberId;
     if (memberId) {
       setActiveId(memberId);
-      setChats(prev => ({ [memberId]: [], ...prev }));
+      setChats(prev => ({ ...prev, [memberId]: prev[memberId] ?? [] }));
     }
   }, [location.state]);
 
@@ -115,6 +116,12 @@ const MessagesPage: React.FC = () => {
     };
     setChats(prev => ({ ...prev, [activeId]: [...(prev[activeId] ?? []), newMsg] }));
     dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? activeId, text: input.trim(), timestamp: newMsg.time })
+        .then((saved: Msg) => {
+          setChats(prev => ({
+            ...prev,
+            [activeId]: (prev[activeId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id } : m),
+          }));
+        })
         .catch((err: unknown) => console.error('[MessagesPage] Failed to send message:', err));
     setInput('');
     inputRef.current?.focus();
@@ -489,13 +496,11 @@ const MessagesPage: React.FC = () => {
           <div className="p-4 flex flex-col items-center text-center border-b border-surface-100">
             <div className="relative mb-3">
               <Avatar name={activeMember.name} color={activeColor} size="xl" />
-              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor['online'] }} />
+              {(() => { const s = activeMember.status === 'active' ? 'online' : 'offline'; return <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[s] }} />; })()}
             </div>
             <div className="font-bold text-gray-900 text-sm">{activeMember.name}</div>
             <div className="text-xs text-gray-400 mt-0.5">{activeMember?.designation ?? ''}</div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor['online'] + '20', color: statusColor['online'] }}>
-              {statusLabel['online']}
-            </span>
+            {(() => { const s = activeMember.status === 'active' ? 'online' : 'offline'; return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor[s] + '20', color: statusColor[s] }}>{statusLabel[s]}</span>; })()}
           </div>
 
           {/* Quick actions */}
@@ -505,7 +510,11 @@ const MessagesPage: React.FC = () => {
               { icon: Phone, label: 'Voice Call', action: () => { setCallType('phone'); setShowCallBanner(true); } },
               { icon: Video, label: 'Video Call', action: () => { setCallType('video'); setShowCallBanner(true); } },
               { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
-              { icon: Trash2, label: 'Clear Chat', action: () => setChats(p => ({ ...p, [activeId]: [] })) },
+              { icon: Trash2, label: 'Clear Chat', action: () => {
+                const msgs = chats[activeId] ?? [];
+                msgs.forEach(m => dbApi().deleteMessage(m.id).catch((err: unknown) => console.error('[MessagesPage] Failed to delete message:', err)));
+                setChats(p => ({ ...p, [activeId]: [] }));
+              }},
             ].map(({ icon: Icon, label, action }) => (
               <button
                 key={label}
@@ -561,7 +570,7 @@ const MessagesPage: React.FC = () => {
                     No team members yet. Invite members from the Members page first.
                   </div>
                 )}
-                {members.map(m => (
+                {members.filter(m => m.id !== myId).map(m => (
                   <button key={m.id} onClick={() => {
                     setChats(prev => ({ ...prev, [m.id]: [] }));
                     setActiveId(m.id);

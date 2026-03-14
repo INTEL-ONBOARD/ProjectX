@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send, Trash2 } from 'lucide-react';
+import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send } from 'lucide-react';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const authApi = () => (window as any).electronAPI.auth as { updateRole: (userId: string, role: string) => Promise<void> };
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { useMembersContext } from '../context/MembersContext';
@@ -313,6 +316,7 @@ const MembersPage: React.FC = () => {
                         onChange={e => {
                           const newRole = e.target.value as User['role'];
                           updateMember(selectedMember.id, { role: newRole }).catch(console.error);
+                          authApi().updateRole(selectedMember.id, newRole).catch(console.error);
                           setSelectedMember(prev => prev ? { ...prev, role: newRole } : prev);
                         }}
                         className="text-xs font-semibold text-gray-700 border border-surface-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-primary-400"

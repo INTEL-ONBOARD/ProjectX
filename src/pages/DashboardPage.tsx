@@ -15,7 +15,7 @@ const TODAY = new Date().toISOString().split('T')[0];
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { attendanceRecords } = useContext(AppContext);
+  const { attendanceRecords, selectedWeekStart } = useContext(AppContext);
   const { allTasks } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const todoTasks = allTasks.filter(t => t.status === 'todo');
@@ -27,9 +27,12 @@ const DashboardPage: React.FC = () => {
   const inProgressCount = inProgressTasks.length;
   const sprintPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
-  const totalSlots = members.length * 5;
-  const presentSlots = attendanceRecords.filter(r => r.status === 'present' || r.status === 'wfh').length;
-  const attendanceRate = totalSlots > 0 ? Math.round((presentSlots / totalSlots) * 100) : 0;
+  const weekEnd = (() => { const d = new Date(selectedWeekStart); d.setDate(d.getDate() + 4); return d.toISOString().split('T')[0]; })();
+  const weekRecords = attendanceRecords.filter(r => r.date >= selectedWeekStart && r.date <= weekEnd);
+  const weekTrackedDays = new Set(weekRecords.map(r => r.date)).size;
+  const denominator = members.length * (weekTrackedDays > 0 ? weekTrackedDays : 5);
+  const presentSlots = weekRecords.filter(r => r.status === 'present' || r.status === 'wfh').length;
+  const attendanceRate = denominator > 0 ? Math.round((presentSlots / denominator) * 100) : 0;
 
   const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY && t.status !== 'done').length;
   const completionPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
@@ -169,8 +172,10 @@ const DashboardPage: React.FC = () => {
                   <div className="w-2 h-2 rounded-full shrink-0 bg-primary-400" />
                   <span className="text-sm text-gray-700 flex-1 truncate">{task.title}</span>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                    task.priority === 'high' ? 'bg-[#D8727D22] text-[#D8727D]' : 'bg-[#DFA87433] text-[#D58D49]'
-                  }`}>{task.priority === 'high' ? 'High' : 'Low'}</span>
+                    task.priority === 'high' ? 'bg-[#D8727D22] text-[#D8727D]' :
+                    task.priority === 'completed' ? 'bg-[#83C29D33] text-[#68B266]' :
+                    'bg-[#DFA87433] text-[#D58D49]'
+                  }`}>{task.priority === 'high' ? 'High' : task.priority === 'completed' ? 'Done' : 'Low'}</span>
                 </motion.div>
               ))}
             </div>

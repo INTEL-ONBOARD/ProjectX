@@ -40,7 +40,7 @@ const TasksPage: React.FC = () => {
   useEffect(() => {
     const s = (location.state as any)?.search;
     if (s) setSearchQuery(s);
-  }, []);
+  }, [location.state]);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
@@ -506,7 +506,10 @@ const TasksPage: React.FC = () => {
                         <span className="text-xs font-medium">Upload image</span>
                       </button>
                     )}
-                    <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, setDetailImage)} />
+                    <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, (url) => {
+                      setDetailImage(url);
+                      if (selectedTask) updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
+                    })} />
                   </div>
                 )}
 

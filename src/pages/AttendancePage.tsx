@@ -49,8 +49,6 @@ const AttendancePage: React.FC = () => {
         sum + WEEK_DATES.filter(d => getMemberStatus(m.id, d) === 'absent').length, 0);
     const perfectCount = members.filter(m =>
         WEEK_DATES.every(d => isPresent(getMemberStatus(m.id, d)))).length;
-    const avgRate = members.length > 0 ? Math.round((totalPresent / (members.length * 5)) * 100) : 0;
-
     const dailyPresent = WEEK_DATES.map(date =>
         members.filter(m => isPresent(getMemberStatus(m.id, date))).length
     );
@@ -59,10 +57,16 @@ const AttendancePage: React.FC = () => {
         members.some(m => getMemberStatus(m.id, date) !== undefined)
     ).length;
 
+    const trackedDays = daysWithData > 0 ? daysWithData : 5;
+    const avgRate = members.length > 0 ? Math.round((totalPresent / (members.length * trackedDays)) * 100) : 0;
+    const hasAbsenceCount = members.filter(m =>
+        WEEK_DATES.some(d => getMemberStatus(m.id, d) === 'absent')
+    ).length;
+
     const metrics = [
-        { label: 'Team Avg Rate', value: `${avgRate}%`, trend: 'This week', trendUp: true, color: '', accent: true, icon: TrendingUp, barPct: avgRate },
+        { label: 'Team Avg Rate', value: `${avgRate}%`, trend: `${trackedDays} day${trackedDays !== 1 ? 's' : ''} tracked`, trendUp: true, color: '', accent: true, icon: TrendingUp, barPct: avgRate },
         { label: 'Perfect Attendance', value: String(perfectCount), trend: '100% rate', trendUp: true, color: '#68B266', accent: false, icon: CheckCircle, barPct: members.length > 0 ? (perfectCount / members.length) * 100 : 0 },
-        { label: 'One Absence', value: String(members.length - perfectCount), trend: '80% rate', trendUp: false, color: '#D58D49', accent: false, icon: AlertCircle, barPct: members.length > 0 ? ((members.length - perfectCount) / members.length) * 100 : 0 },
+        { label: 'Has Absence', value: String(hasAbsenceCount), trend: 'This week', trendUp: false, color: '#D58D49', accent: false, icon: AlertCircle, barPct: members.length > 0 ? (hasAbsenceCount / members.length) * 100 : 0 },
         { label: 'Days Tracked', value: String(daysWithData), trend: 'Mon–Fri', trendUp: true, color: '#30C5E5', accent: false, icon: Calendar, barPct: (daysWithData / 5) * 100 },
     ];
 

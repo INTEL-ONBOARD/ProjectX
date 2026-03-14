@@ -145,8 +145,15 @@ const RolePermsSchema = new Schema({
     allowedRoutes:  { type: [String], default: [] },
 });
 
+const RoleSchema = new Schema({
+    appId: { type: String, required: true, unique: true },
+    name:  { type: String, required: true, unique: true },
+    color: { type: String, default: '#9CA3AF' },
+});
+
 const OrgModel = mongoose.model('Org', OrgSchema);
 const RolePermsModel = mongoose.model('RolePerms', RolePermsSchema);
+const RoleModel = mongoose.model('Role', RoleSchema);
 const UserModel = mongoose.model('User', UserSchema);
 const TaskModel = mongoose.model('Task', TaskSchema);
 const ProjectModel = mongoose.model('Project', ProjectSchema);
@@ -160,6 +167,7 @@ const ProjectRichModel = mongoose.model('ProjectRich', ProjectRichSchema);
 
 const toUser = d => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email: d.email ?? '', location: d.location ?? '', role: d.role, designation: d.designation ?? '', status: d.status });
 const toProject = d => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
+const toRole = d => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, commentData: (d.commentData ?? []).map(c => ({ id: c.id, author: c.author, text: c.text, time: c.time })), files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });
 
 // ─── MongoDB connection ────────────────────────────────────────────────────────
@@ -348,6 +356,15 @@ function registerDbHandlers() {
                 if (!exists) await RolePermsModel.create(p);
             }
         }
+        // Seed default roles if none exist
+        const roleCount = await RoleModel.countDocuments();
+        if (roleCount === 0) {
+            await RoleModel.insertMany([
+                { appId: 'role_admin',   name: 'admin',   color: '#5030E5' },
+                { appId: 'role_manager', name: 'manager', color: '#D97706' },
+                { appId: 'role_member',  name: 'member',  color: '#9CA3AF' },
+            ]);
+        }
     });
 
     // Organization
@@ -370,6 +387,58 @@ function registerDbHandlers() {
         // data: { role, allowedRoutes }
         const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, new: true }).lean();
         return safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] });
+    });
+
+    // Roles (dynamic role management)
+    ipcMain.handle('db:roles:getAll', async () => {
+        const docs = await RoleModel.find().lean();
+        return safe(docs.map(toRole));
+    });
+
+    ipcMain.handle('db:roles:create', async (_e, data) => {
+        if (data.name === 'admin') throw new Error('Cannot create a role named admin.');
+        const existing = await RoleModel.findOne({ name: data.name }).lean();
+        if (existing) throw new Error(`Role "${data.name}" already exists.`);
+        const d = await RoleModel.create({ appId: `role_${Date.now()}`, name: data.name, color: data.color });
+        return safe(toRole(d.toObject()));
+    });
+
+    ipcMain.handle('db:roles:updateColor', async (_e, data) => {
+        const d = await RoleModel.findOneAndUpdate({ appId: data.appId }, { color: data.color }, { new: true }).lean();
+        if (!d) throw new Error('Role not found.');
+        return safe(toRole(d));
+    });
+
+    ipcMain.handle('db:roles:rename', async (_e, data) => {
+        const role = await RoleModel.findOne({ appId: data.appId }).lean();
+        if (!role) throw new Error('Role not found.');
+        if (role.name === 'admin') throw new Error('Cannot rename the admin role.');
+        const conflict = await RoleModel.findOne({ name: data.newName }).lean();
+        if (conflict) throw new Error(`Role "${data.newName}" already exists.`);
+        const oldName = role.name;
+        await RoleModel.findOneAndUpdate({ appId: data.appId }, { name: data.newName });
+        // Cascade: RolePerms — delete old, insert new with same routes
+        const oldPerms = await RolePermsModel.findOne({ role: oldName }).lean();
+        const allowedRoutes = oldPerms?.allowedRoutes ?? ['/settings'];
+        await RolePermsModel.deleteOne({ role: oldName });
+        await RolePermsModel.create({ role: data.newName, allowedRoutes });
+        // Cascade: User and AuthUser role fields
+        await UserModel.updateMany({ role: oldName }, { role: data.newName });
+        await AuthUserModel.updateMany({ role: oldName }, { role: data.newName });
+        return safe({ ok: true, oldName });
+    });
+
+    ipcMain.handle('db:roles:delete', async (_e, data) => {
+        const role = await RoleModel.findOne({ appId: data.appId }).lean();
+        if (!role) throw new Error('Role not found.');
+        if (role.name === 'admin') throw new Error('Cannot delete the admin role.');
+        await RoleModel.deleteOne({ appId: data.appId });
+        return safe({ ok: true });
+    });
+
+    ipcMain.handle('db:roleperms:delete', async (_e, data) => {
+        await RolePermsModel.deleteOne({ role: data.roleName });
+        return safe({ ok: true });
     });
 
     // User preferences

@@ -15,7 +15,7 @@ import MessagesPage from './pages/MessagesPage';
 import TasksPage from './pages/TasksPage';
 import MembersPage from './pages/MembersPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
-import { AppProvider, AppContext } from './context/AppContext';
+import { AppProvider, AppContext, User } from './context/AppContext';
 import { MembersProvider } from './context/MembersContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RolePermsProvider, useRolePerms } from './context/RolePermsContext';
@@ -39,7 +39,7 @@ const AuthAppSync: React.FC = () => {
                 id: authUser.id,
                 name: authUser.name,
                 email: authUser.email,
-                role: authUser.role,
+                role: authUser.role as User['role'],
                 status: 'active',
             });
         }

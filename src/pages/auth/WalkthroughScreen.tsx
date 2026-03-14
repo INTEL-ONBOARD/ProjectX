@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import AuthBackground, { BrandPanel, FormPanel } from './AuthBackground';
+import { BrandPanel, FormPanel } from './AuthBackground';
 
 const steps = [
   {

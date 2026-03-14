@@ -55,7 +55,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
     return () => document.removeEventListener('mousedown', handler);
   }, [showMenu]);
 
-  const otherStatuses = (['todo', 'in-progress', 'done'] as TaskStatus[]).filter(s => s !== task.status);
+  const otherStatuses = (['todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'done'] as TaskStatus[]).filter(s => s !== task.status);
 
   return (
     <motion.div

@@ -3,7 +3,7 @@ export function downloadCsv(filename: string, rows: string[][]): void {
     .map(row =>
       row
         .map(cell =>
-          cell.includes(',') || cell.includes('"')
+          cell.includes(',') || cell.includes('"') || cell.includes('\n') || cell.includes('\r')
             ? `"${cell.replace(/"/g, '""')}"`
             : cell
         )

@@ -31,9 +31,10 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const getMemberColor = (id: string): string => {
-    const idx = members.findIndex(m => m.id === id);
-    if (idx === -1) return memberColors[0];
-    return memberColors[idx % memberColors.length];
+    // Hash the id so color is stable regardless of list order or deletions
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+    return memberColors[hash % memberColors.length];
   };
 
   const addMember = async (member: Omit<User, 'id'>) => {

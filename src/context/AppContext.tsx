@@ -39,7 +39,7 @@ export interface Team {
 
 export interface User {
     id: string;
-    orgId: string;
+    orgId?: string;
     deptId?: string;
     name: string;
     email: string;

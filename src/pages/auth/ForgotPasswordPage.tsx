@@ -15,19 +15,13 @@ const fi = (i: number) => ({
 
 const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin }) => {
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
+  const [error] = useState('');
   const [focused, setFocused] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) { setError('Please enter your email address.'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Enter a valid email address.'); return; }
-    setError('');
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setLoading(false);
     setSent(true);
   };
 
@@ -75,7 +69,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
                 </div>
                 <h1 className="text-[1.75rem] font-bold text-gray-900 tracking-tight leading-tight">Forgot password?</h1>
                 <p className="text-gray-500 text-sm mt-1.5 leading-relaxed">
-                  No worries. Enter your email and we'll send you a reset link right away.
+                  Enter your email and we'll show you how to get help from your workspace administrator.
                 </p>
               </motion.div>
 
@@ -120,9 +114,9 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
                           <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3"/>
                           <path d="M12 2a10 10 0 0 1 10 10" stroke="#fff" strokeWidth="3" strokeLinecap="round"/>
                         </svg>
-                        Sending link...
+                        Loading...
                       </>
-                    ) : 'Send reset link'}
+                    ) : 'Continue'}
                   </motion.button>
                 </motion.div>
               </form>
@@ -162,12 +156,11 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
                 transition={{ delay: 0.2, duration: 0.35 }}
               >
                 <h2 className="text-[1.75rem] font-bold text-gray-900 tracking-tight leading-tight mb-2">
-                  Check your email
+                  Contact your admin
                 </h2>
                 <p className="text-gray-500 text-sm leading-relaxed mb-8">
-                  We've sent a password reset link to{' '}
-                  <span className="font-semibold text-gray-800">{email}</span>.{' '}
-                  It should arrive within a minute.
+                  Password resets are handled by your workspace administrator. Please contact them directly and ask them to reset the password for{' '}
+                  <span className="font-semibold text-gray-800">{email || 'your account'}</span>.
                 </p>
 
                 <motion.button
@@ -183,12 +176,6 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
                   Back to login
                 </motion.button>
 
-                <p className="text-center mt-4 text-xs text-gray-400">
-                  Didn't receive it?{' '}
-                  <button onClick={() => setSent(false)} className="font-semibold text-primary-500 hover:text-primary-600 transition-colors">
-                    Try again
-                  </button>
-                </p>
               </motion.div>
             </motion.div>
           )}

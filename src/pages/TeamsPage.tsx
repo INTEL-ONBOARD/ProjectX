@@ -518,6 +518,7 @@ const TeamsPage: React.FC = () => {
 
   const handleDeleteProject = (id: string) => {
     deleteProject(id).catch(console.error);
+    dbApi().deleteProjectRich(id).catch(console.error);
     setLocalRichData(prev => {
       const next = { ...prev };
       delete next[id];

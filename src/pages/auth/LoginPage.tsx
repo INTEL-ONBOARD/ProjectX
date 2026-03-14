@@ -31,15 +31,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
   useEffect(() => {
     const api = ipc();
     if (!api) { setDbStatus('connected'); return; }
-    const onConnected = () => setDbStatus('connected');
-    const onFailed = () => setDbStatus('failed');
-    api.on?.('db:connected', onConnected);
-    api.on?.('db:connection-failed', onFailed);
-    // If already connected (app loaded fast), check after short delay
+    const unsubConnected = api.onDbConnected?.(() => setDbStatus('connected'));
+    const unsubFailed = api.onDbConnectionFailed?.(() => setDbStatus('failed'));
+    // Fallback: if still connecting after 5s, assume connected (fast startup)
     const t = setTimeout(() => setDbStatus(s => s === 'connecting' ? 'connected' : s), 5000);
     return () => {
-      api.removeListener?.('db:connected', onConnected);
-      api.removeListener?.('db:connection-failed', onFailed);
+      unsubConnected?.();
+      unsubFailed?.();
       clearTimeout(t);
     };
   }, []);

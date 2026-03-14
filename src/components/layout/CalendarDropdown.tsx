@@ -156,9 +156,9 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                 ))}
             </div>
 
-            {/* Date grid — only 5 rows (35 cells) */}
+            {/* Date grid — up to 6 rows (42 cells) */}
             <div className="grid grid-cols-7 px-2 pb-2 gap-y-0.5">
-                {cells.slice(0, 35).map(({ date, isCurrentMonth }) => {
+                {cells.map(({ date, isCurrentMonth }) => {
                     const dateStr = toISODate(date);
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedDate;

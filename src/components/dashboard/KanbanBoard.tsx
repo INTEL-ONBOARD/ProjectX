@@ -4,7 +4,7 @@ import {
   X, Tag, User, Calendar, ChevronDown, ImagePlus,
   Check, Edit3, Trash2, MessageSquare, Send,
 } from 'lucide-react';
-import { Task, TaskStatus } from '../../types';
+import { Task, TaskStatus, TaskCommentItem } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useMembersContext } from '../../context/MembersContext';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
@@ -28,7 +28,7 @@ const priorityStyles: Record<string, { bg: string; text: string; label: string }
   completed: { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]', label: 'Completed' },
 };
 
-type Comment = { id: string; author: string; text: string; time: string };
+type Comment = TaskCommentItem;
 
 
 interface Filters {
@@ -43,7 +43,7 @@ interface KanbanBoardProps {
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
-  const { allTasks, moveTask, updateTask, deleteTask, createTask, projects } = useProjects();
+  const { allTasks, moveTask, updateTask, deleteTask, createTask, projects, activeProject } = useProjects();
   const { members, getMemberColor } = useMembersContext();
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -69,7 +69,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
     setEditMode(false);
     setConfirmDelete(false);
     setShowStatusDrop(false);
-    setComments([]);
+    setComments(task.commentData ?? []);
     setCommentInput('');
     setDetailImage(null);
   };
@@ -105,19 +105,30 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
 
   const handleAddComment = () => {
     if (!commentInput.trim() || !selectedTask) return;
-    setComments(prev => [...prev, { id: String(Date.now()), author: 'You', text: commentInput.trim(), time: 'Now' }]);
-    const newCount = (selectedTask.comments ?? 0) + 1;
-    updateTask(selectedTask.id, { comments: newCount }).catch(console.error);
-    setSelectedTask(prev => prev ? { ...prev, comments: newCount } : prev);
+    const newComment: Comment = {
+      id: String(Date.now()),
+      author: 'You',
+      text: commentInput.trim(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    const newComments = [...(selectedTask.commentData ?? []), newComment];
+    const newCount = newComments.length;
+    setComments(newComments);
+    updateTask(selectedTask.id, { comments: newCount, commentData: newComments }).catch(console.error);
+    setSelectedTask(prev => prev ? { ...prev, comments: newCount, commentData: newComments } : prev);
     setCommentInput('');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedTask) return;
-    const url = URL.createObjectURL(file);
-    setDetailImage(url);
-    updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string;
+      setDetailImage(dataUrl);
+      updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), dataUrl] }).catch(console.error);
+    };
+    reader.readAsDataURL(file);
   };
 
   const applyFilters = (tasks: Task[]): Task[] => {
@@ -158,7 +169,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
               key={col.status}
               title={col.title}
               status={col.status}
-              tasks={applyFilters(allTasks.filter(t => t.status === col.status))}
+              tasks={applyFilters(allTasks.filter(t => t.status === col.status && t.projectId === activeProject))}
               dotColor={col.dotColor}
               lineColor={col.lineColor}
               index={index}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Pencil, Link2, UserPlus, SlidersHorizontal, Calendar,
@@ -30,6 +30,8 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayTo
   const [showFilter, setShowFilter] = useState(false);
   const [todayActive, setTodayActive] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  useEffect(() => { setViewMode('grid'); }, [activeProject]);
   const [showInvite, setShowInvite] = useState(false);
 
   // Filter state
