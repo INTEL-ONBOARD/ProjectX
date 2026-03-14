@@ -248,9 +248,14 @@ const OrganizationPage: React.FC = () => {
     finally { setUsersLoading(false); }
   }, [showToast]);
 
-  // Load users when Users or Permissions section is first visited
+  // Always re-fetch when visiting the Users section (ensures fresh data)
   useEffect(() => {
-    if ((section === 'users' || section === 'permissions') && isAdmin && !usersLoaded) loadUsers();
+    if (section === 'users' && isAdmin) loadUsers();
+  }, [section, isAdmin, loadUsers]);
+
+  // Load users once when visiting Permissions section (only needs counts)
+  useEffect(() => {
+    if (section === 'permissions' && isAdmin && !usersLoaded) loadUsers();
   }, [section, isAdmin, usersLoaded, loadUsers]);
 
   // Prevent non-admins from reaching admin-only sections via stale state

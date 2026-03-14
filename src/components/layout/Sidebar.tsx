@@ -15,7 +15,6 @@ import {
     MoreHorizontal,
     Bug,
     X,
-    Shield,
 } from 'lucide-react';
 import { useProjects } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
@@ -39,7 +38,6 @@ const ALL_NAV_ITEMS = [
     { id: '/reports', label: 'Reports', icon: BarChart3 },
     { id: '/organization', label: 'Organization', icon: Building2 },
     { id: '/settings', label: 'Settings', icon: Settings },
-    { id: '/admin', label: 'Admin', icon: Shield, adminOnly: true },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -59,10 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     const { getAllowedRoutes } = useRolePerms();
 
     const allowedRoutes = getAllowedRoutes(user?.role ?? 'member');
-    const navItems = ALL_NAV_ITEMS.filter(item => {
-        if (item.adminOnly) return user?.role === 'admin';
-        return allowedRoutes.includes(item.id);
-    });
+    const navItems = ALL_NAV_ITEMS.filter(item => allowedRoutes.includes(item.id));
 
     return (
         <>
