@@ -39,13 +39,16 @@ role: 'admin' | 'manager' | 'member';
 // To:
 role: string;
 
-// Change register() and authApi().register() role param from:
+// Change register() param and AuthContextValue.register signature from:
 role: 'admin' | 'manager' | 'member'
 // To:
 role: string
+
+// Also update authApi() local const inside AuthContext.tsx:
+register: (name, email, password, role: string) => Promise<AuthUser>
 ```
 
-**Impact:** `isAdmin` check (`authUser?.role === 'admin'`) still works — string comparison, no change needed.
+**Impact:** `isAdmin` check (`authUser?.role === 'admin'`) still works — string comparison, no change needed. All role string comparisons (`roleStyles[current]`, `RoleDropdown`, etc.) are already `Record<string, ...>` lookups and are unaffected.
 
 ### `electron/main.ts` — Mongoose schema changes
 ```js
@@ -91,8 +94,8 @@ Channel naming follows the existing `db:<collection>:<action>` convention.
 | `db:roles:getAll` | — | `{ appId, name, color }[]` | Load all Role docs. Called on `RolesContext` mount after DB connects. |
 | `db:roles:create` | `{ name, color }` | `{ appId, name, color }` | Throws if name already exists. `admin` blocked. |
 | `db:roles:updateColor` | `{ appId, color }` | `{ appId, name, color }` | Updates color only. `name` is NOT accepted — all renames go through `db:roles:rename`. |
-| `db:roles:rename` | `{ appId, newName }` | `{ ok: boolean, oldName: string }` | `appId` is the authoritative lookup key. Cascade (sequential): 1) update `Role.name` 2) update `RolePerms.role` field (delete old doc, insert new doc with same `allowedRoutes`) 3) `UserModel.updateMany({ role: oldName }, { role: newName })` 4) `AuthUserModel.updateMany({ role: oldName }, { role: newName })`. Returns `oldName` so client can update local state. On any step failure: log error, return `{ ok: false }` (partial state accepted — mid-session consistency is out of scope). Throws if `newName` already exists. `admin` is blocked. |
-| `db:roles:delete` | `{ appId }` | `{ ok: boolean }` | Deletes Role doc by `appId`. Does NOT cascade to RolePerms — client must call `db:roleperms:delete` separately. `admin` is blocked. Only call when no users have this role (enforced client-side). |
+| `db:roles:rename` | `{ appId, newName }` | `{ ok: boolean, oldName: string }` | `appId` is the authoritative lookup key. Cascade (sequential): 1) read current `role.name` as `oldName` 2) update `Role.name` to `newName` 3) delete `RolePerms` doc where `role === oldName`, then insert new doc with `role: newName` and same `allowedRoutes` 4) `UserModel.updateMany({ role: oldName }, { role: newName })` 5) `AuthUserModel.updateMany({ role: oldName }, { role: newName })`. Returns `{ ok: true, oldName }` on full success. On any step failure: log error, return `{ ok: false }`. `admin` is blocked. Throws if `newName` already exists. |
+| `db:roles:delete` | `{ appId }` | `{ ok: boolean }` | Deletes Role doc by `appId` only — does NOT cascade to RolePerms. Client calls `db:roleperms:delete` as a second step. `admin` is blocked. Only called when no users have this role (enforced client-side). |
 | `db:roleperms:delete` | `{ roleName }` | `{ ok: boolean }` | Deletes `RolePerms` doc where `role === roleName`. Called by client after `db:roles:delete` succeeds. |
 
 **Preload additions** (`electron/preload.ts`) — added under `db`:
@@ -220,9 +223,9 @@ Opens on row click. Closes via backdrop click or X button.
   - Disabled with tooltip "Reassign all users first" when member count > 0
   - Enabled when count = 0: clicking shows inline confirm ("Delete role [name]? This cannot be undone.") → on confirm:
     1. `dbApi().deleteRole({ appId })` — deletes Role doc only
-    2. On success: `dbApi().deleteRolePerms({ roleName: role.name })` — deletes RolePerms doc
-    3. On success: `RolesContext.removeRole(appId)` + `RolePermsContext.removeRolePerms(role.name)` → success toast
-    4. If either IPC fails: error toast, role card stays, no local state changes
+    2. `dbApi().deleteRolePerms({ roleName: role.name })` — deletes RolePerms doc (called regardless of step 1 result, since `deleteRole` failing leaves the RolePerms doc intact)
+    3. If both succeed: `RolesContext.removeRole(appId)` + `RolePermsContext.removeRolePerms(role.name)` → success toast
+    4. If either IPC fails: error toast, no local state changes (role card stays visible)
 
 ### "+ New Role" form (inline, at top of list)
 - Text input for role name + color swatch picker (default: first `PROJECT_COLORS` swatch)
@@ -258,6 +261,8 @@ Opens on row click. Closes via backdrop click or X button.
 - **Admin column:** all cells show lock icon, no toggle, visually "on" — Admin always has full access
 - **`/settings` row:** all cells show lock icon, no toggle, visually "on" — all roles always have settings access
 - **All other cells:** `Toggle` component (reuse existing)
+
+**`localRoutes` state shape:** The current fixed `Record<'manager' | 'member', string[] | null>` must be replaced with `Record<string, string[] | null>` initialized to `{}`. On toggle/Grant All/Revoke All, set `localRoutes[role.name] = next` as before. When a role is deleted, clear its key: `setLocalRoutes(prev => { const copy = {...prev}; delete copy[roleName]; return copy; })`.
 
 ### Toggle behaviour (same optimistic pattern as current `togglePerm`)
 1. Compute `next` routes (add or remove the route)
