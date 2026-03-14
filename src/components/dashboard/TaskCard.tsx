@@ -23,10 +23,11 @@ interface TaskCardProps {
   index: number;
   onClick: () => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
+  onDeleteTask?: (taskId: string) => void;
   todayMode?: boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, todayMode }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, onDeleteTask, todayMode }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -119,7 +120,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, t
                     <p className="text-xs text-gray-600 mb-2 font-medium">Delete this task?</p>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { setShowMenu(false); }}
+                        onClick={() => { setShowMenu(false); setConfirmDelete(false); onDeleteTask?.(task.id); }}
                         className="flex-1 text-xs font-semibold bg-[#D8727D] text-white py-1.5 rounded-lg hover:bg-[#c5616b] transition-colors"
                       >
                         Delete

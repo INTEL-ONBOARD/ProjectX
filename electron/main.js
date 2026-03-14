@@ -142,7 +142,7 @@ const ProjectRichModel = mongoose.model('ProjectRich', ProjectRichSchema);
 
 const toUser = d => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email: d.email ?? '', location: d.location ?? '', role: d.role, designation: d.designation ?? '', status: d.status });
 const toProject = d => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
-const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: Array.from(d.assignees ?? []), comments: d.comments ?? 0, files: d.files ?? 0, images: Array.from(d.images ?? []), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });
+const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });
 
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
@@ -159,52 +159,55 @@ async function connectDB() {
 
 // ─── IPC Handlers ─────────────────────────────────────────────────────────────
 
+// Safe serialization helper — strips all Mongoose internals before IPC transfer
+const safe = v => JSON.parse(JSON.stringify(v));
+
 function registerDbHandlers() {
-    ipcMain.handle('db:projects:getAll', async () => (await ProjectModel.find().lean()).map(toProject));
-    ipcMain.handle('db:projects:create', async (_e, name, color) => { const d = await ProjectModel.create({ appId: `p${Date.now()}`, name, color }); return toProject(d.toObject()); });
-    ipcMain.handle('db:projects:update', async (_e, id, changes) => { const d = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? toProject(d) : null; });
+    ipcMain.handle('db:projects:getAll', async () => safe((await ProjectModel.find().lean()).map(toProject)));
+    ipcMain.handle('db:projects:create', async (_e, name, color) => { const d = await ProjectModel.create({ appId: `p${Date.now()}`, name, color }); return safe(toProject(d.toObject())); });
+    ipcMain.handle('db:projects:update', async (_e, id, changes) => { const d = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toProject(d)) : null; });
     ipcMain.handle('db:projects:delete', async (_e, id) => { await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); return true; });
 
-    ipcMain.handle('db:tasks:getAll', async () => (await TaskModel.find().lean()).map(toTask));
-    ipcMain.handle('db:tasks:create', async (_e, taskData) => { const d = await TaskModel.create({ appId: `t${Date.now()}`, ...taskData }); return toTask(d.toObject()); });
-    ipcMain.handle('db:tasks:update', async (_e, id, changes) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? toTask(d) : null; });
+    ipcMain.handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
+    ipcMain.handle('db:tasks:create', async (_e, taskData) => { const d = await TaskModel.create({ appId: `t${Date.now()}`, ...taskData }); return safe(toTask(d.toObject())); });
+    ipcMain.handle('db:tasks:update', async (_e, id, changes) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toTask(d)) : null; });
     ipcMain.handle('db:tasks:delete', async (_e, id) => { await TaskModel.deleteOne({ appId: id }); return true; });
-    ipcMain.handle('db:tasks:move', async (_e, id, newStatus) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, { status: newStatus }, { new: true }).lean(); return d ? toTask(d) : null; });
+    ipcMain.handle('db:tasks:move', async (_e, id, newStatus) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, { status: newStatus }, { new: true }).lean(); return d ? safe(toTask(d)) : null; });
     ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
 
-    ipcMain.handle('db:members:getAll', async () => (await UserModel.find().lean()).map(toUser));
-    ipcMain.handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return toUser(d.toObject()); });
-    ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? toUser(d) : null; });
+    ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
+    ipcMain.handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
+    ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toUser(d)) : null; });
     ipcMain.handle('db:members:remove', async (_e, id) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
 
-    ipcMain.handle('db:attendance:getAll', async () => (await AttendanceModel.find().lean()).map(d => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null })));
+    ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map(d => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
     ipcMain.handle('db:attendance:set', async (_e, record) => {
         const recordId = `${record.userId}-${record.date}`;
         const d = await AttendanceModel.findOneAndUpdate({ recordId }, { recordId, ...record }, { upsert: true, new: true }).lean();
-        return { id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null };
+        return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null });
     });
     ipcMain.handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
 
     // Messages
-    const toMsg = d => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: Object.fromEntries(d.reactions ?? new Map()), deleted: d.deleted ?? false });
+    const toMsg = d => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
 
     ipcMain.handle('db:messages:getBetween', async (_e, userId, peerId) => {
         const msgs = await MessageModel.find({ $or: [{ fromId: userId, toId: peerId }, { fromId: peerId, toId: userId }] }).sort({ timestamp: 1 }).lean();
-        return msgs.map(toMsg);
+        return safe(msgs.map(toMsg));
     });
     ipcMain.handle('db:messages:send', async (_e, msg) => {
         const d = await MessageModel.create({ msgId: `m${Date.now()}`, ...msg });
-        return toMsg(d.toObject());
+        return safe(toMsg(d.toObject()));
     });
     ipcMain.handle('db:messages:react', async (_e, msgId, userId, emoji) => {
         const msg = await MessageModel.findOne({ msgId }).lean();
         if (!msg) return null;
-        const reactions = new Map(Object.entries(msg.reactions ?? {}));
-        const users = reactions.get(emoji) ?? [];
-        if (users.includes(userId)) reactions.set(emoji, users.filter(u => u !== userId));
-        else reactions.set(emoji, [...users, userId]);
+        const reactions = msg.reactions ? Object.fromEntries(Object.entries(msg.reactions)) : {};
+        const users = reactions[emoji] ?? [];
+        if (users.includes(userId)) reactions[emoji] = users.filter(u => u !== userId);
+        else reactions[emoji] = [...users, userId];
         const d = await MessageModel.findOneAndUpdate({ msgId }, { reactions }, { new: true }).lean();
-        return d ? toMsg(d) : null;
+        return d ? safe(toMsg(d)) : null;
     });
     ipcMain.handle('db:messages:delete', async (_e, msgId) => {
         await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
@@ -216,45 +219,45 @@ function registerDbHandlers() {
 
     ipcMain.handle('db:convmeta:getAll', async (_e, userId) => {
         const docs = await ConvMetaModel.find({ userId }).lean();
-        return docs.map(toConvMeta);
+        return safe(docs.map(toConvMeta));
     });
     ipcMain.handle('db:convmeta:set', async (_e, meta) => {
         const convId = `${meta.userId}-${meta.peerId}`;
         const d = await ConvMetaModel.findOneAndUpdate({ convId }, { convId, ...meta }, { upsert: true, new: true }).lean();
-        return toConvMeta(d);
+        return safe(toConvMeta(d));
     });
 
     // Departments
-    const toDept = d => ({ id: d.deptId, name: d.name, color: d.color, memberIds: Array.from(d.memberIds ?? []) });
+    const toDept = d => ({ id: d.deptId, name: d.name, color: d.color, memberIds: (d.memberIds ?? []).map(String) });
 
-    ipcMain.handle('db:depts:getAll', async () => (await DeptModel.find().lean()).map(toDept));
-    ipcMain.handle('db:depts:create', async (_e, dept) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return toDept(d.toObject()); });
-    ipcMain.handle('db:depts:update', async (_e, id, changes) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { new: true }).lean(); return d ? toDept(d) : null; });
+    ipcMain.handle('db:depts:getAll', async () => safe((await DeptModel.find().lean()).map(toDept)));
+    ipcMain.handle('db:depts:create', async (_e, dept) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return safe(toDept(d.toObject())); });
+    ipcMain.handle('db:depts:update', async (_e, id, changes) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { new: true }).lean(); return d ? safe(toDept(d)) : null; });
     ipcMain.handle('db:depts:delete', async (_e, id) => { await DeptModel.deleteOne({ deptId: id }); return true; });
 
     // Project rich data
     const toProjectRich = d => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General' });
 
-    ipcMain.handle('db:projectrich:getAll', async () => (await ProjectRichModel.find().lean()).map(toProjectRich));
+    ipcMain.handle('db:projectrich:getAll', async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
     ipcMain.handle('db:projectrich:set', async (_e, data) => {
         const d = await ProjectRichModel.findOneAndUpdate({ projectId: data.projectId }, data, { upsert: true, new: true }).lean();
-        return toProjectRich(d);
+        return safe(toProjectRich(d));
     });
 
-    // Auth — credentials stored in MongoDB, password in plaintext (no backend hashing available in Electron main)
+    // Auth — credentials stored in MongoDB
     const toAuthUser = d => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 
     ipcMain.handle('db:auth:login', async (_e, email, password) => {
         const found = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (!found || found.password !== password) throw new Error('Invalid email or password.');
-        return toAuthUser(found);
+        return safe(toAuthUser(found));
     });
 
     ipcMain.handle('db:auth:register', async (_e, name, email, password, role) => {
         const existing = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (existing) throw new Error('An account with this email already exists.');
         const d = await AuthUserModel.create({ appId: `auth-${Date.now()}`, name, email: email.toLowerCase(), password, role });
-        return toAuthUser(d.toObject());
+        return safe(toAuthUser(d.toObject()));
     });
 
     ipcMain.handle('db:auth:updatePassword', async (_e, userId, currentPassword, newPassword) => {
@@ -276,7 +279,7 @@ function registerDbHandlers() {
         }
     });
 
-    // User preferences (theme, sidebar, week start, walkthrough, view)
+    // User preferences
     const toUserPref = d => ({
         userId: d.userId, theme: d.theme, sidebarCollapsed: d.sidebarCollapsed ?? false,
         selectedWeekStart: d.selectedWeekStart ?? null, hasSeenWalkthrough: d.hasSeenWalkthrough ?? false,
@@ -284,11 +287,11 @@ function registerDbHandlers() {
     });
     ipcMain.handle('db:userpref:get', async (_e, userId) => {
         const d = await UserPrefModel.findOne({ userId }).lean();
-        return d ? toUserPref(d) : null;
+        return d ? safe(toUserPref(d)) : null;
     });
     ipcMain.handle('db:userpref:set', async (_e, prefs) => {
         const d = await UserPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
-        return toUserPref(d);
+        return safe(toUserPref(d));
     });
 
     // Notification preferences
@@ -300,11 +303,11 @@ function registerDbHandlers() {
     });
     ipcMain.handle('db:notifpref:get', async (_e, userId) => {
         const d = await NotifPrefModel.findOne({ userId }).lean();
-        return d ? toNotifPref(d) : null;
+        return d ? safe(toNotifPref(d)) : null;
     });
     ipcMain.handle('db:notifpref:set', async (_e, prefs) => {
         const d = await NotifPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
-        return toNotifPref(d);
+        return safe(toNotifPref(d));
     });
 
     // Appearance preferences
@@ -314,11 +317,11 @@ function registerDbHandlers() {
     });
     ipcMain.handle('db:appearancepref:get', async (_e, userId) => {
         const d = await AppearancePrefModel.findOne({ userId }).lean();
-        return d ? toAppearancePref(d) : null;
+        return d ? safe(toAppearancePref(d)) : null;
     });
     ipcMain.handle('db:appearancepref:set', async (_e, prefs) => {
         const d = await AppearancePrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
-        return toAppearancePref(d);
+        return safe(toAppearancePref(d));
     });
 }
 
@@ -332,8 +335,16 @@ if (!process.env.VITE_DEV_SERVER_URL) {
 }
 
 function checkForUpdates() {
-    if (!autoUpdater || !mainWindow) return;
-    autoUpdater.checkForUpdates().catch(err => console.error('Update check failed:', err));
+    if (!mainWindow) return;
+    if (!autoUpdater) {
+        // Running in dev mode — autoUpdater is disabled
+        mainWindow.webContents.send('update:error', 'Auto-updater is not available in development mode.');
+        return;
+    }
+    autoUpdater.checkForUpdates().catch(err => {
+        console.error('Update check failed:', err);
+        mainWindow?.webContents.send('update:error', err.message);
+    });
 }
 
 function setupAutoUpdater() {

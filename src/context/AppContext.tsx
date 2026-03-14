@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useEffect, useMemo, useState, ReactN
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const win = () => window as any;
-const isMock = typeof window === 'undefined' || !win().electronAPI?.db;
 const dbApi = () => win().electronAPI.db;
 const prefsApi = () => win().electronAPI.userPrefs;
 
@@ -114,13 +113,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [theme, setThemeState] = useState<'light' | 'dark'>('light');
     const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-    const [selectedWeekStart, setSelectedWeekStartState] = useState<string>(currentWeekMonday);
-    // Track which userId we last loaded prefs for (avoid re-loading on unrelated re-renders)
+    const [selectedWeekStart, setSelectedWeekStartState] = useState<string>(currentWeekMonday());
     const [prefLoadedFor, setPrefLoadedFor] = useState<string | null>(null);
 
-    // Load user prefs whenever currentUser changes
+    // Load user prefs from MongoDB whenever currentUser changes
     useEffect(() => {
-        if (!currentUser || isMock) return;
+        if (!currentUser) return;
         if (prefLoadedFor === currentUser.id) return;
         prefsApi().get(currentUser.id)
             .then((prefs: { theme?: 'light' | 'dark'; sidebarCollapsed?: boolean; selectedWeekStart?: string | null } | null) => {
@@ -133,9 +131,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             .finally(() => setPrefLoadedFor(currentUser.id));
     }, [currentUser, prefLoadedFor]);
 
-    // Load attendance from MongoDB
+    // Load attendance from MongoDB on mount
     useEffect(() => {
-        if (isMock) return;
         dbApi().getAttendance()
             .then((docs: AttendanceRecord[]) => {
                 if (docs && docs.length > 0) setAttendanceRecords(docs);
@@ -150,7 +147,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const setTheme = useCallback((t: 'light' | 'dark') => {
         setThemeState(t);
-        if (!isMock && currentUser) {
+        if (currentUser) {
             prefsApi().set({ userId: currentUser.id, theme: t })
                 .catch((err: unknown) => console.error('[AppContext] Failed to save theme:', err));
         }
@@ -158,7 +155,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const setSidebarCollapsed = useCallback((collapsed: boolean) => {
         setSidebarCollapsedState(collapsed);
-        if (!isMock && currentUser) {
+        if (currentUser) {
             prefsApi().set({ userId: currentUser.id, sidebarCollapsed: collapsed })
                 .catch((err: unknown) => console.error('[AppContext] Failed to save sidebar state:', err));
         }
@@ -166,7 +163,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const setSelectedWeekStart = useCallback((date: string) => {
         setSelectedWeekStartState(date);
-        if (!isMock && currentUser) {
+        if (currentUser) {
             prefsApi().set({ userId: currentUser.id, selectedWeekStart: date })
                 .catch((err: unknown) => console.error('[AppContext] Failed to save week start:', err));
         }
@@ -183,9 +180,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
             return [...prev, { ...record, id }];
         });
-        if (!isMock) {
-            dbApi().setAttendance({ ...record }).catch((err: unknown) => console.error('[AppContext] Failed to persist attendance record:', err));
-        }
+        dbApi().setAttendance({ ...record })
+            .catch((err: unknown) => console.error('[AppContext] Failed to persist attendance record:', err));
     }, []);
 
     const value = useMemo(

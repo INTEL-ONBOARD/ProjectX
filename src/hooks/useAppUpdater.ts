@@ -17,7 +17,8 @@ export interface UpdateState {
     appVersion: string | null;
 }
 
-const isElectron = typeof window !== 'undefined' && !!(window as any).electronAPI?.checkForUpdate;
+const getApi = () => (typeof window !== 'undefined' ? (window as any).electronAPI : null);
+const isElectron = () => !!(getApi()?.checkForUpdate);
 
 export function useAppUpdater() {
     const [state, setState] = useState<UpdateState>({
@@ -29,9 +30,8 @@ export function useAppUpdater() {
     });
 
     useEffect(() => {
-        if (!isElectron) return;
-
-        const api = (window as any).electronAPI;
+        if (!isElectron()) return;
+        const api = getApi();
 
         // Get current app version
         api.getVersion?.().then((v: string) =>
@@ -70,18 +70,18 @@ export function useAppUpdater() {
     }, []);
 
     const checkForUpdate = useCallback(() => {
-        if (!isElectron) return;
-        (window as any).electronAPI.checkForUpdate();
+        if (!isElectron()) return;
+        getApi().checkForUpdate();
     }, []);
 
     const installUpdate = useCallback(() => {
-        if (!isElectron) return;
-        (window as any).electronAPI.installUpdate();
+        if (!isElectron()) return;
+        getApi().installUpdate();
     }, []);
 
     const dismiss = useCallback(() => {
         setState(s => ({ ...s, status: 'idle', errorMessage: null }));
     }, []);
 
-    return { state, checkForUpdate, installUpdate, dismiss, isElectron };
+    return { state, checkForUpdate, installUpdate, dismiss, isElectron: isElectron() };
 }

@@ -1,10 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-// ── IPC bridge detection ─────────────────────────────────────────────────────
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const win = () => window as any;
-const isMock = typeof window === 'undefined' || !win().electronAPI?.auth;
 const prefsApi = () => win().electronAPI.userPrefs as {
   get: (userId: string) => Promise<{ hasSeenWalkthrough?: boolean } | null>;
   set: (prefs: { userId: string; hasSeenWalkthrough?: boolean }) => Promise<void>;
@@ -13,34 +10,12 @@ const authApi = () => win().electronAPI.auth as {
   login: (email: string, password: string) => Promise<AuthUser>;
   register: (name: string, email: string, password: string, role: 'admin' | 'manager' | 'member') => Promise<AuthUser>;
   updatePassword: (userId: string, currentPassword: string, newPassword: string) => Promise<boolean>;
+  updateName: (userId: string, newName: string) => Promise<void>;
   seedDefault: () => Promise<void>;
 };
 
-// ── localStorage keys (session only — no credential storage in mock) ─────────
-
+// Session token only — no credential storage
 const SESSION_KEY = 'pm_auth_session';
-const WALKTHROUGH_KEY = 'pm_has_seen_walkthrough';
-
-// ── Mock-mode local credential store (dev/browser only) ─────────────────────
-
-const MOCK_USERS_KEY = 'pm_mock_users';
-interface MockUser { id: string; name: string; email: string; password: string; role: 'admin' | 'manager' | 'member' }
-function getMockUsers(): MockUser[] {
-  try { const r = localStorage.getItem(MOCK_USERS_KEY); if (r) return JSON.parse(r); } catch { /* ignore */ }
-  return [];
-}
-function saveMockUsers(users: MockUser[]) {
-  try { localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users)); } catch { /* ignore */ }
-}
-function seedMockDefault() {
-  const users = getMockUsers();
-  if (!users.find(u => u.email === 'admin@projectm.com')) {
-    users.push({ id: 'auth-default', name: 'Admin User', email: 'admin@projectm.com', password: 'password123', role: 'admin' });
-    saveMockUsers(users);
-  }
-}
-
-// ── Types ────────────────────────────────────────────────────────────────────
 
 export interface AuthUser {
   id: string;
@@ -64,25 +39,19 @@ interface AuthContextValue {
 export const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
 export const useAuth = () => useContext(AuthContext);
 
-// ── Provider ─────────────────────────────────────────────────────────────────
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasSeenWalkthrough, setHasSeenWalkthrough] = useState(false);
 
   useEffect(() => {
-    // Seed default account then restore session
     const init = async () => {
+      // Seed default admin account in MongoDB
       try {
-        if (isMock) {
-          seedMockDefault();
-        } else {
-          await authApi().seedDefault();
-        }
+        await authApi().seedDefault();
       } catch { /* ignore seed errors */ }
 
-      // Restore session
+      // Restore session from localStorage token
       let restoredUser: AuthUser | null = null;
       try {
         const raw = localStorage.getItem(SESSION_KEY);
@@ -92,19 +61,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch { /* ignore */ }
 
-      // Load walkthrough flag: DB first, then localStorage fallback
-      if (!isMock && restoredUser) {
+      // Load walkthrough flag from MongoDB
+      if (restoredUser) {
         try {
           const prefs = await prefsApi().get(restoredUser.id);
-          const seen = prefs?.hasSeenWalkthrough ?? false;
-          setHasSeenWalkthrough(seen);
-          // backfill localStorage so non-Electron paths stay in sync
-          if (seen) localStorage.setItem(WALKTHROUGH_KEY, 'true');
+          setHasSeenWalkthrough(prefs?.hasSeenWalkthrough ?? false);
         } catch {
-          setHasSeenWalkthrough(localStorage.getItem(WALKTHROUGH_KEY) === 'true');
+          setHasSeenWalkthrough(false);
         }
-      } else {
-        setHasSeenWalkthrough(localStorage.getItem(WALKTHROUGH_KEY) === 'true');
       }
     };
 
@@ -118,15 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    let authUser: AuthUser;
-    if (isMock) {
-      const users = getMockUsers();
-      const found = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-      if (!found) throw new Error('Invalid email or password.');
-      authUser = { id: found.id, name: found.name, email: found.email, role: found.role };
-    } else {
-      authUser = await authApi().login(email, password);
-    }
+    const authUser = await authApi().login(email, password);
     localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
     setUser(authUser);
   }, []);
@@ -137,19 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     role: 'admin' | 'manager' | 'member'
   ) => {
-    let authUser: AuthUser;
-    if (isMock) {
-      const users = getMockUsers();
-      if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
-        throw new Error('An account with this email already exists.');
-      }
-      const newUser: MockUser = { id: `auth-${Date.now()}`, name, email: email.toLowerCase(), password, role };
-      users.push(newUser);
-      saveMockUsers(users);
-      authUser = { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role };
-    } else {
-      authUser = await authApi().register(name, email, password, role);
-    }
+    const authUser = await authApi().register(name, email, password, role);
     localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
     setUser(authUser);
   }, []);
@@ -160,9 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const markWalkthroughSeen = useCallback(() => {
-    localStorage.setItem(WALKTHROUGH_KEY, 'true');
     setHasSeenWalkthrough(true);
-    if (!isMock && user) {
+    if (user) {
       prefsApi().set({ userId: user.id, hasSeenWalkthrough: true })
         .catch((err: unknown) => console.error('[AuthContext] Failed to save walkthrough flag:', err));
     }
@@ -170,15 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updatePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     if (!user) throw new Error('Not authenticated.');
-    if (isMock) {
-      const users = getMockUsers();
-      const idx = users.findIndex(u => u.id === user.id);
-      if (idx === -1 || users[idx].password !== currentPassword) throw new Error('Current password is incorrect.');
-      users[idx].password = newPassword;
-      saveMockUsers(users);
-    } else {
-      await authApi().updatePassword(user.id, currentPassword, newPassword);
-    }
+    await authApi().updatePassword(user.id, currentPassword, newPassword);
   }, [user]);
 
   return (

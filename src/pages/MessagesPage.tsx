@@ -21,7 +21,6 @@ const MessagesPage: React.FC = () => {
   const myId = currentUser?.id ?? '';
   const { showToast } = useToast();
   const { user: authUser } = useAuth();
-  const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dbApi = () => (window as any).electronAPI.db;
   const currentUserId = authUser?.id ?? 'local-user';
@@ -74,15 +73,14 @@ const MessagesPage: React.FC = () => {
 
   // Load messages from DB when active peer changes
   useEffect(() => {
-    if (isMock || !activeMember) return;
+    if (!activeMember) return;
     dbApi().getMessagesBetween(currentUserId, activeMember.id)
         .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [activeMember.id]: msgs })))
         .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
-  }, [activeMember?.id, isMock, currentUserId]);
+  }, [activeMember?.id, currentUserId]);
 
   // Load conv meta (pin/star/archive) on mount
   useEffect(() => {
-    if (isMock) return;
     dbApi().getConvMeta(currentUserId)
         .then((metas: Array<{ peerId: string; pinned: boolean; starred: boolean; archived: boolean }>) => {
             const pinned: string[] = [];
@@ -98,7 +96,7 @@ const MessagesPage: React.FC = () => {
             setArchivedIds(archived);
         })
         .catch((err: unknown) => console.error('[MessagesPage] Failed to load conv meta:', err));
-  }, [isMock, currentUserId]);
+  }, [currentUserId]);
 
   const totalUnread = conversations.reduce((sum, m) => {
     const msgs = chats[m.id] ?? [];
@@ -116,10 +114,8 @@ const MessagesPage: React.FC = () => {
       read: false,
     };
     setChats(prev => ({ ...prev, [activeId]: [...(prev[activeId] ?? []), newMsg] }));
-    if (!isMock) {
-        dbApi().sendMessage({ fromId: currentUserId, toId: activeMember!.id, text: input.trim(), timestamp: newMsg.time })
-            .catch((err: unknown) => console.error('[MessagesPage] Failed to send message:', err));
-    }
+    dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? activeId, text: input.trim(), timestamp: newMsg.time })
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to send message:', err));
     setInput('');
     inputRef.current?.focus();
   };
@@ -127,24 +123,20 @@ const MessagesPage: React.FC = () => {
   const addReaction = (msgId: string, emoji: string) => {
     setChats(prev => ({
       ...prev,
-      [activeId]: prev[activeId].map(m =>
+      [activeId]: (prev[activeId] ?? []).map(m =>
         m.id === msgId ? { ...m, reactions: [...(m.reactions ?? []).filter(e => e !== emoji), emoji] } : m
       ),
     }));
     setShowEmojiPicker(null);
-    if (!isMock) {
-      dbApi().reactToMessage(msgId, myId, emoji)
-        .catch((err: unknown) => console.error('[MessagesPage] Failed to save reaction:', err));
-    }
+    dbApi().reactToMessage(msgId, myId, emoji)
+      .catch((err: unknown) => console.error('[MessagesPage] Failed to save reaction:', err));
   };
 
   const deleteMessage = (msgId: string) => {
     setChats(prev => ({ ...prev, [activeId]: prev[activeId].filter(m => m.id !== msgId) }));
     setShowContextMenu(null);
-    if (!isMock) {
-      dbApi().deleteMessage(msgId)
-        .catch((err: unknown) => console.error('[MessagesPage] Failed to delete message:', err));
-    }
+    dbApi().deleteMessage(msgId)
+      .catch((err: unknown) => console.error('[MessagesPage] Failed to delete message:', err));
   };
 
   const filteredConvos = conversations.filter(m => {
@@ -356,7 +348,7 @@ const MessagesPage: React.FC = () => {
                 <Video size={16} />
               </motion.button>
               <motion.button
-                onClick={e => { e.stopPropagation(); setPinnedIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (!isMock && activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: !pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
+                onClick={e => { e.stopPropagation(); setPinnedIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: !pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${pinnedIds.includes(activeId) ? 'text-primary-500 bg-primary-50' : 'text-gray-400 hover:bg-surface-100'}`}
                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
                 title="Pin conversation"
@@ -364,7 +356,7 @@ const MessagesPage: React.FC = () => {
                 <Pin size={16} />
               </motion.button>
               <motion.button
-                onClick={e => { e.stopPropagation(); setStarredIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (!isMock && activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: !starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
+                onClick={e => { e.stopPropagation(); setStarredIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: !starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${starredIds.includes(activeId) ? 'text-[#FFA500] bg-[#FFA50015]' : 'text-gray-400 hover:bg-surface-100'}`}
                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
                 title="Star conversation"
@@ -535,7 +527,7 @@ const MessagesPage: React.FC = () => {
             {[
               { icon: Phone, label: 'Voice Call', action: () => { setCallType('phone'); setShowCallBanner(true); } },
               { icon: Video, label: 'Video Call', action: () => { setCallType('video'); setShowCallBanner(true); } },
-              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); if (!isMock && activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
+              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
               { icon: Trash2, label: 'Clear Chat', action: () => setChats(p => ({ ...p, [activeId]: [] })) },
             ].map(({ icon: Icon, label, action }) => (
               <button

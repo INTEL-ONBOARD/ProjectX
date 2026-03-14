@@ -20,7 +20,6 @@ import { useProjects } from '../context/ProjectContext';
 // ── IPC bridge ───────────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const win = () => window as any;
-const isMock = typeof window === 'undefined' || !win().electronAPI?.notifPrefs;
 const notifPrefsApi  = () => win().electronAPI.notifPrefs  as { get: (uid: string) => Promise<NotifPrefs | null>; set: (p: NotifPrefs & { userId: string }) => Promise<void> };
 const appearApi      = () => win().electronAPI.appearancePrefs as { get: (uid: string) => Promise<AppearPrefs | null>; set: (p: AppearPrefs & { userId: string }) => Promise<void> };
 const authApi        = () => win().electronAPI.auth as { updateName: (userId: string, newName: string) => Promise<void> };
@@ -207,16 +206,6 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     if (notifLoaded.current || !currentUser?.id) return;
     notifLoaded.current = true;
-    if (isMock) {
-      try {
-        const raw = localStorage.getItem(`pm_notif_${currentUser.id}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          setNotifications({ ...defaultNotifications, ...parsed });
-        }
-      } catch { /* ignore */ }
-      return;
-    }
     notifPrefsApi().get(currentUser.id)
       .then(prefs => { if (prefs) setNotifications({ ...defaultNotifications, ...prefs }); })
       .catch((err: unknown) => console.error('[SettingsPage] Failed to load notif prefs:', err));
@@ -230,7 +219,7 @@ const SettingsPage: React.FC = () => {
   const appearLoaded = useRef(false);
 
   useEffect(() => {
-    if (appearLoaded.current || !currentUser?.id || isMock) return;
+    if (appearLoaded.current || !currentUser?.id) return;
     appearLoaded.current = true;
     appearApi().get(currentUser.id)
       .then(prefs => {
@@ -254,7 +243,7 @@ const SettingsPage: React.FC = () => {
 
 
   const saveAppearance = (patch: Partial<AppearPrefs>) => {
-    if (!isMock && currentUser?.id) {
+    if (currentUser?.id) {
       const current: AppearPrefs & { userId: string } = {
         userId: currentUser.id, themeMode, accentColor, fontSize, compactMode, ...patch,
       };
@@ -266,9 +255,7 @@ const SettingsPage: React.FC = () => {
   const toggleNotif = (key: keyof NotifPrefs) => {
     setNotifications(p => {
       const updated = { ...p, [key]: !p[key] };
-      if (isMock && currentUser?.id) {
-        try { localStorage.setItem(`pm_notif_${currentUser.id}`, JSON.stringify(updated)); } catch { /* ignore */ }
-      } else if (!isMock && currentUser?.id) {
+      if (currentUser?.id) {
         notifPrefsApi().set({ userId: currentUser.id, ...updated })
           .catch((err: unknown) => console.error('[SettingsPage] Failed to save notif prefs:', err));
       }
@@ -286,10 +273,8 @@ const SettingsPage: React.FC = () => {
           location: locationValue.trim() || undefined,
           designation: roleValue.trim() || undefined,
         });
-        if (!isMock) {
-          authApi().updateName(currentUser.id, newName)
-            .catch((err: unknown) => console.error('[SettingsPage] Failed to sync auth name:', err));
-        }
+        authApi().updateName(currentUser.id, newName)
+          .catch((err: unknown) => console.error('[SettingsPage] Failed to sync auth name:', err));
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         showToast('Profile saved!', 'success');

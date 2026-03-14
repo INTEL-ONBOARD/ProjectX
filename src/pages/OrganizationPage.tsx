@@ -8,7 +8,6 @@ import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
 import { PROJECT_COLORS } from '../data/mockData';
 
-const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dbApi = () => (window as any).electronAPI.db;
 
@@ -164,16 +163,6 @@ const OrganizationPage: React.FC = () => {
   const [deptRoster, setDeptRoster] = useState<DeptEntry[]>([]);
 
   useEffect(() => {
-    if (isMock) {
-        setDeptRoster([
-            { icon: FolderKanban, name: 'Project Management', color: '#5030E5', memberIds: [] },
-            { icon: Code2, name: 'Frontend', color: '#30C5E5', memberIds: [] },
-            { icon: Palette, name: 'Design', color: '#FFA500', memberIds: [] },
-            { icon: Settings2, name: 'Backend', color: '#68B266', memberIds: [] },
-            { icon: SearchCode, name: 'QA', color: '#D8727D', memberIds: [] },
-        ]);
-        return;
-    }
     dbApi().getDepts()
         .then((docs: Array<{ id: string; name: string; color: string; memberIds: string[] }>) => {
             setDeptRoster(docs.map(d => ({ id: d.id, name: d.name, color: d.color, memberIds: d.memberIds, icon: FolderKanban })));
@@ -339,16 +328,12 @@ const OrganizationPage: React.FC = () => {
               <button
                 onClick={() => {
                   if (!newDeptName.trim()) return;
-                  setDeptRoster(prev => [...prev, { icon: FolderKanban, name: newDeptName.trim(), color: newDeptColor, memberIds: [] }]);
-                  if (!isMock) {
-                    dbApi().createDept({ name: newDeptName.trim(), color: newDeptColor, memberIds: [] })
-                        .then((d: { id: string; name: string; color: string; memberIds: string[] }) => {
-                            setDeptRoster(prev => prev.map(dept =>
-                                dept.name === newDeptName.trim() && dept.color === newDeptColor ? { ...dept, id: d.id } : dept
-                            ));
-                        })
-                        .catch((err: unknown) => console.error('[OrganizationPage] Failed to create department:', err));
-                  }
+                  const deptName = newDeptName.trim();
+                  dbApi().createDept({ name: deptName, color: newDeptColor, memberIds: [] })
+                      .then((d: { id: string; name: string; color: string; memberIds: string[] }) => {
+                          setDeptRoster(prev => [...prev, { id: d.id, icon: FolderKanban, name: d.name, color: d.color, memberIds: [] }]);
+                      })
+                      .catch((err: unknown) => console.error('[OrganizationPage] Failed to create department:', err));
                   setNewDeptName('');
                   setNewDeptColor(PROJECT_COLORS[0]);
                   setShowAddDept(false);
@@ -384,12 +369,13 @@ const OrganizationPage: React.FC = () => {
               .map(m => (
                 <button key={m.id}
                   onClick={() => {
+                    const dept = addMemberToDept !== null ? deptRoster[addMemberToDept] : null;
+                    const newMemberIds = [...(dept?.memberIds ?? []), m.id];
                     setDeptRoster(prev => prev.map((d, i) =>
-                      i === addMemberToDept ? { ...d, memberIds: [...d.memberIds, m.id] } : d
+                      i === addMemberToDept ? { ...d, memberIds: newMemberIds } : d
                     ));
-                    const updatedDept = deptRoster[addMemberToDept!];
-                    if (!isMock && updatedDept?.id) {
-                        dbApi().updateDept(updatedDept.id, { memberIds: [...updatedDept.memberIds, m.id] })
+                    if (dept?.id) {
+                        dbApi().updateDept(dept.id, { memberIds: newMemberIds })
                             .catch((err: unknown) => console.error('[OrganizationPage] Failed to update department:', err));
                     }
                     setAddMemberToDept(null);

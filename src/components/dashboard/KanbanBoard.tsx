@@ -156,6 +156,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
               onTaskClick={openTask}
               onAddTask={(status) => { setFormDefaultStatus(status); setShowTaskForm(true); }}
               onMoveTask={(taskId, newStatus) => moveTask(taskId, newStatus).catch(console.error)}
+              onDeleteTask={(taskId) => deleteTask(taskId).catch(console.error)}
             />
           ))}
         </div>

@@ -15,7 +15,6 @@ import { useAuth } from '../context/AuthContext';
 import NewProjectModal from '../components/modals/NewProjectModal';
 import { Project } from '../types';
 
-const isMock = typeof window === 'undefined' || !(window as Window & { electronAPI?: { db?: unknown } }).electronAPI?.db;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dbApi = () => (window as any).electronAPI.db;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -441,7 +440,6 @@ const TeamsPage: React.FC = () => {
   const [localRichData, setLocalRichData] = useState<Record<string, Partial<ProjectData>>>(initialRichData);
 
   useEffect(() => {
-    if (isMock) return;
     dbApi().getProjectRich()
         .then((docs: Array<{ projectId: string; description: string; status: 'active' | 'on-hold' | 'completed'; priority: 'low' | 'medium' | 'high'; memberIds: string[]; dueDate: string; starred: boolean; category: string }>) => {
             const richMap: Record<string, Partial<ProjectData>> = {};
@@ -479,7 +477,7 @@ const TeamsPage: React.FC = () => {
 
   // Load view preference from MongoDB on mount
   useEffect(() => {
-    if (isMock || !authUser?.id) return;
+    if (!authUser?.id) return;
     userPrefsApi().get(authUser.id)
       .then(prefs => { if (prefs?.projectsView) setViewState(prefs.projectsView); })
       .catch((err: unknown) => console.error('[TeamsPage] Failed to load view pref:', err));
@@ -487,7 +485,7 @@ const TeamsPage: React.FC = () => {
 
   const setView = (v: 'grid' | 'list') => {
     setViewState(v);
-    if (!isMock && authUser?.id) {
+    if (authUser?.id) {
       userPrefsApi().set({ userId: authUser.id, projectsView: v })
         .catch((err: unknown) => console.error('[TeamsPage] Failed to save view pref:', err));
     }
@@ -513,11 +511,9 @@ const TeamsPage: React.FC = () => {
       ...prev,
       [id]: { ...prev[id], starred: newStarred },
     }));
-    if (!isMock) {
-      const current = localRichData[id] ?? {};
-      dbApi().setProjectRich({ projectId: id, description: current.description ?? '', status: current.status ?? 'active', priority: current.priority ?? 'medium', memberIds: current.memberIds ?? [], dueDate: current.dueDate ?? '', starred: newStarred, category: current.category ?? 'General' })
-          .catch((err: unknown) => console.error('[TeamsPage] Failed to persist star:', err));
-    }
+    const current = localRichData[id] ?? {};
+    dbApi().setProjectRich({ projectId: id, description: current.description ?? '', status: current.status ?? 'active', priority: current.priority ?? 'medium', memberIds: current.memberIds ?? [], dueDate: current.dueDate ?? '', starred: newStarred, category: current.category ?? 'General' })
+        .catch((err: unknown) => console.error('[TeamsPage] Failed to persist star:', err));
   };
 
   const handleDeleteProject = (id: string) => {

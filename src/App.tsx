@@ -117,12 +117,6 @@ const MainApp: React.FC = () => (
 const Root: React.FC = () => {
     const { isAuthenticated, isLoading, hasSeenWalkthrough, markWalkthroughSeen } = useAuth();
     const [splashDone, setSplashDone] = useState(false);
-    const [walkthroughDone, setWalkthroughDone] = useState(hasSeenWalkthrough);
-
-    const handleWalkthroughComplete = () => {
-        markWalkthroughSeen();
-        setWalkthroughDone(true);
-    };
 
     // 1. Splash (while isLoading is true AND splash not manually dismissed)
     if (isLoading && !splashDone) {
@@ -134,10 +128,10 @@ const Root: React.FC = () => {
     }
 
     // 2. Walkthrough (first time only, after splash)
-    if (!isAuthenticated && !walkthroughDone) {
+    if (!isAuthenticated && !hasSeenWalkthrough) {
         return (
             <AnimatePresence>
-                <WalkthroughScreen onComplete={handleWalkthroughComplete} />
+                <WalkthroughScreen onComplete={markWalkthroughSeen} />
             </AnimatePresence>
         );
     }

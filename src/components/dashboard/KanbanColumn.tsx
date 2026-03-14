@@ -14,11 +14,12 @@ interface KanbanColumnProps {
   onTaskClick: (task: Task) => void;
   onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
+  onDeleteTask?: (taskId: string) => void;
 }
 
 const KanbanColumn: React.FC<KanbanColumnProps> = ({
   title, status, tasks, dotColor, lineColor, index,
-  onTaskClick, onAddTask, onMoveTask,
+  onTaskClick, onAddTask, onMoveTask, onDeleteTask,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -86,6 +87,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
             index={i}
             onClick={() => onTaskClick(task)}
             onMoveTask={onMoveTask}
+            onDeleteTask={onDeleteTask}
           />
         ))}
         {tasks.length === 0 && isDragOver && (
