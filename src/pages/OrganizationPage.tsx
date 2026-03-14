@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Building2, Users, MapPin, BarChart2, FolderKanban, Settings2, X, Plus,
+  Building2, Users, User, MapPin, BarChart2, FolderKanban, Settings2, X, Plus,
   ChevronDown, Shield, Check, Search, RefreshCw, ChevronRight,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
@@ -170,10 +170,23 @@ const ALL_PERM_ROUTES = [
   { id: '/settings',     label: 'Settings',     icon: Settings2,     description: 'Settings' },
 ];
 
-const PERM_ROLES: { key: 'manager' | 'member'; label: string; badgeCls: string; barColor: string }[] = [
-  { key: 'manager', label: 'Manager',        badgeCls: 'bg-[#FFFBEB] text-[#D97706] border-[#FCD34D]', barColor: '#D97706' },
-  { key: 'member',  label: 'Member / Guest', badgeCls: 'bg-surface-100 text-gray-500 border-surface-200', barColor: '#9CA3AF' },
+const PERM_ROLES: { key: 'manager' | 'member'; label: string; icon: React.ElementType; badgeCls: string; barColor: string }[] = [
+  { key: 'manager', label: 'Manager',        icon: Users, badgeCls: 'bg-[#FFFBEB] text-[#D97706] border-[#FCD34D]', barColor: '#D97706' },
+  { key: 'member',  label: 'Member / Guest', icon: User,  badgeCls: 'bg-surface-100 text-gray-500 border-surface-200', barColor: '#9CA3AF' },
 ];
+
+// ── Toggle switch ──────────────────────────────────────────────────────────────
+const Toggle: React.FC<{ checked: boolean; onChange: () => void; disabled?: boolean }> = ({ checked, onChange, disabled }) => (
+  <button
+    type="button"
+    onClick={disabled ? undefined : onChange}
+    className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${checked ? 'bg-primary-500' : 'bg-surface-200'} ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+  >
+    <span
+      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`}
+    />
+  </button>
+);
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 type SectionId = 'overview' | 'users' | 'permissions';
@@ -467,7 +480,78 @@ const OrganizationPage: React.FC = () => {
 
           {section === 'permissions' && isAdmin && (
             <motion.div key="permissions" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-              {null /* Task 4 */}
+              <div className="mb-1">
+                <h2 className="text-xl font-bold text-gray-900">Role Permissions</h2>
+                <p className="text-sm text-gray-400 mt-0.5">Configure which pages each role can access</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-5 mt-6">
+                {PERM_ROLES.map((role, ri) => {
+                  const allowed = perms.find(p => p.role === role.key)?.allowedRoutes ?? ['/settings'];
+                  const RoleIcon = role.icon;
+                  const count = authUsers.filter(u => u.role === role.key).length;
+                  return (
+                    <motion.div
+                      key={role.key}
+                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ri * 0.06 }}
+                      className="bg-white rounded-2xl border border-surface-200 overflow-hidden"
+                    >
+                      {/* Card header */}
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
+                        <div className="flex items-center gap-2.5">
+                          <RoleIcon size={16} className="text-gray-400" />
+                          <span className="text-sm font-bold text-gray-900">{role.label}</span>
+                          <span className="bg-surface-100 text-gray-500 text-xs rounded-full px-2 py-0.5 font-medium">{count}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {saving === role.key && <span className="text-xs text-gray-400 animate-pulse">Saving…</span>}
+                          {/* Progress */}
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-16 h-1.5 bg-surface-200 rounded-full overflow-hidden">
+                              <motion.div
+                                className="h-full rounded-full"
+                                style={{ backgroundColor: role.barColor }}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.round((allowed.length / ALL_PERM_ROUTES.length) * 100)}%` }}
+                                transition={{ duration: 0.5 }}
+                              />
+                            </div>
+                            <span className="text-[11px] text-gray-400">{allowed.length}/{ALL_PERM_ROUTES.length}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Route toggle rows */}
+                      <div className="divide-y divide-surface-100">
+                        {ALL_PERM_ROUTES.map(route => {
+                          const isOn = allowed.includes(route.id);
+                          const isLocked = route.id === '/settings';
+                          return (
+                            <div key={route.id} className="flex items-center justify-between px-5 py-3">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm text-gray-700">{route.label}</span>
+                                <span className="text-xs text-gray-400">{route.id}</span>
+                                {isLocked && <span className="text-[10px] text-gray-300 ml-1">always on</span>}
+                              </div>
+                              <Toggle
+                                checked={isOn || isLocked}
+                                onChange={() => togglePerm(role.key, route.id)}
+                                disabled={isLocked}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Admin note */}
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-primary-50 border border-primary-100 mt-5">
+                <Shield size={13} className="text-primary-400 shrink-0" />
+                <p className="text-xs text-primary-600"><span className="font-bold">Admin</span> always has full access and cannot be restricted.</p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
