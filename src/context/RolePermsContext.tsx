@@ -9,7 +9,7 @@ export interface RolePerms {
 }
 
 const DEFAULT_PERMS: RolePerms[] = [
-    { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings'] },
+    { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings', '/roles', '/user-requests'] },
     { role: 'manager', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/attendance', '/settings'] },
     { role: 'member',  allowedRoutes: ['/settings'] },
 ];

@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         updatePassword: (userId, currentPassword, newPassword) => ipcRenderer.invoke('db:auth:updatePassword', userId, currentPassword, newPassword),
         updateName:     (userId, newName)                    => ipcRenderer.invoke('db:auth:updateName', userId, newName),
         seedDefault:    ()                                   => ipcRenderer.invoke('db:auth:seedDefault'),
+        getAll:         ()                                   => ipcRenderer.invoke('db:auth:getAll'),
+        updateRole:     (userId, role)                       => ipcRenderer.invoke('db:auth:updateRole', userId, role),
     },
 
     // Database — all operations go through Electron main → MongoDB Atlas

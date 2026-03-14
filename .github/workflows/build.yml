@@ -3,8 +3,6 @@ name: Build & Release
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*.*.*'
   pull_request:
     branches: [main]
 
@@ -13,7 +11,7 @@ permissions:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
-  # Type-check & build web assets (runs on every push/PR for fast feedback)
+  # Type-check (runs on every push/PR)
   # ─────────────────────────────────────────────────────────────────────────────
   typecheck:
     name: Type check
@@ -34,12 +32,53 @@ jobs:
         run: npx tsc --noEmit
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Build & publish Electron app (only on version tags)
+  # Auto-tag: read version from package.json, create tag if it doesn't exist yet
+  # ─────────────────────────────────────────────────────────────────────────────
+  auto-tag:
+    name: Auto tag from package.json
+    needs: typecheck
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      tag_created: ${{ steps.create-tag.outputs.tag_created }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from package.json
+        id: get-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Create tag if it doesn't exist
+        id: create-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="v${{ steps.get-version.outputs.version }}"
+          if git ls-remote --tags origin "$VERSION" | grep -q "$VERSION"; then
+            echo "Tag $VERSION already exists — skipping release"
+            echo "tag_created=false" >> $GITHUB_OUTPUT
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$VERSION"
+            git push origin "$VERSION"
+            echo "Tag $VERSION created"
+            echo "tag_created=true" >> $GITHUB_OUTPUT
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build & publish Electron installers (only when a new tag was just created)
   # ─────────────────────────────────────────────────────────────────────────────
   release:
     name: Release — ${{ matrix.os }}
-    needs: typecheck
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: auto-tag
+    if: needs.auto-tag.outputs.tag_created == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -70,13 +109,10 @@ jobs:
 
       - name: Build & publish Electron app
         env:
-          # Use the built-in token — works automatically on public repos, no setup needed
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
         run: npx electron-builder --${{ matrix.platform }} --publish always
 
-      - name: Upload artifacts (fallback)
+      - name: Upload artifacts (fallback on failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -85,17 +121,20 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Publish the draft release after all platform builds succeed
+  # Publish: mark draft → public after all platform builds succeed
   # ─────────────────────────────────────────────────────────────────────────────
   publish-release:
     name: Publish release
-    needs: release
+    needs: [auto-tag, release]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: needs.auto-tag.outputs.tag_created == 'true'
     steps:
       - uses: actions/checkout@v4
 
       - name: Mark release as published (non-draft, latest)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit ${{ github.ref_name }} --draft=false --latest
+        run: |
+          TAG="v${{ needs.auto-tag.outputs.version }}"
+          gh release edit "$TAG" --draft=false --latest
+          echo "Released $TAG as public ✓"

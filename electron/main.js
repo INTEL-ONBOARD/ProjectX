@@ -289,6 +289,16 @@ function registerDbHandlers() {
         return true;
     });
 
+    ipcMain.handle('db:auth:getAll', async () => {
+        const docs = await AuthUserModel.find().lean();
+        return safe(docs.map(d => ({ id: d.appId, name: d.name, email: d.email, role: d.role })));
+    });
+
+    ipcMain.handle('db:auth:updateRole', async (_e, userId, role) => {
+        await AuthUserModel.findOneAndUpdate({ appId: userId }, { role });
+        return true;
+    });
+
     ipcMain.handle('db:auth:seedDefault', async () => {
         // Legacy default account
         const existing = await AuthUserModel.findOne({ email: 'admin@projectm.com' }).lean();
