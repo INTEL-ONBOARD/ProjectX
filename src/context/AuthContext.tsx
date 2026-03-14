@@ -8,7 +8,7 @@ const prefsApi = () => win().electronAPI.userPrefs as {
 };
 const authApi = () => win().electronAPI.auth as {
   login: (email: string, password: string) => Promise<AuthUser>;
-  register: (name: string, email: string, password: string, role: 'admin' | 'manager' | 'member') => Promise<AuthUser>;
+  register: (name: string, email: string, password: string, role: string) => Promise<AuthUser>;
   updatePassword: (userId: string, currentPassword: string, newPassword: string) => Promise<boolean>;
   updateName: (userId: string, newName: string) => Promise<void>;
   seedDefault: () => Promise<void>;
@@ -21,7 +21,7 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'manager' | 'member';
+  role: string;
 }
 
 interface AuthContextValue {
@@ -30,7 +30,7 @@ interface AuthContextValue {
   isLoading: boolean;
   hasSeenWalkthrough: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: 'admin' | 'manager' | 'member') => Promise<void>;
+  register: (name: string, email: string, password: string, role: string) => Promise<void>;
   logout: () => void;
   markWalkthroughSeen: () => void;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -61,11 +61,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch { /* ignore */ }
 
-      // Load walkthrough flag from MongoDB
-      if (restoredUser) {
+      // Load walkthrough flag — localStorage first (works even pre-login), then DB
+      if (localStorage.getItem('pm_walkthrough_seen') === 'true') {
+        setHasSeenWalkthrough(true);
+      } else if (restoredUser) {
         try {
           const prefs = await prefsApi().get(restoredUser.id);
-          setHasSeenWalkthrough(prefs?.hasSeenWalkthrough ?? false);
+          if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true);
         } catch {
           setHasSeenWalkthrough(false);
         }
@@ -91,7 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     name: string,
     email: string,
     password: string,
-    role: 'admin' | 'manager' | 'member'
+    role: string
   ) => {
     const authUser = await authApi().register(name, email, password, role);
     localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
@@ -105,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const markWalkthroughSeen = useCallback(() => {
     setHasSeenWalkthrough(true);
+    localStorage.setItem('pm_walkthrough_seen', 'true');
     if (user) {
       prefsApi().set({ userId: user.id, hasSeenWalkthrough: true })
         .catch((err: unknown) => console.error('[AuthContext] Failed to save walkthrough flag:', err));
