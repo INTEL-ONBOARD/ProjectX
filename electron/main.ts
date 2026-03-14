@@ -189,6 +189,8 @@ const toUserPref    = (d: any) => ({ userId: d.userId, theme: d.theme, sidebarCo
 const toNotifPref   = (d: any) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAppearancePref = (d: any) => ({ userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor, fontSize: d.fontSize, compactMode: d.compactMode ?? false });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toRole = (d: any) => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
@@ -384,6 +386,58 @@ function registerDbHandlers() {
     ipcMain.handle('db:roleperms:set', async (_e, data: { role: string; allowedRoutes: string[] }) => {
         const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, new: true }).lean() as any;
         return safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] });
+    });
+
+    // Roles (dynamic role management)
+    ipcMain.handle('db:roles:getAll', async () => {
+        const docs = await RoleModel.find().lean() as any[];
+        return safe(docs.map(toRole));
+    });
+
+    ipcMain.handle('db:roles:create', async (_e, data: { name: string; color: string }) => {
+        if (data.name === 'admin') throw new Error('Cannot create a role named admin.');
+        const existing = await RoleModel.findOne({ name: data.name }).lean();
+        if (existing) throw new Error(`Role "${data.name}" already exists.`);
+        const d = await RoleModel.create({ appId: `role_${Date.now()}`, name: data.name, color: data.color });
+        return safe(toRole(d.toObject()));
+    });
+
+    ipcMain.handle('db:roles:updateColor', async (_e, data: { appId: string; color: string }) => {
+        const d = await RoleModel.findOneAndUpdate({ appId: data.appId }, { color: data.color }, { new: true }).lean();
+        if (!d) throw new Error('Role not found.');
+        return safe(toRole(d));
+    });
+
+    ipcMain.handle('db:roles:rename', async (_e, data: { appId: string; newName: string }) => {
+        const role = await RoleModel.findOne({ appId: data.appId }).lean() as any;
+        if (!role) throw new Error('Role not found.');
+        if (role.name === 'admin') throw new Error('Cannot rename the admin role.');
+        const conflict = await RoleModel.findOne({ name: data.newName }).lean();
+        if (conflict) throw new Error(`Role "${data.newName}" already exists.`);
+        const oldName = role.name;
+        await RoleModel.findOneAndUpdate({ appId: data.appId }, { name: data.newName });
+        // Cascade: RolePerms — delete old, insert new with same routes
+        const oldPerms = await RolePermsModel.findOne({ role: oldName }).lean() as any;
+        const allowedRoutes = oldPerms?.allowedRoutes ?? ['/settings'];
+        await RolePermsModel.deleteOne({ role: oldName });
+        await RolePermsModel.create({ role: data.newName, allowedRoutes });
+        // Cascade: User and AuthUser role fields
+        await UserModel.updateMany({ role: oldName }, { role: data.newName });
+        await AuthUserModel.updateMany({ role: oldName }, { role: data.newName });
+        return safe({ ok: true, oldName });
+    });
+
+    ipcMain.handle('db:roles:delete', async (_e, data: { appId: string }) => {
+        const role = await RoleModel.findOne({ appId: data.appId }).lean() as any;
+        if (!role) throw new Error('Role not found.');
+        if (role.name === 'admin') throw new Error('Cannot delete the admin role.');
+        await RoleModel.deleteOne({ appId: data.appId });
+        return safe({ ok: true });
+    });
+
+    ipcMain.handle('db:roleperms:delete', async (_e, data: { roleName: string }) => {
+        await RolePermsModel.deleteOne({ role: data.roleName });
+        return safe({ ok: true });
     });
 
     // User preferences
