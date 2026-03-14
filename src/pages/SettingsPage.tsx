@@ -16,7 +16,7 @@ import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
-import { useRolePerms } from '../context/RolePermsContext';
+
 
 // ── IPC bridge ───────────────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,13 +170,6 @@ const NAV_GROUPS_BASE = [
       { id: 'about', label: 'About', icon: Info },
     ],
   },
-  {
-    label: 'Admin',
-    adminOnly: true,
-    items: [
-      { id: 'permissions', label: 'Role Permissions', icon: Shield },
-    ],
-  },
 ];
 
 const ACCENT_COLORS = [
@@ -195,7 +188,7 @@ const SettingsPage: React.FC = () => {
   const { user: authUser, logout, updatePassword } = useAuth();
   const { updateMember, members } = useMembersContext();
   const { projects, allTasks } = useProjects();
-  const { perms, setRolePerms } = useRolePerms();
+
 
   const isAdmin = authUser?.role === 'admin';
   const navGroups = NAV_GROUPS_BASE.filter(g => !g.adminOnly || isAdmin);
@@ -1154,76 +1147,6 @@ const SettingsPage: React.FC = () => {
                 </motion.div>
               )}
 
-              {/* ══ Role Permissions (admin only) ══ */}
-              {activeSection === 'permissions' && isAdmin && (
-                <motion.div key="permissions" className="flex flex-col gap-4 bg-white pb-4"
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}>
-
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Role Permissions" subtitle="Control which pages each role can access" />
-                    <div className="px-5 py-4 flex flex-col gap-6">
-                      {(['manager', 'member'] as const).map(role => {
-                        const rolePerms = perms.find(p => p.role === role);
-                        const allowed = rolePerms?.allowedRoutes ?? [];
-                        const ALL_ROUTES = [
-                          { id: '/',             label: 'Task Board' },
-                          { id: '/dashboard',    label: 'Dashboard' },
-                          { id: '/messages',     label: 'Messages' },
-                          { id: '/tasks',        label: 'Tasks' },
-                          { id: '/teams',        label: 'Projects' },
-                          { id: '/members',      label: 'Members' },
-                          { id: '/attendance',   label: 'Attendance' },
-                          { id: '/reports',      label: 'Reports' },
-                          { id: '/organization', label: 'Organization' },
-                          { id: '/settings',     label: 'Settings' },
-                        ];
-                        return (
-                          <div key={role}>
-                            <div className="text-xs font-bold text-gray-700 capitalize mb-3 flex items-center gap-2">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                role === 'manager' ? 'bg-primary-50 text-primary-600' : 'bg-surface-100 text-gray-500'
-                              }`}>{role === 'member' ? 'Member / Guest' : 'Manager'}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              {ALL_ROUTES.map(route => {
-                                const isChecked = allowed.includes(route.id);
-                                const isLocked = route.id === '/settings'; // always on
-                                return (
-                                  <button
-                                    key={route.id}
-                                    type="button"
-                                    disabled={isLocked}
-                                    onClick={() => {
-                                      const next = isChecked
-                                        ? allowed.filter(r => r !== route.id)
-                                        : [...allowed, route.id];
-                                      setRolePerms(role, next).catch(console.error);
-                                    }}
-                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all ${
-                                      isChecked
-                                        ? 'border-primary-300 bg-primary-50 text-primary-700'
-                                        : 'border-surface-200 text-gray-400 hover:border-surface-300 hover:text-gray-600'
-                                    } ${isLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                  >
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
-                                      isChecked ? 'bg-primary-500 border-primary-500' : 'border-surface-300'
-                                    }`}>
-                                      {isChecked && <Check size={9} className="text-white" strokeWidth={3} />}
-                                    </div>
-                                    {route.label}
-                                    {isLocked && <span className="ml-auto text-[9px] text-gray-300">always on</span>}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
 
             </AnimatePresence>
           </div>
