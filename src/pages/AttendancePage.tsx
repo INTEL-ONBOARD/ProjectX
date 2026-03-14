@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { motion } from 'framer-motion';
-import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar } from 'lucide-react';
+import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AppContext, AttendanceRecord } from '../context/AppContext';
@@ -16,6 +16,200 @@ function addDays(dateStr: string, n: number): string {
     const dy = String(date.getDate()).padStart(2, '0');
     return `${yr}-${mo}-${dy}`;
 }
+
+const TODAY_DATE = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+const TodaySessionCard: React.FC = () => {
+  const { currentUser, attendanceRecords, setAttendanceRecord } = useContext(AppContext);
+  const [now, setNow] = React.useState(Date.now());
+  const [saving, setSaving] = React.useState(false);
+
+  if (!currentUser) return null;
+
+  const todayRecord = attendanceRecords.find(
+    r => r.userId === currentUser.id && r.date === TODAY_DATE
+  ) ?? null;
+
+  // ── Derive state ────────────────────────────────────────────────────────────
+  type SessionState = 'NOT_STARTED' | 'WORKING' | 'ON_BREAK' | 'DONE';
+  const state: SessionState = (() => {
+    if (!todayRecord?.checkIn) return 'NOT_STARTED';
+    if (todayRecord.checkOut) return 'DONE';
+    const sessions = todayRecord.breakSessions ?? [];
+    if (sessions.length > 0 && sessions[sessions.length - 1].end === null) return 'ON_BREAK';
+    return 'WORKING';
+  })();
+
+  // ── Timer ───────────────────────────────────────────────────────────────────
+  React.useEffect(() => {
+    if (state !== 'WORKING' && state !== 'ON_BREAK') return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [state, todayRecord?.checkIn]);
+
+  // ── Time math ───────────────────────────────────────────────────────────────
+  const fmt = (ms: number) => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const hh = Math.floor(s / 3600).toString().padStart(2, '0');
+    const mm = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+    const ss = (s % 60).toString().padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
+  };
+
+  const checkInMs = todayRecord?.checkIn ? new Date(todayRecord.checkIn).getTime() : 0;
+  const closedBreakMs = (todayRecord?.breakSessions ?? [])
+    .filter(b => b.end)
+    .reduce((sum, b) => sum + (new Date(b.end!).getTime() - new Date(b.start).getTime()), 0);
+  const openBreakMs = state === 'ON_BREAK'
+    ? now - new Date(todayRecord!.breakSessions![todayRecord!.breakSessions!.length - 1].start).getTime()
+    : 0;
+  const workMs = state === 'NOT_STARTED' ? 0
+    : state === 'DONE'
+      ? new Date(todayRecord!.checkOut!).getTime() - checkInMs - closedBreakMs
+      : now - checkInMs - closedBreakMs - openBreakMs;
+
+  // ── Summary row helpers ─────────────────────────────────────────────────────
+  const fmtTime = (iso: string | null | undefined) =>
+    iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  const breakMinutes = Math.round(closedBreakMs / 60000);
+
+  // ── Badge config ────────────────────────────────────────────────────────────
+  const badgeCfg: Record<SessionState, { label: string; bg: string; text: string }> = {
+    NOT_STARTED: { label: 'Not Started', bg: 'bg-gray-100',    text: 'text-gray-500'   },
+    WORKING:     { label: 'Working',     bg: 'bg-[#83C29D33]', text: 'text-[#68B266]'  },
+    ON_BREAK:    { label: 'On Break',    bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]'  },
+    DONE:        { label: 'Done',        bg: 'bg-[#E0E7EF]',   text: 'text-[#6B7FA3]'  },
+  };
+  const badge = badgeCfg[state];
+
+  // ── Action handlers ─────────────────────────────────────────────────────────
+  const act = async (fn: () => Promise<void>) => {
+    if (saving) return;
+    setSaving(true);
+    try { await fn(); } finally { setSaving(false); }
+  };
+
+  const handlePunchIn = () => act(async () => {
+    const existing = attendanceRecords.find(r => r.userId === currentUser.id && r.date === TODAY_DATE);
+    const { id: _id, ...existingRest } = existing ?? { id: '' };
+    await setAttendanceRecord({
+      ...existingRest,
+      userId: currentUser.id,
+      date: TODAY_DATE,
+      status: 'present',
+      checkIn: new Date().toISOString(),
+      breakSessions: [],
+    });
+  });
+
+  const handleBreakOut = () => act(async () => {
+    const { id: _id, ...rec } = todayRecord!;
+    await setAttendanceRecord({
+      ...rec,
+      breakSessions: [...(rec.breakSessions ?? []), { start: new Date().toISOString(), end: null }],
+    });
+  });
+
+  const handleBreakIn = () => act(async () => {
+    const { id: _id, ...rec } = todayRecord!;
+    const sessions = [...(rec.breakSessions ?? [])];
+    sessions[sessions.length - 1] = { ...sessions[sessions.length - 1], end: new Date().toISOString() };
+    await setAttendanceRecord({ ...rec, breakSessions: sessions });
+  });
+
+  const handlePunchOut = () => act(async () => {
+    const { id: _id, ...rec } = todayRecord!;
+    const sessions = [...(rec.breakSessions ?? [])];
+    if (sessions.length > 0 && !sessions[sessions.length - 1].end) {
+      sessions[sessions.length - 1] = { ...sessions[sessions.length - 1], end: new Date().toISOString() };
+    }
+    await setAttendanceRecord({ ...rec, checkOut: new Date().toISOString(), breakSessions: sessions });
+  });
+
+  return (
+    <motion.div
+      className="bg-white rounded-2xl border border-surface-200 p-4"
+      initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.35, delay: 0, ease: [0.4, 0, 0.2, 1] }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-gray-900 text-sm">Today's Session</h3>
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.bg} ${badge.text}`}>
+          {badge.label}
+        </span>
+      </div>
+
+      {/* Timer area */}
+      <div className="text-center mb-4">
+        <div className="text-3xl font-mono font-bold text-gray-900 tracking-tight">
+          {fmt(workMs)}
+        </div>
+        <div className="text-xs text-gray-400 mt-0.5">
+          {state === 'DONE' ? 'Total Work Time' : 'Net Work Time'}
+        </div>
+
+        {state === 'ON_BREAK' && (
+          <div className="mt-2">
+            <div className="text-lg font-mono font-semibold text-[#D58D49]">
+              {fmt(openBreakMs)}
+            </div>
+            <div className="text-xs text-[#D58D49]">On Break</div>
+          </div>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      {state === 'NOT_STARTED' && (
+        <button
+          onClick={handlePunchIn}
+          disabled={saving}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+          style={{ background: 'linear-gradient(135deg, #68B266 0%, #4CAF50 100%)' }}
+        >
+          <LogIn size={15} /> Punch In
+        </button>
+      )}
+
+      {state === 'WORKING' && (
+        <div className="flex gap-2">
+          <button
+            onClick={handleBreakOut}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-[#D58D49] text-[#D58D49] flex items-center justify-center gap-2 hover:bg-[#DFA87415] transition-colors disabled:opacity-60"
+          >
+            <Coffee size={15} /> Break Out
+          </button>
+          <button
+            onClick={handlePunchOut}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-[#D8727D] text-[#D8727D] flex items-center justify-center gap-2 hover:bg-[#D8727D15] transition-colors disabled:opacity-60"
+          >
+            <LogOut size={15} /> Punch Out
+          </button>
+        </div>
+      )}
+
+      {state === 'ON_BREAK' && (
+        <button
+          onClick={handleBreakIn}
+          disabled={saving}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+          style={{ background: '#D58D49' }}
+        >
+          <Coffee size={15} /> Break In
+        </button>
+      )}
+
+      {/* Summary row */}
+      <div className="flex justify-between mt-4 pt-3 border-t border-surface-100 text-xs text-gray-500">
+        <span>In: <span className="font-semibold text-gray-800">{fmtTime(todayRecord?.checkIn)}</span></span>
+        <span>Break: <span className="font-semibold text-gray-800">{breakMinutes}m</span></span>
+        <span>Out: <span className="font-semibold text-gray-800">{fmtTime(todayRecord?.checkOut)}</span></span>
+      </div>
+    </motion.div>
+  );
+};
 
 const AttendancePage: React.FC = () => {
     const { attendanceRecords, selectedWeekStart } = useContext(AppContext);
@@ -189,6 +383,7 @@ const AttendancePage: React.FC = () => {
 
         {/* Side panels */}
         <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
+          <TodaySessionCard />
           {/* Attendance Summary */}
           <motion.div className="bg-white rounded-2xl border border-surface-200 p-4"
             initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
