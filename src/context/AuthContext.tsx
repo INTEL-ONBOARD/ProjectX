@@ -34,6 +34,7 @@ interface AuthContextValue {
   logout: () => void;
   markWalkthroughSeen: () => void;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updateDisplayName: (name: string) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue>({} as AuthContextValue);
@@ -119,6 +120,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await authApi().updatePassword(user.id, currentPassword, newPassword);
   }, [user]);
 
+  const updateDisplayName = useCallback((name: string) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, name };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -130,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout,
       markWalkthroughSeen,
       updatePassword,
+      updateDisplayName,
     }}>
       {children}
     </AuthContext.Provider>
