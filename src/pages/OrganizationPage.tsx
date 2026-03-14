@@ -380,11 +380,15 @@ const OrganizationPage: React.FC = () => {
           )}
 
           {section === 'users' && isAdmin && (
-            <div key="users">{null /* Task 3 */}</div>
+            <motion.div key="users" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              {null /* Task 3 */}
+            </motion.div>
           )}
 
           {section === 'permissions' && isAdmin && (
-            <div key="permissions">{null /* Task 4 */}</div>
+            <motion.div key="permissions" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              {null /* Task 4 */}
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
