@@ -11,19 +11,25 @@ export interface RolePerms {
 const DEFAULT_PERMS: RolePerms[] = [
     { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings'] },
     { role: 'manager', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/attendance', '/settings'] },
-    { role: 'member',  allowedRoutes: ['/settings'] },
+    { role: 'member',  allowedRoutes: ['/', '/dashboard', '/tasks', '/messages', '/attendance', '/settings'] },
 ];
 
 interface RolePermsContextType {
     perms: RolePerms[];
     getAllowedRoutes: (role: string) => string[];
     setRolePerms: (role: string, allowedRoutes: string[]) => Promise<void>;
+    addRolePerms: (entry: RolePerms) => void;
+    renameRolePerms: (oldName: string, newName: string) => void;
+    removeRolePerms: (roleName: string) => void;
 }
 
 export const RolePermsContext = createContext<RolePermsContextType>({
     perms: DEFAULT_PERMS,
     getAllowedRoutes: (role) => DEFAULT_PERMS.find(p => p.role === role)?.allowedRoutes ?? ['/settings'],
     setRolePerms: async () => {},
+    addRolePerms: () => {},
+    renameRolePerms: () => {},
+    removeRolePerms: () => {},
 });
 
 export const useRolePerms = () => useContext(RolePermsContext);
@@ -46,8 +52,20 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
         setPerms(prev => prev.map(p => p.role === role ? updated : p));
     }, []);
 
+    const addRolePerms = useCallback((entry: RolePerms) => {
+        setPerms(prev => [...prev, entry]);
+    }, []);
+
+    const renameRolePerms = useCallback((oldName: string, newName: string) => {
+        setPerms(prev => prev.map(p => p.role === oldName ? { ...p, role: newName } : p));
+    }, []);
+
+    const removeRolePerms = useCallback((roleName: string) => {
+        setPerms(prev => prev.filter(p => p.role !== roleName));
+    }, []);
+
     return (
-        <RolePermsContext.Provider value={{ perms, getAllowedRoutes, setRolePerms }}>
+        <RolePermsContext.Provider value={{ perms, getAllowedRoutes, setRolePerms, addRolePerms, renameRolePerms, removeRolePerms }}>
             {children}
         </RolePermsContext.Provider>
     );
