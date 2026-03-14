@@ -246,16 +246,11 @@ const OrganizationPage: React.FC = () => {
     }
     catch (err) { console.error('[OrganizationPage] Failed to load auth users:', err); showToast('Failed to load users.', 'error'); }
     finally { setUsersLoading(false); }
-  }, []);
+  }, [showToast]);
 
-  // Load users when Users section is visited (guarded by usersLoaded to prevent re-fetching on re-render)
+  // Load users when Users or Permissions section is first visited
   useEffect(() => {
-    if (section === 'users' && isAdmin && !usersLoaded) loadUsers();
-  }, [section, isAdmin, usersLoaded, loadUsers]);
-
-  // Load users when Permissions section is first visited (needs user counts for badges)
-  useEffect(() => {
-    if (section === 'permissions' && isAdmin && !usersLoaded) loadUsers();
+    if ((section === 'users' || section === 'permissions') && isAdmin && !usersLoaded) loadUsers();
   }, [section, isAdmin, usersLoaded, loadUsers]);
 
   // Prevent non-admins from reaching admin-only sections via stale state
@@ -288,18 +283,26 @@ const OrganizationPage: React.FC = () => {
   const setSaving = (role: 'manager' | 'member', val: boolean) =>
     role === 'manager' ? setSavingManager(val) : setSavingMember(val);
 
-  // Stable ref to latest perms to avoid stale closure race on rapid toggling
-  const permsRef = React.useRef(perms);
-  useEffect(() => { permsRef.current = perms; }, [perms]);
+  // Optimistic local route lists — updated synchronously on each toggle so rapid
+  // clicks accumulate correctly instead of racing against async context updates.
+  const [localRoutes, setLocalRoutes] = useState<Record<'manager' | 'member', string[] | null>>({ manager: null, member: null });
+  const getRoutes = (role: 'manager' | 'member') =>
+    localRoutes[role] ?? perms.find(p => p.role === role)?.allowedRoutes ?? ['/settings'];
 
   const togglePerm = async (role: 'manager' | 'member', routeId: string) => {
     if (routeId === '/settings') return;
-    const current = permsRef.current.find(p => p.role === role)?.allowedRoutes ?? ['/settings'];
+    const current = getRoutes(role);
     const next = current.includes(routeId) ? current.filter(r => r !== routeId) : [...current, routeId];
     // Enforce /settings invariant in data
     if (!next.includes('/settings')) next.push('/settings');
+    // Update optimistic state synchronously so next rapid click sees this change
+    setLocalRoutes(prev => ({ ...prev, [role]: next }));
     setSaving(role, true);
-    try { await setRolePerms(role, next); }
+    try {
+      await setRolePerms(role, next);
+      // Context updated — clear optimistic override so we read from context
+      setLocalRoutes(prev => ({ ...prev, [role]: null }));
+    }
     finally { setSaving(role, false); }
   };
 
@@ -498,7 +501,7 @@ const OrganizationPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-5 mt-6">
                 {PERM_ROLES.map((role, ri) => {
-                  const allowed = perms.find(p => p.role === role.key)?.allowedRoutes ?? ['/settings'];
+                  const allowed = getRoutes(role.key);
                   const RoleIcon = role.icon;
                   const count = authUsers.filter(u => u.role === role.key).length;
                   return (
@@ -586,7 +589,7 @@ const OrganizationPage: React.FC = () => {
                     .then((d: { id: string; name: string; color: string; memberIds: string[] }) => {
                       setDeptRoster(prev => [...prev, { id: d.id, icon: FolderKanban, name: d.name, color: d.color, memberIds: [] }]);
                     })
-                    .catch((err: unknown) => console.error('[OrganizationPage] Failed to create department:', err));
+                    .catch((err: unknown) => { console.error('[OrganizationPage] Failed to create department:', err); showToast('Failed to create department.', 'error'); });
                   setNewDeptName(''); setNewDeptColor(PROJECT_COLORS[0]); setShowAddDept(false);
                 }} className="w-full bg-primary-500 text-white font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors">
                   Create Department
@@ -608,7 +611,7 @@ const OrganizationPage: React.FC = () => {
                   const dept = addMemberToDept !== null ? deptRoster[addMemberToDept] : null;
                   const newMemberIds = [...(dept?.memberIds ?? []), m.id];
                   setDeptRoster(prev => prev.map((d, i) => i === addMemberToDept ? { ...d, memberIds: newMemberIds } : d));
-                  if (dept?.id) dbApi().updateDept(dept.id, { memberIds: newMemberIds }).catch((err: unknown) => console.error('[OrganizationPage] Failed to update department:', err));
+                  if (dept?.id) dbApi().updateDept(dept.id, { memberIds: newMemberIds }).catch((err: unknown) => { console.error('[OrganizationPage] Failed to update department:', err); showToast('Failed to update department.', 'error'); });
                   setAddMemberToDept(null);
                 }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-50 transition-colors">
                   <Avatar name={m.name} color={getMemberColor(m.id)} size="sm" />
