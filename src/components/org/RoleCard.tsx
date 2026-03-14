@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Lock, Trash2 } from 'lucide-react';
 import { RoleDoc } from '../../context/RolesContext';
@@ -28,6 +28,8 @@ export const RoleCard: React.FC<Props> = ({
     const [nameValue, setNameValue] = useState(role.name);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const nameRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => { setNameValue(role.name); }, [role.name]);
 
     const members = authUsers.filter(u => u.role === role.name);
     const allowedRoutes = perms.find(p => p.role === role.name)?.allowedRoutes ?? ['/settings'];

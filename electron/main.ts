@@ -300,6 +300,10 @@ function registerDbHandlers() {
         const d = await ProjectRichModel.findOneAndUpdate({ projectId: data.projectId }, data, { upsert: true, new: true }).lean();
         return safe(toProjectRich(d));
     });
+    ipcMain.handle('db:projectrich:delete', async (_e, projectId: string) => {
+        await ProjectRichModel.deleteOne({ projectId });
+        return true;
+    });
 
     // Auth
     ipcMain.handle('db:auth:login', async (_e, email: string, password: string) => {

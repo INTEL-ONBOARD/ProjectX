@@ -15,7 +15,7 @@ const UserSchema = new Schema({
     avatar: { type: String, default: '' },
     email: String,
     location: String,
-    role: { type: String, enum: ['admin', 'manager', 'member'], default: 'member' },
+    role: { type: String, default: 'member' },
     designation: String,
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
 });
@@ -93,7 +93,7 @@ const AuthUserSchema = new Schema({
     name:     { type: String, required: true },
     email:    { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role:     { type: String, enum: ['admin', 'manager', 'member'], default: 'member' },
+    role:     { type: String, default: 'member' },
 });
 
 const UserPrefSchema = new Schema({

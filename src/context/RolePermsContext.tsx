@@ -48,8 +48,8 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }, [perms]);
 
     const setRolePerms = useCallback(async (role: string, allowedRoutes: string[]) => {
-        const updated = await dbApi().setRolePerms({ role, allowedRoutes });
-        setPerms(prev => prev.map(p => p.role === role ? updated : p));
+        await dbApi().setRolePerms({ role, allowedRoutes });
+        setPerms(prev => prev.map(p => p.role === role ? { role, allowedRoutes } : p));
     }, []);
 
     const addRolePerms = useCallback((entry: RolePerms) => {

@@ -44,7 +44,7 @@ export interface User {
     name: string;
     email: string;
     avatar?: string;
-    role: 'admin' | 'manager' | 'member';
+    role: string;
     pin?: string;
     designation?: string;
     location?: string;

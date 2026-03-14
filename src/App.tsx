@@ -39,7 +39,7 @@ const AuthAppSync: React.FC = () => {
                 id: authUser.id,
                 name: authUser.name,
                 email: authUser.email,
-                role: authUser.role as User['role'],
+                role: authUser.role,
                 status: 'active',
             });
         }
