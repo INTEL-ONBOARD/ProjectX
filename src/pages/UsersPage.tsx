@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { ChevronRight, Users2, Shield, UserCheck, KeyRound, UserPlus, MoreVertical } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, Users2, Shield, UserCheck, KeyRound, UserPlus, MoreVertical, Eye, UserCog, Trash2 } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useRolePerms } from '../context/RolePermsContext';
@@ -29,10 +29,22 @@ type Tab = typeof TABS[number];
 // ─── Users Tab ──────────────────────────────────────────────────────────────
 
 const UsersTab: React.FC = () => {
-    const { members, getMemberColor } = useMembersContext();
+    const { members, getMemberColor, removeMember } = useMembersContext();
     const { roles } = useRoles();
     const [drawerMember, setDrawerMember] = useState<User | null>(null);
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+    const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setMenuOpenId(null);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     const getRoleStyle = (roleName: string) => roleStyles[roleName] ?? roleStyles.member;
     const getRoleColor = (roleName: string) => roles.find(r => r.name === roleName)?.color ?? '#9ca3af';
@@ -130,12 +142,68 @@ const UsersTab: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                                            <button
-                                                onClick={() => setMenuOpenId(menuOpenId === member.id ? null : member.id)}
-                                                className="p-1 rounded-md hover:bg-surface-100 text-gray-300 hover:text-gray-500 transition-colors"
-                                            >
-                                                <MoreVertical size={14} />
-                                            </button>
+                                            <div className="relative inline-flex items-center justify-end">
+                                                {confirmRemoveId === member.id ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-[10px] text-gray-500 whitespace-nowrap">Remove {member.name.split(' ')[0]}?</span>
+                                                        <button
+                                                            className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors"
+                                                            onClick={() => { removeMember(member.id).catch(console.error); setConfirmRemoveId(null); }}
+                                                        >
+                                                            Confirm
+                                                        </button>
+                                                        <button
+                                                            className="text-[10px] font-bold text-gray-500 hover:text-gray-700 px-1.5 py-0.5 rounded bg-surface-100 hover:bg-surface-200 transition-colors"
+                                                            onClick={() => setConfirmRemoveId(null)}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setMenuOpenId(menuOpenId === member.id ? null : member.id)}
+                                                            className="p-1 rounded-md hover:bg-surface-100 text-gray-300 hover:text-gray-500 transition-colors"
+                                                        >
+                                                            <MoreVertical size={14} />
+                                                        </button>
+                                                        <AnimatePresence>
+                                                            {menuOpenId === member.id && (
+                                                                <motion.div
+                                                                    ref={menuRef}
+                                                                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                                                                    transition={{ duration: 0.12 }}
+                                                                    className="absolute right-0 top-full mt-1 z-50 bg-white border border-surface-200 rounded-xl shadow-lg py-1 w-40"
+                                                                >
+                                                                    <button
+                                                                        onClick={() => { setMenuOpenId(null); setDrawerMember(member); }}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-surface-50 transition-colors"
+                                                                    >
+                                                                        <Eye size={13} className="text-gray-400" />
+                                                                        View Profile
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { setMenuOpenId(null); setDrawerMember(member); }}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-surface-50 transition-colors"
+                                                                    >
+                                                                        <UserCog size={13} className="text-gray-400" />
+                                                                        Change Role
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => { setMenuOpenId(null); setConfirmRemoveId(member.id); }}
+                                                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 transition-colors"
+                                                                    >
+                                                                        <Trash2 size={13} />
+                                                                        Remove
+                                                                    </button>
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </motion.tr>
                                 );

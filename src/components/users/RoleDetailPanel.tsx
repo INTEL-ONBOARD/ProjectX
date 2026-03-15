@@ -10,7 +10,7 @@ const dbApi = () => (window as any).electronAPI.db;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const authApi = () => (window as any).electronAPI.auth;
 
-const BUILT_IN = ['admin'];
+const BUILT_IN = ['admin', 'guest'];
 const PRESET_COLORS = ['#5030E5', '#D97706', '#68B266', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6'];
 
 interface Props {

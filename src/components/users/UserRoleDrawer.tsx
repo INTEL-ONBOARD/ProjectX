@@ -57,12 +57,12 @@ export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
             {member && (
                 <>
                     <motion.div
-                        className="fixed inset-0 bg-black/20 z-40"
+                        className="fixed inset-x-0 bottom-0 top-16 bg-black/20 z-40"
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         onClick={onClose}
                     />
                     <motion.div
-                        className="fixed top-0 right-0 h-full w-[420px] bg-white shadow-2xl z-50 flex flex-col"
+                        className="fixed top-16 right-0 h-[calc(100vh-4rem)] w-[420px] bg-white shadow-2xl z-50 flex flex-col"
                         initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                     >

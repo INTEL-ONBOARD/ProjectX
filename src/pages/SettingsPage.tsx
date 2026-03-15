@@ -97,7 +97,7 @@ const SettingCard: React.FC<{
   action?: React.ReactNode;
   className?: string;
 }> = ({ title, description, children, action, className = '' }) => (
-  <div className={`bg-white rounded-2xl p-6 ${className}`}>
+  <div className={`bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100 ${className}`}>
     <div className="flex items-start justify-between mb-4">
       <div>
         <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
@@ -427,7 +427,8 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="px-8 shrink-0">
+      <div className="px-4 shrink-0">
+        <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-1 bg-surface-50 rounded-2xl p-1 border border-surface-200 w-fit">
           {TABS.map(tab => (
             <button
@@ -443,6 +444,7 @@ const SettingsPage: React.FC = () => {
               {tab.label}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -460,9 +462,7 @@ const SettingsPage: React.FC = () => {
               >
                 {/* Card 1 — Identity hero */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl overflow-hidden">
-                    {/* Gradient accent bar */}
-                    <div className="h-1.5 w-full bg-gradient-to-r from-[#5030E5] to-[#7C3AED]" />
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-1">
                         <h3 className="font-semibold text-gray-900 text-sm">Profile</h3>
@@ -516,7 +516,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Card 2 — Activity stats */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="px-6 pt-5 pb-2">
                       <h3 className="font-semibold text-gray-900 text-sm">Activity</h3>
                       <p className="text-xs text-gray-500 mt-0.5">Your contribution statistics</p>
@@ -552,7 +552,7 @@ const SettingsPage: React.FC = () => {
               >
                 {/* Card 1 — Delivery Channels */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#5030E510]">
@@ -591,7 +591,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Card 2 — Activity Events */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
                       <div>
                         <h3 className="font-semibold text-gray-900 text-sm">Activity Events</h3>
@@ -635,7 +635,7 @@ const SettingsPage: React.FC = () => {
               >
                 {/* Card 1 — Theme (full width) */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl p-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="font-semibold text-gray-900 text-sm">Theme</h3>
@@ -707,7 +707,7 @@ const SettingsPage: React.FC = () => {
                 {/* Row 2 — Accent Color + Display side-by-side */}
                 <div className="grid grid-cols-2 gap-4 items-start">
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                    <div className="bg-white rounded-2xl p-6">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <h3 className="font-semibold text-gray-900 text-sm">Accent Color</h3>
@@ -737,7 +737,7 @@ const SettingsPage: React.FC = () => {
                   </motion.div>
 
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                    <div className="bg-white rounded-2xl p-6">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <h3 className="font-semibold text-gray-900 text-sm">Display</h3>
@@ -790,7 +790,7 @@ const SettingsPage: React.FC = () => {
               >
                 {/* Card 1 — Change Password */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl p-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FEE2E2]">
                         <Lock size={18} className="text-[#D8727D]" />
@@ -857,7 +857,7 @@ const SettingsPage: React.FC = () => {
                 {/* Right column: 2FA + Sessions */}
                 <div className="flex flex-col gap-4">
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                    <div className="bg-white rounded-2xl overflow-hidden">
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                       <div className="px-6 py-4 border-b border-surface-100">
                         <h3 className="font-semibold text-gray-900 text-sm">Two-Factor Authentication</h3>
                         <p className="text-xs text-gray-500 mt-0.5">Add an extra layer of security to your account</p>
@@ -885,7 +885,7 @@ const SettingsPage: React.FC = () => {
                   </motion.div>
 
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                    <div className="bg-white rounded-2xl overflow-hidden">
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                       <div className="px-6 py-4 border-b border-surface-100">
                         <h3 className="font-semibold text-gray-900 text-sm">Sessions & Login History</h3>
                         <p className="text-xs text-gray-500 mt-0.5">Manage your active sessions</p>
@@ -942,7 +942,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Plans */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl p-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
                     <h3 className="font-semibold text-gray-900 text-sm mb-1">Plans</h3>
                     <p className="text-xs text-gray-500 mb-4">Choose the plan that's right for you</p>
                     <div className="grid grid-cols-3 gap-4">
@@ -979,7 +979,7 @@ const SettingsPage: React.FC = () => {
                 {/* Row 2 — Usage + Danger Zone side-by-side */}
                 <div className="grid grid-cols-2 gap-4 items-start">
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                    <div className="bg-white rounded-2xl p-6">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
                       <h3 className="font-semibold text-gray-900 text-sm mb-1">Usage</h3>
                       <p className="text-xs text-gray-500 mb-4">Your current resource consumption</p>
                       <div className="flex flex-col gap-4">
@@ -1010,33 +1010,37 @@ const SettingsPage: React.FC = () => {
                   </motion.div>
 
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
-                    <div className="bg-[#FFF5F5] rounded-2xl border border-[#D8727D30] p-6 border-l-4 border-l-[#D8727D]">
-                      <div className="flex items-center gap-2 mb-1">
-                        <AlertTriangle size={15} className="text-[#D8727D]" />
-                        <h3 className="font-semibold text-[#D8727D] text-sm">Danger Zone</h3>
+                    <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
+                      <div className="flex items-center gap-2.5 mb-1">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#FEE2E2] shrink-0">
+                          <AlertTriangle size={14} className="text-[#D8727D]" />
+                        </div>
+                        <h3 className="font-semibold text-gray-900 text-sm">Danger Zone</h3>
                       </div>
-                      <p className="text-xs text-gray-500 mb-4">These actions are irreversible. Proceed with caution.</p>
+                      <p className="text-xs text-gray-500 mb-4 ml-[42px]">These actions are irreversible. Proceed with caution.</p>
                       <div className="flex flex-col gap-2">
                         <button onClick={handleExportData}
-                          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white border border-surface-200 text-gray-600 hover:bg-surface-50 transition-colors w-full">
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-surface-50 text-gray-600 hover:bg-surface-100 transition-colors w-full">
                           <Download size={14} /> Export Data
                         </button>
                         {!confirmDelete ? (
                           <button onClick={handleDeleteAccount}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors w-full">
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-[#FEE2E2] text-[#D8727D] hover:bg-[#fdd] transition-colors w-full">
                             <Trash2 size={14} /> Delete Account
                           </button>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Are you sure?</span>
-                            <button onClick={() => { setConfirmDelete(false); showToast('Account deletion is disabled in this version.', 'info'); }}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors">
-                              Yes, delete
-                            </button>
-                            <button onClick={() => setConfirmDelete(false)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-surface-200 text-gray-500 hover:bg-surface-50 transition-colors">
-                              Cancel
-                            </button>
+                          <div className="flex flex-col gap-2">
+                            <p className="text-xs text-gray-500 px-1">Are you sure? This cannot be undone.</p>
+                            <div className="flex gap-2">
+                              <button onClick={() => { setConfirmDelete(false); showToast('Account deletion is disabled in this version.', 'info'); }}
+                                className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-[#D8727D] text-white hover:bg-[#c05a65] transition-colors">
+                                Yes, delete
+                              </button>
+                              <button onClick={() => setConfirmDelete(false)}
+                                className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-surface-100 text-gray-600 hover:bg-surface-200 transition-colors">
+                                Cancel
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1055,8 +1059,7 @@ const SettingsPage: React.FC = () => {
               >
                 {/* App Info hero */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl overflow-hidden">
-                    <div className="h-1.5 w-full bg-gradient-to-r from-[#5030E5] to-[#7C3AED]" />
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="p-6 flex items-center gap-5">
                       <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold bg-gradient-to-br from-[#5030E5] to-[#7C3AED] shrink-0 shadow-lg">
                         PX
@@ -1077,7 +1080,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Software Updates */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl p-6">
+                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
                     <h3 className="font-semibold text-gray-900 text-sm mb-1">Software Updates</h3>
                     <p className="text-xs text-gray-500 mb-4">Keep your app up to date</p>
                     <div className="flex flex-col gap-4">

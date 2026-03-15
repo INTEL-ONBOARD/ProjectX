@@ -311,13 +311,13 @@ function registerDbHandlers() {
         if (!found || found.password !== password) throw new Error('Invalid email or password.');
         return safe(toAuthUser(found));
     });
-    ipcMain.handle('db:auth:register', async (_e, name: string, email: string, password: string, role: string) => {
+    ipcMain.handle('db:auth:register', async (_e, name: string, email: string, password: string, _role: string) => {
         const existing = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (existing) throw new Error('An account with this email already exists.');
         const appId = `auth-${Date.now()}`;
-        const d = await AuthUserModel.create({ appId, name, email: email.toLowerCase(), password, role });
-        // Mirror into User collection so the member shows up in the Users/Members pages
-        await UserModel.create({ appId, name, email: email.toLowerCase(), role, status: 'active' });
+        // All new registrations start as 'guest' — an admin must upgrade them
+        const d = await AuthUserModel.create({ appId, name, email: email.toLowerCase(), password, role: 'guest' });
+        await UserModel.create({ appId, name, email: email.toLowerCase(), role: 'guest', status: 'active' });
         return safe(toAuthUser(d.toObject()));
     });
     ipcMain.handle('db:auth:updatePassword', async (_e, userId: string, currentPassword: string, newPassword: string) => {
@@ -359,16 +359,27 @@ function registerDbHandlers() {
         if (!orgExists) {
             await OrgModel.create({ orgId: 'org-toursurv', name: 'Toursurv', workStart: '09:00', workEnd: '18:00', createdAt: new Date().toISOString() });
         }
-        // Only admin perms are seeded — all other roles are user-created
+        // Seed admin perms (always overwrite to keep routes current)
         await RolePermsModel.findOneAndUpdate(
             { role: 'admin' },
             { allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/users', '/settings'] },
             { upsert: true }
         );
-        // Seed only the admin role if it doesn't exist
+        // Seed guest perms — settings only (always overwrite)
+        await RolePermsModel.findOneAndUpdate(
+            { role: 'guest' },
+            { allowedRoutes: ['/settings'] },
+            { upsert: true }
+        );
+        // Seed admin role if it doesn't exist
         const adminRole = await RoleModel.findOne({ name: 'admin' }).lean();
         if (!adminRole) {
             await RoleModel.create({ appId: 'role_admin', name: 'admin', color: '#5030E5' });
+        }
+        // Seed guest role if it doesn't exist
+        const guestRole = await RoleModel.findOne({ name: 'guest' }).lean();
+        if (!guestRole) {
+            await RoleModel.create({ appId: 'role_guest', name: 'guest', color: '#9CA3AF' });
         }
     });
 

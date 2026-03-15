@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send } from 'lucide-react';
+import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send, Eye, UserCog, Trash2 } from 'lucide-react';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const authApi = () => (window as any).electronAPI.auth as { updateRole: (userId: string, role: string) => Promise<void> };
@@ -39,7 +39,19 @@ const MembersPage: React.FC = () => {
 
   const [selectedMember, setSelectedMember] = useState<User | null>(null);
   const [showInvite, setShowInvite] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const adminCount = members.filter(m => m.role === 'admin').length;
   const managerCount = members.filter(m => m.role === 'manager').length;
@@ -186,7 +198,7 @@ const MembersPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="relative flex items-center justify-end">
-                          {isConfirmingRemove ? (
+                          {confirmRemoveId === member.id ? (
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-gray-500 whitespace-nowrap">Remove {member.name.split(' ')[0]}?</span>
                               <button
@@ -207,12 +219,50 @@ const MembersPage: React.FC = () => {
                               </button>
                             </div>
                           ) : (
-                            <button
-                              className="p-1 rounded hover:bg-surface-200 text-gray-400 hover:text-gray-600 transition-colors"
-                              onClick={() => setConfirmRemoveId(member.id === confirmRemoveId ? null : member.id)}
-                            >
-                              <MoreVertical size={14} />
-                            </button>
+                            <>
+                              <button
+                                className="p-1 rounded hover:bg-surface-200 text-gray-400 hover:text-gray-600 transition-colors"
+                                onClick={() => setMenuOpenId(prev => prev === member.id ? null : member.id)}
+                              >
+                                <MoreVertical size={14} />
+                              </button>
+                              <AnimatePresence>
+                                {menuOpenId === member.id && (
+                                  <motion.div
+                                    ref={menuRef}
+                                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                                    transition={{ duration: 0.12 }}
+                                    className="absolute right-0 top-full mt-1 z-50 bg-white border border-surface-200 rounded-xl shadow-lg py-1 w-40"
+                                  >
+                                    <button
+                                      onClick={() => { setMenuOpenId(null); setSelectedMember(member); }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-surface-50 transition-colors"
+                                    >
+                                      <Eye size={13} className="text-gray-400" />
+                                      View Profile
+                                    </button>
+                                    {isAdmin && (
+                                      <button
+                                        onClick={() => { setMenuOpenId(null); setSelectedMember(member); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-surface-50 transition-colors"
+                                      >
+                                        <UserCog size={13} className="text-gray-400" />
+                                        Change Role
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => { setMenuOpenId(null); setConfirmRemoveId(member.id); }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 transition-colors"
+                                    >
+                                      <Trash2 size={13} />
+                                      Remove
+                                    </button>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </>
                           )}
                         </div>
                       </td>
