@@ -20,6 +20,7 @@ import { MembersProvider } from './context/MembersContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RolePermsProvider, useRolePerms } from './context/RolePermsContext';
 import { RolesProvider } from './context/RolesContext';
+import { PresenceProvider } from './context/PresenceContext';
 import BugReportModal from './components/ui/BugReportModal';
 import UpdateBanner from './components/ui/UpdateBanner';
 import { ToastProvider } from './components/ui/Toast';
@@ -275,13 +276,15 @@ const App: React.FC = () => (
             <RolePermsProvider>
                 <RolesProvider>
                 <MembersProvider>
-                    <ProjectProvider>
-                        <ToastProvider>
-                            <HashRouter>
-                                <Root />
-                            </HashRouter>
-                        </ToastProvider>
-                    </ProjectProvider>
+                    <PresenceProvider>
+                        <ProjectProvider>
+                            <ToastProvider>
+                                <HashRouter>
+                                    <Root />
+                                </HashRouter>
+                            </ToastProvider>
+                        </ProjectProvider>
+                    </PresenceProvider>
                 </MembersProvider>
                 </RolesProvider>
             </RolePermsProvider>
