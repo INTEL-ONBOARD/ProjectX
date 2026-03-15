@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { RolePermsProvider, useRolePerms } from './context/RolePermsContext';
 import { RolesProvider } from './context/RolesContext';
 import { PresenceProvider } from './context/PresenceContext';
+import { NotificationProvider } from './context/NotificationContext';
 import BugReportModal from './components/ui/BugReportModal';
 import UpdateBanner from './components/ui/UpdateBanner';
 import { ToastProvider } from './components/ui/Toast';
@@ -278,11 +279,13 @@ const App: React.FC = () => (
                 <MembersProvider>
                     <PresenceProvider>
                         <ProjectProvider>
-                            <ToastProvider>
-                                <HashRouter>
-                                    <Root />
-                                </HashRouter>
-                            </ToastProvider>
+                            <NotificationProvider>
+                                <ToastProvider>
+                                    <HashRouter>
+                                        <Root />
+                                    </HashRouter>
+                                </ToastProvider>
+                            </NotificationProvider>
                         </ProjectProvider>
                     </PresenceProvider>
                 </MembersProvider>

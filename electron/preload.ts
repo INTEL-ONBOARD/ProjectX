@@ -79,6 +79,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         set: (prefs: object)  => ipcRenderer.invoke('db:notifpref:set', prefs),
     },
 
+    // Notifications
+    notifs: {
+        getAll:      (userId: string): Promise<unknown[]> => ipcRenderer.invoke('db:notifs:getAll', userId),
+        create:      (notif: object): Promise<unknown>    => ipcRenderer.invoke('db:notifs:create', notif),
+        markRead:    (notifId: string): Promise<boolean>  => ipcRenderer.invoke('db:notifs:markRead', notifId),
+        markAllRead: (userId: string): Promise<boolean>   => ipcRenderer.invoke('db:notifs:markAllRead', userId),
+        deleteOld:   (userId: string): Promise<boolean>   => ipcRenderer.invoke('db:notifs:deleteOld', userId),
+    },
+
     // Appearance preferences
     appearancePrefs: {
         get: (userId: string) => ipcRenderer.invoke('db:appearancepref:get', userId),

@@ -118,6 +118,17 @@ const NotifPrefSchema = new Schema({
     quietHours:     { type: Boolean, default: true },
 });
 
+const NotificationSchema = new Schema({
+    notifId:   { type: String, required: true, unique: true },
+    userId:    { type: String, required: true },
+    type:      { type: String, enum: ['task_overdue', 'task_assigned', 'new_message'], required: true },
+    title:     { type: String, required: true },
+    body:      { type: String, default: '' },
+    refId:     { type: String, default: '' },
+    read:      { type: Boolean, default: false },
+    createdAt: { type: String, required: true },
+});
+
 const AppearancePrefSchema = new Schema({
     userId:      { type: String, required: true, unique: true },
     themeMode:   { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
@@ -152,6 +163,7 @@ const ProjectRichModel    = mongoose.model('ProjectRich', ProjectRichSchema);
 const AuthUserModel       = mongoose.model('AuthUser', AuthUserSchema);
 const UserPrefModel       = mongoose.model('UserPref', UserPrefSchema);
 const NotifPrefModel      = mongoose.model('NotifPref', NotifPrefSchema);
+const NotificationModel   = mongoose.model('Notification', NotificationSchema);
 const AppearancePrefModel = mongoose.model('AppearancePref', AppearancePrefSchema);
 const OrgModel            = mongoose.model('Org', OrgSchema);
 const RolePermsModel      = mongoose.model('RolePerms', RolePermsSchema);
@@ -192,6 +204,8 @@ const toUserPref    = (d: any) => ({ userId: d.userId, theme: d.theme, sidebarCo
 const toNotifPref   = (d: any) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAppearancePref = (d: any) => ({ userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor, fontSize: d.fontSize, compactMode: d.compactMode ?? false });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toNotif = (d: any) => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? '', refId: d.refId ?? '', read: d.read ?? false, createdAt: d.createdAt });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toRole = (d: any) => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 
@@ -528,6 +542,33 @@ function registerDbHandlers() {
     ipcMain.handle('db:appearancepref:set', async (_e, prefs: object) => {
         const d = await AppearancePrefModel.findOneAndUpdate({ userId: (prefs as any).userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toAppearancePref(d));
+    });
+
+    // Notifications
+    ipcMain.handle('db:notifs:getAll', async (_e, userId: string) => {
+        const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(50).lean();
+        return safe(docs.map(toNotif));
+    });
+    ipcMain.handle('db:notifs:create', async (_e, notif: { userId: string; type: string; title: string; body?: string; refId?: string }) => {
+        const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
+        return safe(toNotif(d.toObject()));
+    });
+    ipcMain.handle('db:notifs:markRead', async (_e, notifId: string) => {
+        await NotificationModel.updateOne({ notifId }, { read: true });
+        return true;
+    });
+    ipcMain.handle('db:notifs:markAllRead', async (_e, userId: string) => {
+        await NotificationModel.updateMany({ userId, read: false }, { read: true });
+        return true;
+    });
+    ipcMain.handle('db:notifs:deleteOld', async (_e, userId: string) => {
+        const all = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).lean() as any[];
+        if (all.length > 100) {
+            const toDelete = all.slice(100).map((d: any) => d.notifId);
+            await NotificationModel.deleteMany({ notifId: { $in: toDelete } });
+        }
+        return true;
     });
 }
 

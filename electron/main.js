@@ -120,6 +120,17 @@ const NotifPrefSchema = new Schema({
     quietHours:     { type: Boolean, default: true },
 });
 
+const NotificationSchema = new Schema({
+    notifId:   { type: String, required: true, unique: true },
+    userId:    { type: String, required: true },
+    type:      { type: String, enum: ['task_overdue', 'task_assigned', 'new_message'], required: true },
+    title:     { type: String, required: true },
+    body:      { type: String, default: '' },
+    refId:     { type: String, default: '' },
+    read:      { type: Boolean, default: false },
+    createdAt: { type: String, required: true },
+});
+
 const AppearancePrefSchema = new Schema({
     userId:      { type: String, required: true, unique: true },
     themeMode:   { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
@@ -141,6 +152,7 @@ const OrgSchema = new Schema({
 const AuthUserModel = mongoose.model('AuthUser', AuthUserSchema);
 const UserPrefModel = mongoose.model('UserPref', UserPrefSchema);
 const NotifPrefModel = mongoose.model('NotifPref', NotifPrefSchema);
+const NotificationModel = mongoose.model('Notification', NotificationSchema);
 const AppearancePrefModel = mongoose.model('AppearancePref', AppearancePrefSchema);
 const RolePermsSchema = new Schema({
     role:           { type: String, required: true, unique: true },
@@ -496,6 +508,34 @@ function registerDbHandlers() {
     ipcMain.handle('db:appearancepref:set', async (_e, prefs) => {
         const d = await AppearancePrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toAppearancePref(d));
+    });
+
+    // Notifications
+    const toNotif = d => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? '', refId: d.refId ?? '', read: d.read ?? false, createdAt: d.createdAt });
+    ipcMain.handle('db:notifs:getAll', async (_e, userId) => {
+        const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(50).lean();
+        return safe(docs.map(toNotif));
+    });
+    ipcMain.handle('db:notifs:create', async (_e, notif) => {
+        const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
+        return safe(toNotif(d.toObject()));
+    });
+    ipcMain.handle('db:notifs:markRead', async (_e, notifId) => {
+        await NotificationModel.updateOne({ notifId }, { read: true });
+        return true;
+    });
+    ipcMain.handle('db:notifs:markAllRead', async (_e, userId) => {
+        await NotificationModel.updateMany({ userId, read: false }, { read: true });
+        return true;
+    });
+    ipcMain.handle('db:notifs:deleteOld', async (_e, userId) => {
+        const all = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).lean();
+        if (all.length > 100) {
+            const toDelete = all.slice(100).map(d => d.notifId);
+            await NotificationModel.deleteMany({ notifId: { $in: toDelete } });
+        }
+        return true;
     });
 }
 

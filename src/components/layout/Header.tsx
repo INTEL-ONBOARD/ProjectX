@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Calendar, HelpCircle, Bell, ChevronDown, BookOpen, PlayCircle, Headphones, Bug, LogOut, Settings, CheckSquare, Users } from 'lucide-react';
+import { Search, Calendar, HelpCircle, Bell, ChevronDown, BookOpen, PlayCircle, Headphones, Bug, LogOut, Settings, CheckSquare, Users, MessageCircle, CheckSquare2, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -9,6 +9,7 @@ import { useMembersContext } from '../../context/MembersContext';
 import { Avatar } from '../ui/Avatar';
 import CalendarDropdown from './CalendarDropdown';
 import { useToast } from '../ui/Toast';
+import { useNotifications } from '../../context/NotificationContext';
 
 type HelpIcon = 'book' | 'play' | 'headphones' | 'bug';
 const HelpIconMap: Record<HelpIcon, React.ElementType> = { book: BookOpen, play: PlayCircle, headphones: Headphones, bug: Bug };
@@ -26,6 +27,7 @@ const Header: React.FC = () => {
     const { allTasks } = useProjects();
     const { members, getMemberColor } = useMembersContext();
     const { showToast } = useToast();
+    const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [showResults, setShowResults] = useState(false);
@@ -70,9 +72,6 @@ const Header: React.FC = () => {
         document.addEventListener('mousedown', handleMouseDown);
         return () => document.removeEventListener('mousedown', handleMouseDown);
     }, []);
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const unreadCount = allTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== 'done').length;
 
     const handleSearchKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -250,7 +249,7 @@ const Header: React.FC = () => {
                     <AnimatePresence>
                         {isNotifOpen && (
                             <motion.div
-                                className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
                                 initial={{ opacity: 0, y: -8, scale: 0.97 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -258,25 +257,43 @@ const Header: React.FC = () => {
                             >
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-surface-100">
                                     <span className="text-xs font-bold text-gray-900">Notifications</span>
-                                    {unreadCount > 0 && <span className="text-[10px] font-bold text-[#D8727D] bg-[#D8727D15] px-2 py-0.5 rounded-full">{unreadCount} overdue</span>}
+                                    {unreadCount > 0 && (
+                                        <button
+                                            onClick={markAllRead}
+                                            className="text-[10px] font-semibold text-primary-500 hover:text-primary-600 transition-colors"
+                                        >
+                                            Mark all read
+                                        </button>
+                                    )}
                                 </div>
-                                {unreadCount === 0 ? (
+                                {notifications.length === 0 ? (
                                     <div className="px-4 py-6 text-center text-xs text-gray-400">No notifications</div>
                                 ) : (
-                                    <div className="max-h-60 overflow-y-auto">
-                                        {allTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== 'done').slice(0, 8).map(task => (
-                                            <button
-                                                key={task.id}
-                                                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-surface-50 transition-colors text-left border-b border-surface-100 last:border-0"
-                                                onClick={() => { navigate('/tasks', { state: { search: task.title } }); setIsNotifOpen(false); }}
-                                            >
-                                                <div className="w-2 h-2 rounded-full bg-[#D8727D] shrink-0 mt-1.5" />
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-xs font-semibold text-gray-800 truncate">{task.title}</div>
-                                                    <div className="text-[10px] text-[#D8727D] mt-0.5">Due {task.dueDate}</div>
-                                                </div>
-                                            </button>
-                                        ))}
+                                    <div className="max-h-72 overflow-y-auto">
+                                        {notifications.slice(0, 15).map(notif => {
+                                            const IconComp = notif.type === 'new_message' ? MessageCircle
+                                                : notif.type === 'task_assigned' ? CheckSquare2 : Clock;
+                                            const iconColor = notif.type === 'new_message' ? 'text-primary-500 bg-primary-50'
+                                                : notif.type === 'task_assigned' ? 'text-[#68B266] bg-[#83C29D20]'
+                                                : 'text-[#D8727D] bg-[#D8727D15]';
+                                            const navTarget = notif.type === 'new_message' ? '/messages' : '/tasks';
+                                            return (
+                                                <button
+                                                    key={notif.id}
+                                                    className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-surface-50 transition-colors text-left border-b border-surface-100 last:border-0 ${!notif.read ? 'bg-primary-50/30' : ''}`}
+                                                    onClick={() => { markRead(notif.id); navigate(navTarget); setIsNotifOpen(false); }}
+                                                >
+                                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${iconColor}`}>
+                                                        <IconComp size={13} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className={`text-xs font-semibold truncate ${!notif.read ? 'text-gray-900' : 'text-gray-600'}`}>{notif.title}</div>
+                                                        {notif.body && <div className="text-[10px] text-gray-400 mt-0.5 truncate">{notif.body}</div>}
+                                                    </div>
+                                                    {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-primary-500 shrink-0 mt-2" />}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </motion.div>
