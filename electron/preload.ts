@@ -97,7 +97,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Auth — credentials stored in MongoDB Atlas
     auth: {
         login:          (email: string, password: string)                                  => ipcRenderer.invoke('db:auth:login', email, password),
-        register:       (name: string, email: string, password: string, role: string)      => ipcRenderer.invoke('db:auth:register', name, email, password, role),
+        register:       (name: string, email: string, password: string, role: string, orgId?: string) => ipcRenderer.invoke('db:auth:register', name, email, password, role, orgId),
         updatePassword: (userId: string, currentPassword: string, newPassword: string)     => ipcRenderer.invoke('db:auth:updatePassword', userId, currentPassword, newPassword),
         updateName:     (userId: string, newName: string)                                  => ipcRenderer.invoke('db:auth:updateName', userId, newName),
         seedDefault:    ()                                                                 => ipcRenderer.invoke('db:auth:seedDefault'),

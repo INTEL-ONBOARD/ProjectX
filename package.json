@@ -1,6 +1,6 @@
 {
   "name": "projectx",
-  "version": "1.3.0",
+  "version": "1.3.5",
   "description": "Project Planning Desktop App",
   "main": "electron/main.js",
   "author": "",
@@ -25,6 +25,27 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.8.0"
+  },
+  "build": {
+    "appId": "com.intel-onboard.projectx",
+    "productName": "Project X",
+    "publish": {
+      "provider": "github",
+      "owner": "INTEL-ONBOARD",
+      "repo": "ProjectX"
+    },
+    "directories": {
+      "output": "dist-electron"
+    },
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
