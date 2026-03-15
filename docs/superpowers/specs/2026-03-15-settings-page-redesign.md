@@ -10,6 +10,7 @@ Revamp `src/pages/SettingsPage.tsx` with a professional, polished UI consistent 
 - No new files, no new IPC handlers, no new context changes
 - All existing functionality preserved (profile save, password change, notification toggles, appearance prefs, billing display, update checker)
 - No dark mode implementation (themeMode preference is stored but not applied to the app — preserve as-is)
+- Localization card (Language, Timezone, Date Format) from the existing Appearance section is **intentionally omitted** — it was display-only with no real functionality. The `timezoneValue` state variable can be removed.
 
 ---
 
@@ -103,7 +104,8 @@ const flashSaved = (key: string) => {
   setTimeout(() => setSavedField(null), 2000);
 };
 
-// Badge component (inline)
+// Badge component — defined INSIDE the SettingsPage function body, AFTER the savedField
+// state declaration above, so it can close over savedField.
 const SavedBadge = ({ id }: { id: string }) => (
   <AnimatePresence>
     {savedField === id && (
@@ -168,7 +170,12 @@ const ToggleRow: React.FC<{
         {description && <div className="text-xs text-gray-400">{description}</div>}
       </div>
     </div>
-    <Toggle checked={checked} onChange={onChange} />
+    {/* The existing Toggle component uses `on` (not `checked`) and `onChange: () => void`.
+        Update the Toggle component's props to accept `on: boolean; onChange: (v: boolean) => void`
+        OR keep the existing signature and call it as:
+        <Toggle on={checked} onChange={() => onChange(!checked)} />
+        Recommended: update Toggle to accept `(v: boolean)` so callers don't need the wrapper. */}
+    <Toggle on={checked} onChange={() => onChange(!checked)} />
   </div>
 );
 ```
@@ -237,6 +244,30 @@ Right column — 2×2 grid of `InputField`:
 - Designation / Role (onBlur saves)
 
 Save handler on blur: call `updateMember` + `authApi().updateName` (same as existing `handleSave`).
+
+**Share Profile button** — below the identity card, a small outlined button:
+```tsx
+<button
+  onClick={handleShareProfile}
+  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-surface-200 text-gray-500 hover:bg-surface-50 transition-colors"
+>
+  <Link size={12} /> Share Profile
+</button>
+```
+`handleShareProfile` copies `window.location.href` to clipboard and shows a toast — preserve existing logic.
+
+**Sign Out** — placed at the bottom of the Identity card, after the Share Profile button, as a separate row with a top border:
+```tsx
+<div className="flex items-center justify-between pt-3 mt-3 border-t border-surface-100">
+  <span className="text-xs text-gray-400">Signed in as {authUser?.email}</span>
+  <button
+    onClick={logout}
+    className="flex items-center gap-1.5 text-xs font-medium text-[#D8727D] hover:text-[#c05a65] transition-colors"
+  >
+    <LogOut size={13} /> Sign Out
+  </button>
+</div>
+```
 
 **Card 2 — Stats**
 
@@ -395,8 +426,8 @@ Each card has: name, price, 3 bullet features, CTA button.
 Three progress meters (Storage, API Calls, Members) — same animated bars as existing.
 
 **Danger Zone** — separated by a thin red-tinted `border-t border-[#D8727D20]`:
-- Export Data button (outlined)
-- Delete Account button (red outlined, requires `confirmDelete` double-confirm)
+- Export Data button (outlined) — calls `handleExportData()` (shows toast, same as existing)
+- Delete Account button (red outlined) — requires `confirmDelete` double-confirm state, same two-step logic as existing `handleDeleteAccount()`
 
 ---
 
@@ -454,12 +485,15 @@ No new files. No new IPC handlers.
 
 ## Preserved Functionality Checklist
 
-- Profile: name/email/location/designation edit + save via `updateMember` + `authApi`
+- Profile: name/email/location/designation edit + save via `updateMember` + `authApi().updateName`
+- Profile: `handleShareProfile` — copies link to clipboard, shows toast
+- Profile: Sign Out via `logout()` from AuthContext — placed in Identity card footer
 - Profile: stats (tasksDone, tasksTotal, tasksInProg, myProjects) derived same way
-- Notifications: all 9 toggles persisted via `notifPrefsApi`
-- Appearance: themeMode, accentColor, fontSize, compactMode persisted via `appearApi` + `setTheme`
-- Security: password strength calculator, show/hide, `updatePassword` from AuthContext, `logout`
-- Billing: usage meters, export data, delete account with `confirmDelete`
-- About: update checker via `useAppUpdater` hook, all update states
-- Toast notifications on save/error
-- `useRef` guards preventing duplicate pref loads on re-render
+- Notifications: all 9 toggles persisted via `notifPrefsApi().set(...)` on every change
+- Appearance: themeMode, accentColor, fontSize, compactMode persisted via `appearApi().set(...)` + `setTheme`
+- Security: password strength calculator, show/hide toggles per field, `updatePassword` from AuthContext
+- Billing: `handleExportData()` (toast), `handleDeleteAccount()` with `confirmDelete` double-confirm, usage meters
+- About: update checker via `useAppUpdater` hook, all update states (idle/checking/available/downloading/downloaded/error)
+- Toast notifications on all save/error actions
+- `useRef` guards (`notifLoaded`, `appearLoaded`) preventing duplicate pref loads on re-render
+- `timezoneValue` state removed (Localization card intentionally dropped)
