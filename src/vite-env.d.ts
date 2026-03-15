@@ -55,6 +55,7 @@ interface ElectronDB {
   // Organization
   getOrg(): Promise<Organization | null>;
   setOrg(data: object): Promise<Organization>;
+  listOrgs(): Promise<{ id: string; name: string }[]>;
 
   // Role permissions
   getRolePerms(): Promise<RolePerms[]>;
@@ -73,7 +74,7 @@ interface ElectronDB {
 
 interface ElectronAuth {
   login(email: string, password: string): Promise<{ id: string; name: string; email: string; role: string }>;
-  register(name: string, email: string, password: string, role: string): Promise<{ id: string; name: string; email: string; role: string }>;
+  register(name: string, email: string, password: string, role: string, orgId?: string): Promise<{ id: string; name: string; email: string; role: string }>;
   updatePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean>;
   updateName(userId: string, newName: string): Promise<void>;
   seedDefault(): Promise<void>;
@@ -103,6 +104,8 @@ interface ElectronAPI {
   installUpdate(): Promise<void>;
   onDbConnected(cb: () => void): () => void;
   onDbConnectionFailed(cb: (_: unknown, message: string) => void): () => void;
+  onDbDisconnected(cb: () => void): () => void;
+  onDbReconnected(cb: () => void): () => void;
   onUpdateChecking(cb: () => void): () => void;
   onUpdateAvailable(cb: (_: unknown, info: { version: string; releaseDate?: string; releaseNotes?: string | null }) => void): () => void;
   onUpdateNotAvailable(cb: () => void): () => void;
