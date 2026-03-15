@@ -71,12 +71,17 @@ const MessagesPage: React.FC = () => {
     }));
   }, [activeId]);
 
-  // Load messages from DB when active peer changes
+  // Load messages from DB when active peer changes, then poll every 5s
   useEffect(() => {
     if (!activeMember) return;
-    dbApi().getMessagesBetween(currentUserId, activeMember.id)
-        .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [activeMember.id]: msgs })))
-        .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
+    const peerId = activeMember.id;
+    const fetch = () =>
+      dbApi().getMessagesBetween(currentUserId, peerId)
+          .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [peerId]: msgs })))
+          .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
+    fetch();
+    const pollId = setInterval(fetch, 5_000);
+    return () => clearInterval(pollId);
   }, [activeMember?.id, currentUserId]);
 
   // Load conv meta (pin/star/archive) on mount
