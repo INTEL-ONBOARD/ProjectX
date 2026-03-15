@@ -3,13 +3,14 @@ import { motion } from 'framer-motion';
 
 interface SplashScreenProps {
   onComplete: () => void;
+  duration?: number;
 }
 
-const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 2800 }) => {
   useEffect(() => {
-    const timer = setTimeout(onComplete, 2800);
+    const timer = setTimeout(onComplete, duration);
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [onComplete, duration]);
 
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-white overflow-hidden">

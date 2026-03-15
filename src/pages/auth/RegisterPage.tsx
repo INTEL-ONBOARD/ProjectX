@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -14,17 +14,31 @@ const fi = (i: number) => ({
   transition: { delay: i * 0.055 + 0.08, duration: 0.36, ease: 'easeOut' as const },
 });
 
+interface OrgOption { id: string; name: string; }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const dbApi = () => (window as any).electronAPI.db;
+
 const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [orgId, setOrgId] = useState('');
+  const [orgs, setOrgs] = useState<OrgOption[]>([]);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [globalError, setGlobalError] = useState('');
   const [focus, setFocus] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    dbApi().listOrgs().then((list: OrgOption[]) => {
+      setOrgs(list);
+      if (list.length > 0) setOrgId(list[0].id);
+    }).catch(() => {});
+  }, []);
 
   const sf = (f: string, v: boolean) => setFocus(p => ({ ...p, [f]: v }));
   const inputCls = 'w-full px-4 py-3 rounded-xl text-sm text-gray-800 border outline-none transition-all duration-200 placeholder-gray-400';
@@ -43,6 +57,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
     else if (password.length < 6) e.password = 'At least 6 characters.';
     if (!confirm) e.confirm = 'Please confirm your password.';
     else if (confirm !== password) e.confirm = 'Passwords do not match.';
+    if (!orgId) e.org = 'Please select an organization.';
     return e;
   };
 
@@ -54,7 +69,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
     setGlobalError('');
     setLoading(true);
     try {
-      await register(name.trim(), email.trim(), password, 'member');
+      await register(name.trim(), email.trim(), password, 'member', orgId);
     } catch (err: unknown) {
       setGlobalError(err instanceof Error ? err.message : 'Registration failed.');
     } finally {
@@ -91,6 +106,23 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
           </motion.div>
 
           <motion.div {...fi(3)}>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Organization</label>
+            <select
+              className={inputCls}
+              style={inputStyle('org')}
+              value={orgId}
+              onChange={e => setOrgId(e.target.value)}
+              onFocus={() => sf('org', true)}
+              onBlur={() => sf('org', false)}
+              disabled={loading}
+            >
+              {orgs.length === 0 && <option value="">Loading organizations…</option>}
+              {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+            {errors.org && <p className="text-xs text-red-500 mt-1.5">{errors.org}</p>}
+          </motion.div>
+
+          <motion.div {...fi(4)}>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Password</label>
             <div className="relative">
               <input type={showPass ? 'text' : 'password'} className={inputCls} style={{ ...inputStyle('password'), paddingRight: '2.75rem' }}
@@ -104,7 +136,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
             {errors.password && <p className="text-xs text-red-500 mt-1.5">{errors.password}</p>}
           </motion.div>
 
-          <motion.div {...fi(4)}>
+          <motion.div {...fi(5)}>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Confirm Password</label>
             <input type="password" className={inputCls} style={inputStyle('confirm')} placeholder="Re-enter password"
               value={confirm} onChange={e => setConfirm(e.target.value)} onFocus={() => sf('confirm', true)} onBlur={() => sf('confirm', false)} disabled={loading} />
@@ -123,7 +155,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
             )}
           </AnimatePresence>
 
-          <motion.div {...fi(5)} className="pt-1">
+          <motion.div {...fi(6)} className="pt-1">
             <motion.button type="submit" disabled={loading}
               whileHover={!loading ? { scale: 1.015, boxShadow: '0 8px 28px rgba(80,48,229,0.35)' } : {}}
               whileTap={!loading ? { scale: 0.985 } : {}}
@@ -139,7 +171,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
           </motion.div>
         </form>
 
-        <motion.p {...fi(6)} className="text-center mt-5 text-sm text-gray-500">
+        <motion.p {...fi(7)} className="text-center mt-5 text-sm text-gray-500">
           Already have an account?{' '}
           <button onClick={onNavigateLogin} className="font-semibold text-primary-500 hover:text-primary-600 transition-colors">Sign in</button>
         </motion.p>

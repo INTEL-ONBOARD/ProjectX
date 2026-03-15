@@ -205,21 +205,21 @@ const safe = v => JSON.parse(JSON.stringify(v));
 function registerDbHandlers() {
     ipcMain.handle('db:projects:getAll', async () => safe((await ProjectModel.find().lean()).map(toProject)));
     ipcMain.handle('db:projects:create', async (_e, name, color) => { const d = await ProjectModel.create({ appId: `p${Date.now()}`, name, color }); return safe(toProject(d.toObject())); });
-    ipcMain.handle('db:projects:update', async (_e, id, changes) => { const d = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toProject(d)) : null; });
+    ipcMain.handle('db:projects:update', async (_e, id, changes) => { const d = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toProject(d)) : null; });
     ipcMain.handle('db:projects:delete', async (_e, id) => { await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); return true; });
 
     ipcMain.handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
     ipcMain.handle('db:tasks:create', async (_e, taskData) => { const d = await TaskModel.create({ appId: `t${Date.now()}`, ...taskData }); return safe(toTask(d.toObject())); });
-    ipcMain.handle('db:tasks:update', async (_e, id, changes) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toTask(d)) : null; });
+    ipcMain.handle('db:tasks:update', async (_e, id, changes) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toTask(d)) : null; });
     ipcMain.handle('db:tasks:delete', async (_e, id) => { await TaskModel.deleteOne({ appId: id }); return true; });
-    ipcMain.handle('db:tasks:move', async (_e, id, newStatus) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, { status: newStatus }, { new: true }).lean(); return d ? safe(toTask(d)) : null; });
+    ipcMain.handle('db:tasks:move', async (_e, id, newStatus) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, { status: newStatus }, { returnDocument: 'after' }).lean(); return d ? safe(toTask(d)) : null; });
     ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
 
     ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
     ipcMain.handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
-    ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toUser(d)) : null; });
+    ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toUser(d)) : null; });
     ipcMain.handle('db:members:updateRole', async (_e, id, role) => {
-        const d = await UserModel.findOneAndUpdate({ appId: id }, { role }, { new: true }).lean();
+        const d = await UserModel.findOneAndUpdate({ appId: id }, { role }, { returnDocument: 'after' }).lean();
         if (!d) throw new Error(`Member not found: ${id}`);
         await AuthUserModel.findOneAndUpdate({ appId: id }, { role });
         return safe(toUser(d));
@@ -229,7 +229,7 @@ function registerDbHandlers() {
     ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map(d => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })) }))));
     ipcMain.handle('db:attendance:set', async (_e, record) => {
         const recordId = `${record.userId}-${record.date}`;
-        const d = await AttendanceModel.findOneAndUpdate({ recordId }, { recordId, ...record }, { upsert: true, new: true }).lean();
+        const d = await AttendanceModel.findOneAndUpdate({ recordId }, { recordId, ...record }, { upsert: true, returnDocument: 'after' }).lean();
         return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })) });
     });
     ipcMain.handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
@@ -252,7 +252,7 @@ function registerDbHandlers() {
         const users = reactions[emoji] ?? [];
         if (users.includes(userId)) reactions[emoji] = users.filter(u => u !== userId);
         else reactions[emoji] = [...users, userId];
-        const d = await MessageModel.findOneAndUpdate({ msgId }, { reactions }, { new: true }).lean();
+        const d = await MessageModel.findOneAndUpdate({ msgId }, { reactions }, { returnDocument: 'after' }).lean();
         return d ? safe(toMsg(d)) : null;
     });
     ipcMain.handle('db:messages:delete', async (_e, msgId) => {
@@ -269,7 +269,7 @@ function registerDbHandlers() {
     });
     ipcMain.handle('db:convmeta:set', async (_e, meta) => {
         const convId = `${meta.userId}-${meta.peerId}`;
-        const d = await ConvMetaModel.findOneAndUpdate({ convId }, { convId, ...meta }, { upsert: true, new: true }).lean();
+        const d = await ConvMetaModel.findOneAndUpdate({ convId }, { convId, ...meta }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toConvMeta(d));
     });
 
@@ -278,7 +278,7 @@ function registerDbHandlers() {
 
     ipcMain.handle('db:depts:getAll', async () => safe((await DeptModel.find().lean()).map(toDept)));
     ipcMain.handle('db:depts:create', async (_e, dept) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return safe(toDept(d.toObject())); });
-    ipcMain.handle('db:depts:update', async (_e, id, changes) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { new: true }).lean(); return d ? safe(toDept(d)) : null; });
+    ipcMain.handle('db:depts:update', async (_e, id, changes) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toDept(d)) : null; });
     ipcMain.handle('db:depts:delete', async (_e, id) => { await DeptModel.deleteOne({ deptId: id }); return true; });
 
     // Project rich data
@@ -286,7 +286,7 @@ function registerDbHandlers() {
 
     ipcMain.handle('db:projectrich:getAll', async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
     ipcMain.handle('db:projectrich:set', async (_e, data) => {
-        const d = await ProjectRichModel.findOneAndUpdate({ projectId: data.projectId }, data, { upsert: true, new: true }).lean();
+        const d = await ProjectRichModel.findOneAndUpdate({ projectId: data.projectId }, data, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toProjectRich(d));
     });
     ipcMain.handle('db:projectrich:delete', async (_e, projectId) => {
@@ -381,7 +381,7 @@ function registerDbHandlers() {
         return d ? safe(toOrg(d)) : null;
     });
     ipcMain.handle('db:org:set', async (_e, data) => {
-        const d = await OrgModel.findOneAndUpdate({ orgId: data.id ?? 'org-toursurv' }, { ...data, orgId: data.id ?? 'org-toursurv' }, { upsert: true, new: true }).lean();
+        const d = await OrgModel.findOneAndUpdate({ orgId: data.id ?? 'org-toursurv' }, { ...data, orgId: data.id ?? 'org-toursurv' }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toOrg(d));
     });
 
@@ -392,7 +392,7 @@ function registerDbHandlers() {
     });
     ipcMain.handle('db:roleperms:set', async (_e, data) => {
         // data: { role, allowedRoutes }
-        const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, new: true }).lean();
+        const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, returnDocument: 'after' }).lean();
         return safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] });
     });
 
@@ -411,7 +411,7 @@ function registerDbHandlers() {
     });
 
     ipcMain.handle('db:roles:updateColor', async (_e, data) => {
-        const d = await RoleModel.findOneAndUpdate({ appId: data.appId }, { color: data.color }, { new: true }).lean();
+        const d = await RoleModel.findOneAndUpdate({ appId: data.appId }, { color: data.color }, { returnDocument: 'after' }).lean();
         if (!d) throw new Error('Role not found.');
         return safe(toRole(d));
     });
@@ -459,7 +459,7 @@ function registerDbHandlers() {
         return d ? safe(toUserPref(d)) : null;
     });
     ipcMain.handle('db:userpref:set', async (_e, prefs) => {
-        const d = await UserPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
+        const d = await UserPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toUserPref(d));
     });
 
@@ -475,7 +475,7 @@ function registerDbHandlers() {
         return d ? safe(toNotifPref(d)) : null;
     });
     ipcMain.handle('db:notifpref:set', async (_e, prefs) => {
-        const d = await NotifPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
+        const d = await NotifPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toNotifPref(d));
     });
 
@@ -489,7 +489,7 @@ function registerDbHandlers() {
         return d ? safe(toAppearancePref(d)) : null;
     });
     ipcMain.handle('db:appearancepref:set', async (_e, prefs) => {
-        const d = await AppearancePrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, new: true }).lean();
+        const d = await AppearancePrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toAppearancePref(d));
     });
 }

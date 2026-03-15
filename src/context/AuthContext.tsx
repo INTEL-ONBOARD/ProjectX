@@ -8,7 +8,7 @@ const prefsApi = () => win().electronAPI.userPrefs as {
 };
 const authApi = () => win().electronAPI.auth as {
   login: (email: string, password: string) => Promise<AuthUser>;
-  register: (name: string, email: string, password: string, role: string) => Promise<AuthUser>;
+  register: (name: string, email: string, password: string, role: string, orgId?: string) => Promise<AuthUser>;
   updatePassword: (userId: string, currentPassword: string, newPassword: string) => Promise<boolean>;
   updateName: (userId: string, newName: string) => Promise<void>;
   seedDefault: () => Promise<void>;
@@ -30,7 +30,7 @@ interface AuthContextValue {
   isLoading: boolean;
   hasSeenWalkthrough: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: string, orgId?: string) => Promise<void>;
   logout: () => void;
   markWalkthroughSeen: () => void;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -89,9 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     name: string,
     email: string,
     password: string,
-    role: string
+    role: string,
+    orgId?: string
   ) => {
-    const authUser = await authApi().register(name, email, password, role);
+    const authUser = await authApi().register(name, email, password, role, orgId);
     localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
     setUser(authUser);
   }, []);

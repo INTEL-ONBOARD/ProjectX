@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogIn, LogOut, Coffee, PlayCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AppContext } from '../../context/AppContext';
 
@@ -97,30 +97,45 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
         setViewYear(newYear);
     }
 
-    function markAttendance(status: 'present' | 'absent' | 'wfh') {
-        setAttendanceRecord({ userId: currentUser!.id, date: selectedDate, status });
+    const nowISO = () => new Date().toISOString();
+
+    function clockIn() {
+        const base = currentRecord ?? { userId: currentUser!.id, date: selectedDate, status: 'present' as const };
+        setAttendanceRecord({ ...base, status: 'present', checkIn: nowISO(), checkOut: undefined, breakSessions: [] });
     }
 
-    const toggleBtns: { label: string; status: 'present' | 'absent' | 'wfh'; active: string; inactive: string }[] = [
-        {
-            label: 'Present',
-            status: 'present',
-            active: 'bg-[#68B266] text-white border-[#68B266]',
-            inactive: 'border-[#68B266] text-[#68B266] hover:bg-[#68B26610]',
-        },
-        {
-            label: 'WFH',
-            status: 'wfh',
-            active: 'bg-[#FFA500] text-white border-[#FFA500]',
-            inactive: 'border-[#FFA500] text-[#FFA500] hover:bg-[#FFA50010]',
-        },
-        {
-            label: 'Absent',
-            status: 'absent',
-            active: 'bg-[#D8727D] text-white border-[#D8727D]',
-            inactive: 'border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D10]',
-        },
-    ];
+    function clockOut() {
+        if (!currentRecord) return;
+        // Close any open break session first
+        const breaks = (currentRecord.breakSessions ?? []).map(b =>
+            b.end === null ? { ...b, end: nowISO() } : b
+        );
+        setAttendanceRecord({ ...currentRecord, checkOut: nowISO(), breakSessions: breaks });
+    }
+
+    function breakOut() {
+        if (!currentRecord) return;
+        const breaks = [...(currentRecord.breakSessions ?? []), { start: nowISO(), end: null }];
+        setAttendanceRecord({ ...currentRecord, breakSessions: breaks });
+    }
+
+    function breakIn() {
+        if (!currentRecord) return;
+        const breaks = (currentRecord.breakSessions ?? []).map((b, i, arr) =>
+            i === arr.length - 1 && b.end === null ? { ...b, end: nowISO() } : b
+        );
+        setAttendanceRecord({ ...currentRecord, breakSessions: breaks });
+    }
+
+    const isClockedIn  = !!currentRecord?.checkIn;
+    const isClockedOut = !!currentRecord?.checkOut;
+    const isOnBreak    = isClockedIn && !isClockedOut &&
+        (currentRecord?.breakSessions ?? []).some(b => b.end === null);
+
+    function fmtTime(iso?: string): string {
+        if (!iso) return '';
+        return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
 
     return (
         <motion.div
@@ -185,22 +200,92 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
 
             {/* Clock actions */}
             <div className="px-3 py-2.5">
-                <p className="text-[10px] text-gray-400 mb-2">
+                <p className="text-[10px] text-gray-400 mb-2.5">
                     Log time for <span className="font-semibold text-gray-600">{formatLabel(selectedDate)}</span>
                 </p>
-                <div className="flex gap-1.5">
-                    {toggleBtns.map(btn => (
-                        <button
-                            key={btn.status}
-                            onClick={() => markAttendance(btn.status)}
-                            className={`
-                                flex-1 py-1.5 rounded-lg text-[11px] font-semibold border transition-colors
-                                ${currentStatus === btn.status ? btn.active : btn.inactive}
-                            `}
-                        >
-                            {btn.label}
-                        </button>
-                    ))}
+
+                {/* Status summary */}
+                {isClockedIn && (
+                    <div className="flex items-center gap-3 mb-2.5 px-2 py-1.5 bg-surface-50 rounded-lg text-[10px] text-gray-500">
+                        <span className="flex items-center gap-1">
+                            <LogIn size={10} className="text-[#68B266]" />
+                            <span className="font-semibold text-gray-700">{fmtTime(currentRecord?.checkIn)}</span>
+                        </span>
+                        {isClockedOut && (
+                            <span className="flex items-center gap-1">
+                                <LogOut size={10} className="text-[#D8727D]" />
+                                <span className="font-semibold text-gray-700">{fmtTime(currentRecord?.checkOut)}</span>
+                            </span>
+                        )}
+                        {isOnBreak && (
+                            <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#FFA50015', color: '#FFA500' }}>
+                                On break
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="grid grid-cols-2 gap-1.5">
+                    {/* Clock In */}
+                    <button
+                        onClick={clockIn}
+                        disabled={isClockedIn && !isClockedOut}
+                        className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold border transition-colors
+                            ${isClockedIn && !isClockedOut
+                                ? 'bg-[#68B266] text-white border-[#68B266] opacity-60 cursor-not-allowed'
+                                : 'border-[#68B266] text-[#68B266] hover:bg-[#68B26610]'
+                            }`}
+                    >
+                        <LogIn size={11} />
+                        Clock In
+                    </button>
+
+                    {/* Clock Out */}
+                    <button
+                        onClick={clockOut}
+                        disabled={!isClockedIn || isClockedOut}
+                        className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold border transition-colors
+                            ${isClockedOut
+                                ? 'bg-[#D8727D] text-white border-[#D8727D] opacity-60 cursor-not-allowed'
+                                : !isClockedIn
+                                ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                                : 'border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D10]'
+                            }`}
+                    >
+                        <LogOut size={11} />
+                        Clock Out
+                    </button>
+
+                    {/* Break Out (start break) */}
+                    <button
+                        onClick={breakOut}
+                        disabled={!isClockedIn || isClockedOut || isOnBreak}
+                        className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold border transition-colors
+                            ${isOnBreak
+                                ? 'bg-[#FFA500] text-white border-[#FFA500] opacity-60 cursor-not-allowed'
+                                : !isClockedIn || isClockedOut
+                                ? 'border-gray-200 text-gray-300 cursor-not-allowed'
+                                : 'border-[#FFA500] text-[#FFA500] hover:bg-[#FFA50010]'
+                            }`}
+                    >
+                        <Coffee size={11} />
+                        Break Out
+                    </button>
+
+                    {/* Break In (end break) */}
+                    <button
+                        onClick={breakIn}
+                        disabled={!isOnBreak}
+                        className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold border transition-colors
+                            ${isOnBreak
+                                ? 'border-[#5030E5] text-[#5030E5] hover:bg-[#5030E510]'
+                                : 'border-gray-200 text-gray-300 cursor-not-allowed'
+                            }`}
+                    >
+                        <PlayCircle size={11} />
+                        Break In
+                    </button>
                 </div>
             </div>
         </motion.div>

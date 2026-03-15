@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Users2, Shield, UserCheck, KeyRound, UserPlus, MoreVertical, Eye, UserCog, Trash2 } from 'lucide-react';
+import { ChevronRight, Users2, Shield, UserCheck, KeyRound, UserPlus, MoreVertical, Eye, UserCog, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, Briefcase as BriefcaseIcon } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useRolePerms } from '../context/RolePermsContext';
@@ -13,6 +13,8 @@ import { UserRoleDrawer } from '../components/users/UserRoleDrawer';
 import { RoleListPanel } from '../components/users/RoleListPanel';
 import { RoleDetailPanel } from '../components/users/RoleDetailPanel';
 import { PermissionsPanel } from '../components/users/PermissionsPanel';
+import { AppContext, AttendanceRecord } from '../context/AppContext';
+import { useProjects } from '../context/ProjectContext';
 
 const roleStyles: Record<string, { bg: string; text: string }> = {
     admin:   { bg: 'bg-primary-50',       text: 'text-primary-600' },
@@ -23,8 +25,300 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
 const statusColor = { active: '#68B266', inactive: '#D1D5DB' };
 const statusLabel = { active: 'Active', inactive: 'Inactive' };
 
-const TABS = ['Users', 'Roles', 'Permissions'] as const;
+const TABS = ['Users', 'Roles', 'Permissions', 'Attendance'] as const;
 type Tab = typeof TABS[number];
+
+// ─── Attendance Tab ──────────────────────────────────────────────────────────
+
+const STATUS_META: Record<string, { label: string; bg: string; text: string; dot: string }> = {
+    present:    { label: 'Present',  bg: '#68B26615', text: '#68B266', dot: '#68B266' },
+    wfh:        { label: 'WFH',      bg: '#30C5E515', text: '#30C5E5', dot: '#30C5E5' },
+    'half-day': { label: 'Half',     bg: '#9C27B015', text: '#9C27B0', dot: '#9C27B0' },
+    'on-leave': { label: 'Leave',    bg: '#FFA50015', text: '#FFA500', dot: '#FFA500' },
+    absent:     { label: 'Absent',   bg: '#D8727D15', text: '#D8727D', dot: '#D8727D' },
+    holiday:    { label: 'Holiday',  bg: '#6366f115', text: '#6366f1', dot: '#6366f1' },
+};
+
+function addDays(date: Date, n: number): Date {
+    const d = new Date(date);
+    d.setDate(d.getDate() + n);
+    return d;
+}
+
+function toDateStr(d: Date): string {
+    return d.toISOString().slice(0, 10);
+}
+
+function workHours(checkIn?: string, checkOut?: string): string {
+    if (!checkIn || !checkOut) return '';
+    const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+    if (diff <= 0) return '';
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    return `${h}h${m > 0 ? ` ${m}m` : ''}`;
+}
+
+const AttendanceTab: React.FC = () => {
+    const { attendanceRecords } = useContext(AppContext);
+    const { members } = useMembersContext();
+    const { allTasks } = useProjects();
+
+    // Week navigation — start on Monday of current week
+    const getMonday = (d: Date): Date => {
+        const day = d.getDay();
+        const diff = (day === 0 ? -6 : 1 - day);
+        return addDays(d, diff);
+    };
+
+    const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
+    const [filterUserId, setFilterUserId] = useState<string>('all');
+
+    const days: Date[] = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    const prevWeek = () => setWeekStart(d => addDays(d, -7));
+    const nextWeek = () => setWeekStart(d => addDays(d, 7));
+    const goToday  = () => setWeekStart(getMonday(new Date()));
+
+    const isCurrentWeek = toDateStr(weekStart) === toDateStr(getMonday(new Date()));
+    const todayStr = toDateStr(new Date());
+
+    const displayedMembers = filterUserId === 'all'
+        ? members
+        : members.filter(m => m.id === filterUserId);
+
+    // Index records: userId+date → record
+    const recordMap = new Map<string, AttendanceRecord>();
+    attendanceRecords.forEach(r => recordMap.set(`${r.userId}|${r.date}`, r));
+
+    // Workload per user
+    const workloadMap = new Map<string, { total: number; done: number; inProgress: number }>();
+    members.forEach(m => {
+        const assigned = allTasks.filter(t => t.assignees.includes(m.id));
+        workloadMap.set(m.id, {
+            total:      assigned.length,
+            done:       assigned.filter(t => t.status === 'done').length,
+            inProgress: assigned.filter(t => t.status === 'in-progress').length,
+        });
+    });
+
+    // Summary row counts for header
+    const weekAttSummary = days.map(day => {
+        const ds = toDateStr(day);
+        let present = 0, absent = 0, wfh = 0;
+        members.forEach(m => {
+            const r = recordMap.get(`${m.id}|${ds}`);
+            if (!r) return;
+            if (r.status === 'present') present++;
+            else if (r.status === 'absent') absent++;
+            else if (r.status === 'wfh') wfh++;
+        });
+        return { present, absent, wfh };
+    });
+
+    return (
+        <div className="flex-1 min-h-0 flex flex-col">
+            {/* Controls */}
+            <div className="flex items-center justify-between mb-4 shrink-0">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={prevWeek}
+                        className="p-1.5 rounded-lg border border-surface-200 hover:bg-surface-100 text-gray-500 transition-colors"
+                    >
+                        <ChevronLeft size={14} />
+                    </button>
+                    <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">
+                        {weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {' — '}
+                        {addDays(weekStart, 6).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                    <button
+                        onClick={nextWeek}
+                        className="p-1.5 rounded-lg border border-surface-200 hover:bg-surface-100 text-gray-500 transition-colors"
+                    >
+                        <ChevronRightIcon size={14} />
+                    </button>
+                    {!isCurrentWeek && (
+                        <button
+                            onClick={goToday}
+                            className="ml-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-primary-200 text-primary-600 hover:bg-primary-50 transition-colors"
+                        >
+                            Today
+                        </button>
+                    )}
+                </div>
+
+                <select
+                    value={filterUserId}
+                    onChange={e => setFilterUserId(e.target.value)}
+                    className="text-xs border border-surface-200 rounded-lg px-3 py-1.5 text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary-200"
+                >
+                    <option value="all">All Members</option>
+                    {members.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                </select>
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-3 mb-3 shrink-0 flex-wrap">
+                {Object.entries(STATUS_META).map(([key, s]) => (
+                    <div key={key} className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full" style={{ background: s.dot }} />
+                        <span className="text-[10px] text-gray-400">{s.label}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 min-h-0 bg-white rounded-2xl border border-surface-200 overflow-auto">
+                <table className="w-full border-collapse" style={{ minWidth: 780 }}>
+                    <thead>
+                        {/* Day summary row */}
+                        <tr className="border-b border-surface-100">
+                            <th className="sticky left-0 z-10 bg-surface-50 px-4 py-2 text-left min-w-[160px] border-r border-surface-100">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Member</span>
+                            </th>
+                            {days.map((day, i) => {
+                                const ds = toDateStr(day);
+                                const isToday = ds === todayStr;
+                                const s = weekAttSummary[i];
+                                return (
+                                    <th key={ds} className={`px-2 py-2 text-center min-w-[100px] border-r border-surface-100 last:border-r-0 ${isToday ? 'bg-primary-50' : 'bg-surface-50'}`}>
+                                        <div className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-primary-500' : 'text-gray-400'}`}>
+                                            {dayLabels[i]}
+                                        </div>
+                                        <div className={`text-xs font-extrabold mt-0.5 ${isToday ? 'text-primary-600' : 'text-gray-600'}`}>
+                                            {day.getDate()}
+                                        </div>
+                                        {members.length > 0 && (
+                                            <div className="flex justify-center gap-1 mt-1">
+                                                {s.present > 0 && <span className="text-[9px] font-bold px-1 rounded" style={{ background: '#68B26615', color: '#68B266' }}>{s.present}</span>}
+                                                {s.wfh > 0    && <span className="text-[9px] font-bold px-1 rounded" style={{ background: '#30C5E515', color: '#30C5E5' }}>{s.wfh}</span>}
+                                                {s.absent > 0 && <span className="text-[9px] font-bold px-1 rounded" style={{ background: '#D8727D15', color: '#D8727D' }}>{s.absent}</span>}
+                                            </div>
+                                        )}
+                                    </th>
+                                );
+                            })}
+                            <th className="px-3 py-2 text-center min-w-[120px] bg-surface-50">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Workload</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {displayedMembers.map((member, mi) => {
+                            const wl = workloadMap.get(member.id) ?? { total: 0, done: 0, inProgress: 0 };
+                            const completionPct = wl.total > 0 ? Math.round((wl.done / wl.total) * 100) : 0;
+
+                            // Weekly hours for this member
+                            const weekHours = days.reduce((acc, day) => {
+                                const r = recordMap.get(`${member.id}|${toDateStr(day)}`);
+                                if (!r?.checkIn || !r?.checkOut) return acc;
+                                const diff = new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime();
+                                return diff > 0 ? acc + diff : acc;
+                            }, 0);
+                            const weekHoursLabel = weekHours > 0
+                                ? `${Math.floor(weekHours / 3600000)}h ${Math.floor((weekHours % 3600000) / 60000)}m`
+                                : '—';
+
+                            return (
+                                <motion.tr
+                                    key={member.id}
+                                    className="border-b border-surface-100 last:border-0 hover:bg-surface-50/50 transition-colors"
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.25, delay: mi * 0.04, ease: [0.4, 0, 0.2, 1] }}
+                                >
+                                    {/* Member cell */}
+                                    <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-surface-100 hover:bg-surface-50/50">
+                                        <div className="flex items-center gap-2.5">
+                                            <Avatar name={member.name} color="#9ca3af" size="md" />
+                                            <div>
+                                                <div className="text-xs font-bold text-gray-800 leading-tight">{member.name}</div>
+                                                <div className="text-[10px] text-gray-400 mt-0.5">{member.designation ?? member.role}</div>
+                                                <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                                    <Clock size={9} />
+                                                    {weekHoursLabel} this week
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    {/* Day cells */}
+                                    {days.map(day => {
+                                        const ds = toDateStr(day);
+                                        const isToday = ds === todayStr;
+                                        const record = recordMap.get(`${member.id}|${ds}`);
+                                        const meta = record ? STATUS_META[record.status] : null;
+                                        const hours = record ? workHours(record.checkIn, record.checkOut) : '';
+
+                                        return (
+                                            <td key={ds} className={`px-2 py-3 text-center border-r border-surface-100 last:border-r-0 ${isToday ? 'bg-primary-50/30' : ''}`}>
+                                                {meta ? (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span
+                                                            className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                                                            style={{ background: meta.bg, color: meta.text }}
+                                                        >
+                                                            {meta.label}
+                                                        </span>
+                                                        {hours && (
+                                                            <span className="text-[9px] text-gray-400 font-medium">{hours}</span>
+                                                        )}
+                                                        {record?.checkIn && (
+                                                            <span className="text-[9px] text-gray-300">
+                                                                {new Date(record.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] text-gray-200">—</span>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+
+                                    {/* Workload cell */}
+                                    <td className="px-3 py-3 text-center">
+                                        <div className="flex flex-col items-center gap-1.5">
+                                            <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                                <BriefcaseIcon size={10} />
+                                                <span className="font-semibold text-gray-700">{wl.total}</span>
+                                                <span>tasks</span>
+                                            </div>
+                                            {wl.total > 0 && (
+                                                <>
+                                                    <div className="w-16 h-1.5 bg-surface-200 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full bg-[#68B266] transition-all"
+                                                            style={{ width: `${completionPct}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[9px] text-gray-400">{completionPct}% done</span>
+                                                    {wl.inProgress > 0 && (
+                                                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#FFA50015', color: '#FFA500' }}>
+                                                            {wl.inProgress} active
+                                                        </span>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </td>
+                                </motion.tr>
+                            );
+                        })}
+                        {displayedMembers.length === 0 && (
+                            <tr>
+                                <td colSpan={9} className="py-16 text-center text-xs text-gray-400">No members found</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 // ─── Users Tab ──────────────────────────────────────────────────────────────
 
@@ -392,6 +686,11 @@ const UsersPage: React.FC = () => {
                         selectedRoleId={selectedRoleId}
                         onSelect={setSelectedRoleId}
                     />
+                </div>
+            )}
+            {activeTab === 'Attendance' && (
+                <div className="flex-1 min-h-0 pb-6 flex flex-col">
+                    <AttendanceTab />
                 </div>
             )}
         </motion.div>

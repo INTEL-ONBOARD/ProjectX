@@ -32,6 +32,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('db:connection-failed', cb);
         return () => ipcRenderer.removeListener('db:connection-failed', cb);
     },
+    onDbDisconnected: (cb: () => void) => {
+        ipcRenderer.on('db:disconnected', cb);
+        return () => ipcRenderer.removeListener('db:disconnected', cb);
+    },
+    onDbReconnected: (cb: () => void) => {
+        ipcRenderer.on('db:reconnected', cb);
+        return () => ipcRenderer.removeListener('db:reconnected', cb);
+    },
 
     // Update event listeners
     onUpdateChecking: (cb: () => void) => {
@@ -138,8 +146,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         deleteProjectRich: (projectId: string): Promise<boolean>               => ipcRenderer.invoke('db:projectrich:delete', projectId),
 
         // Organization
-        getOrg: (): Promise<unknown>                                           => ipcRenderer.invoke('db:org:get'),
-        setOrg: (data: object): Promise<unknown>                               => ipcRenderer.invoke('db:org:set', data),
+        getOrg:   (): Promise<unknown>                                         => ipcRenderer.invoke('db:org:get'),
+        setOrg:   (data: object): Promise<unknown>                             => ipcRenderer.invoke('db:org:set', data),
+        listOrgs: (): Promise<unknown[]>                                       => ipcRenderer.invoke('db:org:list'),
 
         // Role permissions
         getRolePerms: (): Promise<unknown[]>                                   => ipcRenderer.invoke('db:roleperms:getAll'),
