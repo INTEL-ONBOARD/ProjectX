@@ -8,7 +8,7 @@ import {
   Link, X,
   Lock, Info, RefreshCw, CheckCircle2,
   LogOut, AtSign, Layers, BarChart2, MessageSquare, Key,
-  Edit3, Save, Globe, ChevronRight,
+  Users, HardDrive, Zap, Edit3,
 } from 'lucide-react';
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import PageHeader from '../components/ui/PageHeader';

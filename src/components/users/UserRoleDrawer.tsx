@@ -25,7 +25,7 @@ export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
 
     React.useEffect(() => {
         if (member) setSelectedRole(member.role);
-    }, [member?.id]);
+    }, [member?.id, member?.role]);
 
     const isSelf = member?.id === authUser?.id;
     const unchanged = selectedRole === member?.role;

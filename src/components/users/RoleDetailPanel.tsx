@@ -21,7 +21,7 @@ interface Props {
 export const RoleDetailPanel: React.FC<Props> = ({ selectedRoleId, onDeleteComplete }) => {
     const { roles, renameRoleLocal, updateRoleLocal, removeRole } = useRoles();
     const { renameRolePerms, removeRolePerms } = useRolePerms();
-    const { members } = useMembersContext();
+    const { members, updateMember } = useMembersContext();
     const { showToast } = useToast();
 
     const role = roles.find(r => r.appId === selectedRoleId) ?? null;
@@ -79,7 +79,7 @@ export const RoleDetailPanel: React.FC<Props> = ({ selectedRoleId, onDeleteCompl
         const affected = members.filter(m => m.role === role.name);
         try {
             for (const m of affected) {
-                await dbApi().updateMember(m.id, { role: 'member' });
+                await updateMember(m.id, { role: 'member' });
                 await authApi().updateRole(m.id, 'member');
             }
             await dbApi().deleteRole({ appId: role.appId });

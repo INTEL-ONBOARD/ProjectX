@@ -105,7 +105,7 @@ const RolesTab: React.FC<RolesTabProps> = ({ selectedRoleId, onSelect, onDeleteC
     const { roles } = useRoles();
     const { members } = useMembersContext();
     return (
-        <div className="flex h-full">
+        <div className="flex h-full min-h-0">
             <RoleListPanel
                 roles={roles}
                 members={members}
@@ -129,7 +129,7 @@ const PermissionsTab: React.FC<PermissionsTabProps> = ({ selectedRoleId, onSelec
     const { roles } = useRoles();
     const { members } = useMembersContext();
     return (
-        <div className="flex h-full">
+        <div className="flex h-full min-h-0">
             <RoleListPanel
                 roles={roles}
                 members={members}

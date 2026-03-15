@@ -43,7 +43,7 @@ export const PermissionsPanel: React.FC<Props> = ({ selectedRoleId }) => {
 
     useEffect(() => {
         setLocalRoutes(role ? getAllowedRoutes(role.name) : []);
-    }, [role?.appId]);
+    }, [role?.appId, getAllowedRoutes]);
 
     if (!role) {
         return (
