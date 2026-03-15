@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HashRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import ProjectHeader from './components/layout/ProjectHeader';
@@ -83,9 +83,10 @@ const KanbanRoute: React.FC = () => {
     const [filters, setFilters] = React.useState({ priority: 'all', assignees: [] as string[], dueDateFilter: 'all' });
     const [todayMode, setTodayMode] = React.useState(false);
     return (
-        <Layout showProjectHeader onFilterChange={setFilters} onTodayToggle={setTodayMode}>
+        <>
+            <ProjectHeader onFilterChange={setFilters} onTodayToggle={setTodayMode} />
             <KanbanBoard filters={filters} todayMode={todayMode} />
-        </Layout>
+        </>
     );
 };
 
@@ -132,30 +133,37 @@ const ProtectedRoute: React.FC<{ path: string; children: React.ReactNode }> = ({
     return <>{children}</>;
 };
 
+// ── Shared layout wrapper for all non-kanban routes ───────────────────────────
+const SharedLayout: React.FC = () => (
+    <Layout><Outlet /></Layout>
+);
+
 // ── Main app routes ───────────────────────────────────────────────────────────
 const MainApp: React.FC = () => (
     <Routes>
-        <Route path="/" element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
-        <Route path="/messages" element={<ProtectedRoute path="/messages"><Layout><MessagesPage /></Layout></ProtectedRoute>} />
-        <Route path="/tasks" element={<ProtectedRoute path="/tasks"><Layout><TasksPage /></Layout></ProtectedRoute>} />
-        <Route path="/members" element={<ProtectedRoute path="/members"><Layout><MembersPage /></Layout></ProtectedRoute>} />
-        <Route path="/dashboard" element={<ProtectedRoute path="/dashboard"><Layout><DashboardPage /></Layout></ProtectedRoute>} />
-        <Route path="/teams" element={<ProtectedRoute path="/teams"><Layout><TeamsPage /></Layout></ProtectedRoute>} />
-        <Route path="/attendance" element={<ProtectedRoute path="/attendance"><Layout><AttendancePage /></Layout></ProtectedRoute>} />
-        <Route path="/reports" element={<ProtectedRoute path="/reports"><Layout><ReportsPage /></Layout></ProtectedRoute>} />
-        <Route path="/users" element={<ProtectedRoute path="/users"><Layout><UsersPage /></Layout></ProtectedRoute>} />
-<Route path="/settings" element={<Layout><SettingsPage /></Layout>} />
-        <Route path="*" element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
+        <Route element={<SharedLayout />}>
+            <Route path="/"           element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
+            <Route path="/messages"   element={<ProtectedRoute path="/messages"><MessagesPage /></ProtectedRoute>} />
+            <Route path="/tasks"      element={<ProtectedRoute path="/tasks"><TasksPage /></ProtectedRoute>} />
+            <Route path="/members"    element={<ProtectedRoute path="/members"><MembersPage /></ProtectedRoute>} />
+            <Route path="/dashboard"  element={<ProtectedRoute path="/dashboard"><DashboardPage /></ProtectedRoute>} />
+            <Route path="/teams"      element={<ProtectedRoute path="/teams"><TeamsPage /></ProtectedRoute>} />
+            <Route path="/attendance" element={<ProtectedRoute path="/attendance"><AttendancePage /></ProtectedRoute>} />
+            <Route path="/reports"    element={<ProtectedRoute path="/reports"><ReportsPage /></ProtectedRoute>} />
+            <Route path="/users"      element={<ProtectedRoute path="/users"><UsersPage /></ProtectedRoute>} />
+            <Route path="/settings"   element={<SettingsPage />} />
+        </Route>
     </Routes>
 );
 
 // ── Root: manages splash → walkthrough → auth → app ──────────────────────────
 const Root: React.FC = () => {
     const { isAuthenticated, isLoading, hasSeenWalkthrough, markWalkthroughSeen } = useAuth();
-    const [splashDone, setSplashDone] = useState(false);
+    const [splashDone, setSplashDone] = useState(() => !!localStorage.getItem('pm_auth_session'));
 
     // 1. Splash (while isLoading is true AND splash not manually dismissed)
-    if (isLoading && !splashDone) {
+    if (isLoading) {
+        if (splashDone) return null; // already logged in — wait silently for session restore
         return (
             <AnimatePresence>
                 <SplashScreen onComplete={() => setSplashDone(true)} />

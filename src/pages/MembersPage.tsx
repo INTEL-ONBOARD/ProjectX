@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import InviteMemberModal from '../components/modals/InviteMemberModal';
 import { downloadCsv } from '../utils/exportCsv';
 import { User } from '../types';
+import { useToast } from '../components/ui/Toast';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
@@ -24,10 +25,12 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
 };
 
 const MembersPage: React.FC = () => {
-  const { members, getMemberColor, addMember, updateMember, removeMember } = useMembersContext();
+  const { members, getMemberColor, addMember, updateMember, removeMember, refetchMembers } = useMembersContext();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const { scrubAssignee, allTasks } = useProjects();
+  const { showToast } = useToast();
+  const [saving, setSaving] = useState(false);
 
   const totalTasks = allTasks.length;
   const memberTaskCounts: Record<string, { assigned: number; total: number }> = {};
@@ -42,6 +45,10 @@ const MembersPage: React.FC = () => {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    refetchMembers().catch(console.error);
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -202,11 +209,19 @@ const MembersPage: React.FC = () => {
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-gray-500 whitespace-nowrap">Remove {member.name.split(' ')[0]}?</span>
                               <button
-                                className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors"
-                                onClick={() => {
-                                  removeMember(member.id).catch(console.error);
-                                  scrubAssignee(member.id).catch(console.error);
-                                  setConfirmRemoveId(null);
+                                className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50"
+                                disabled={saving}
+                                onClick={async () => {
+                                  if (saving) return;
+                                  setSaving(true);
+                                  try {
+                                    await Promise.all([removeMember(member.id), scrubAssignee(member.id)]);
+                                    setConfirmRemoveId(null);
+                                  } catch {
+                                    showToast('Failed to remove member. Please try again.', 'error');
+                                  } finally {
+                                    setSaving(false);
+                                  }
                                 }}
                               >
                                 Confirm
@@ -363,13 +378,26 @@ const MembersPage: React.FC = () => {
                     {isAdmin ? (
                       <select
                         value={selectedMember.role}
-                        onChange={e => {
+                        disabled={saving}
+                        onChange={async e => {
                           const newRole = e.target.value as User['role'];
-                          updateMember(selectedMember.id, { role: newRole }).catch(console.error);
-                          authApi().updateRole(selectedMember.id, newRole).catch(console.error);
+                          setSaving(true);
+                          try {
+                            await updateMember(selectedMember.id, { role: newRole });
+                          } catch {
+                            showToast('Failed to update role.', 'error');
+                            setSaving(false);
+                            return;
+                          }
+                          try {
+                            await authApi().updateRole(selectedMember.id, newRole);
+                          } catch {
+                            showToast('Role saved but auth sync failed. User may need to re-login.', 'info');
+                          }
                           setSelectedMember(prev => prev ? { ...prev, role: newRole } : prev);
+                          setSaving(false);
                         }}
-                        className="text-xs font-semibold text-gray-700 border border-surface-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-primary-400"
+                        className="text-xs font-semibold text-gray-700 border border-surface-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-primary-400 disabled:opacity-50"
                       >
                         <option value="admin">Admin</option>
                         <option value="manager">Manager</option>

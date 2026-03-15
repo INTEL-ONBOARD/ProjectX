@@ -29,12 +29,16 @@ type Tab = typeof TABS[number];
 // ─── Users Tab ──────────────────────────────────────────────────────────────
 
 const UsersTab: React.FC = () => {
-    const { members, getMemberColor, removeMember } = useMembersContext();
+    const { members, getMemberColor, removeMember, refetchMembers } = useMembersContext();
     const { roles } = useRoles();
     const [drawerMember, setDrawerMember] = useState<User | null>(null);
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
     const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        refetchMembers().catch(console.error);
+    }, []);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -342,17 +346,7 @@ const UsersPage: React.FC = () => {
                     eyebrow="Home / Users"
                     title="Users & Roles"
                     description={`${members.length} team member${members.length !== 1 ? 's' : ''}`}
-                    actions={
-                        authUser?.role === 'admin' ? (
-                            <motion.button
-                                onClick={() => { setActiveTab('Roles'); handleAddRole(); }}
-                                className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors"
-                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                            >
-                                <UserPlus size={16} /> Add Role
-                            </motion.button>
-                        ) : undefined
-                    }
+                    actions={undefined}
                 />
             </div>
 

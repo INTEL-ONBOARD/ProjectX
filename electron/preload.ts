@@ -107,8 +107,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Members
         getMembers:    (): Promise<unknown[]>                                  => ipcRenderer.invoke('db:members:getAll'),
         addMember:     (member: object): Promise<unknown>                      => ipcRenderer.invoke('db:members:add', member),
-        updateMember:  (id: string, changes: object): Promise<unknown>         => ipcRenderer.invoke('db:members:update', id, changes),
-        removeMember:  (id: string): Promise<boolean>                          => ipcRenderer.invoke('db:members:remove', id),
+        updateMember:     (id: string, changes: object): Promise<unknown>         => ipcRenderer.invoke('db:members:update', id, changes),
+        updateMemberRole: (id: string, role: string): Promise<unknown>           => ipcRenderer.invoke('db:members:updateRole', id, role),
+        removeMember:     (id: string): Promise<boolean>                         => ipcRenderer.invoke('db:members:remove', id),
 
         // Attendance
         getAttendance:    (): Promise<unknown[]>                               => ipcRenderer.invoke('db:attendance:getAll'),

@@ -71,8 +71,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         // Members
         getMembers: () => ipcRenderer.invoke('db:members:getAll'),
         addMember: (member) => ipcRenderer.invoke('db:members:add', member),
-        updateMember: (id, changes) => ipcRenderer.invoke('db:members:update', id, changes),
-        removeMember: (id) => ipcRenderer.invoke('db:members:remove', id),
+        updateMember:     (id, changes) => ipcRenderer.invoke('db:members:update', id, changes),
+        updateMemberRole: (id, role)    => ipcRenderer.invoke('db:members:updateRole', id, role),
+        removeMember:     (id)          => ipcRenderer.invoke('db:members:remove', id),
 
         // Attendance
         getAttendance: () => ipcRenderer.invoke('db:attendance:getAll'),

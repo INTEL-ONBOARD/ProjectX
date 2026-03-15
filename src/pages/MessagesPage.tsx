@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Send, Search, Phone, Video, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X, MessageSquare } from 'lucide-react';
+import { Plus, Send, Search, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X, MessageSquare } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
@@ -36,9 +36,7 @@ const MessagesPage: React.FC = () => {
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
   const [msgFilter, setMsgFilter] = useState<'all' | 'unread' | 'pinned'>('all');
-  const [showCallBanner, setShowCallBanner] = useState(false);
   const [showNewConvo, setShowNewConvo] = useState(false);
-  const [callType, setCallType] = useState<'phone' | 'video' | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const attachRef = useRef<HTMLInputElement>(null);
@@ -127,7 +125,8 @@ const MessagesPage: React.FC = () => {
     inputRef.current?.focus();
   };
 
-  const addReaction = (msgId: string, emoji: string) => {
+  const addReaction = async (msgId: string, emoji: string) => {
+    const prevChats = chats[activeId] ?? [];
     setChats(prev => ({
       ...prev,
       [activeId]: (prev[activeId] ?? []).map(m =>
@@ -135,15 +134,26 @@ const MessagesPage: React.FC = () => {
       ),
     }));
     setShowEmojiPicker(null);
-    dbApi().reactToMessage(msgId, myId, emoji)
-      .catch((err: unknown) => console.error('[MessagesPage] Failed to save reaction:', err));
+    try {
+      await dbApi().reactToMessage(msgId, myId, emoji);
+    } catch (err: unknown) {
+      console.error('[MessagesPage] Failed to save reaction:', err);
+      setChats(prev => ({ ...prev, [activeId]: prevChats }));
+      showToast('Failed to save reaction.', 'error');
+    }
   };
 
-  const deleteMessage = (msgId: string) => {
+  const deleteMessage = async (msgId: string) => {
+    const prevChats = chats[activeId] ?? [];
     setChats(prev => ({ ...prev, [activeId]: prev[activeId].filter(m => m.id !== msgId) }));
     setShowContextMenu(null);
-    dbApi().deleteMessage(msgId)
-      .catch((err: unknown) => console.error('[MessagesPage] Failed to delete message:', err));
+    try {
+      await dbApi().deleteMessage(msgId);
+    } catch (err: unknown) {
+      console.error('[MessagesPage] Failed to delete message:', err);
+      setChats(prev => ({ ...prev, [activeId]: prevChats }));
+      showToast('Failed to delete message.', 'error');
+    }
   };
 
   const filteredConvos = conversations.filter(m => {
@@ -187,24 +197,6 @@ const MessagesPage: React.FC = () => {
         />
       </div>
 
-      {/* Incoming call banner */}
-      <AnimatePresence>
-        {showCallBanner && (
-          <motion.div
-            className="mb-4 bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl px-5 py-3 flex items-center gap-3 shrink-0"
-            initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
-          >
-            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-              {callType === 'video' ? <Video size={16} className="text-white" /> : <Phone size={16} className="text-white" />}
-            </div>
-            <div className="flex-1">
-              <div className="text-white font-semibold text-sm">{callType === 'video' ? 'Video' : 'Voice'} call not available</div>
-              <div className="text-white/70 text-xs">Calls require a WebRTC backend</div>
-            </div>
-            <button onClick={() => setShowCallBanner(false)} className="bg-[#D8727D] text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[#c25f6b] transition-colors">Dismiss</button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Main chat layout — single unified card */}
       {members.length === 0 ? (
@@ -306,31 +298,15 @@ const MessagesPage: React.FC = () => {
           {/* Chat header */}
           <div className="flex items-center gap-3 px-5 py-3.5 border-b border-surface-100 shrink-0">
             <div className="relative">
-              <Avatar name={activeMember.name} color={activeColor} size="md" />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[activeMember.status === 'active' ? 'online' : 'offline'] }} />
+              <Avatar name={activeMember?.name ?? '—'} color={activeColor} size="md" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[activeMember?.status === 'active' ? 'online' : 'offline'] }} />
             </div>
             <div className="flex-1">
-              <div className="font-bold text-sm text-gray-900">{activeMember.name}</div>
-              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor[activeMember.status === 'active' ? 'online' : 'offline'] }}>{statusLabel[activeMember.status === 'active' ? 'online' : 'offline']}</span></div>
+              <div className="font-bold text-sm text-gray-900">{activeMember?.name ?? '—'}</div>
+              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor[activeMember?.status === 'active' ? 'online' : 'offline'] }}>{statusLabel[activeMember?.status === 'active' ? 'online' : 'offline']}</span></div>
             </div>
             {/* Action icons */}
             <div className="flex items-center gap-1">
-              <motion.button
-                onClick={e => { e.stopPropagation(); setCallType('phone'); setShowCallBanner(true); }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 hover:text-primary-500 transition-colors"
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
-                title="Voice call"
-              >
-                <Phone size={16} />
-              </motion.button>
-              <motion.button
-                onClick={e => { e.stopPropagation(); setCallType('video'); setShowCallBanner(true); }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 hover:text-primary-500 transition-colors"
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
-                title="Video call"
-              >
-                <Video size={16} />
-              </motion.button>
               <motion.button
                 onClick={e => { e.stopPropagation(); setPinnedIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: !pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${pinnedIds.includes(activeId) ? 'text-primary-500 bg-primary-50' : 'text-gray-400 hover:bg-surface-100'}`}
@@ -456,7 +432,7 @@ const MessagesPage: React.FC = () => {
               <input
                 ref={inputRef}
                 type="text"
-                placeholder={`Message ${activeMember.name.split(' ')[0]}…`}
+                placeholder={`Message ${(activeMember?.name ?? '—').split(' ')[0]}…`}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
@@ -495,20 +471,18 @@ const MessagesPage: React.FC = () => {
           {/* Profile section */}
           <div className="p-4 flex flex-col items-center text-center border-b border-surface-100">
             <div className="relative mb-3">
-              <Avatar name={activeMember.name} color={activeColor} size="xl" />
-              {(() => { const s = activeMember.status === 'active' ? 'online' : 'offline'; return <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[s] }} />; })()}
+              <Avatar name={activeMember?.name ?? '—'} color={activeColor} size="xl" />
+              {(() => { const s = activeMember?.status === 'active' ? 'online' : 'offline'; return <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[s] }} />; })()}
             </div>
-            <div className="font-bold text-gray-900 text-sm">{activeMember.name}</div>
+            <div className="font-bold text-gray-900 text-sm">{activeMember?.name ?? '—'}</div>
             <div className="text-xs text-gray-400 mt-0.5">{activeMember?.designation ?? ''}</div>
-            {(() => { const s = activeMember.status === 'active' ? 'online' : 'offline'; return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor[s] + '20', color: statusColor[s] }}>{statusLabel[s]}</span>; })()}
+            {(() => { const s = activeMember?.status === 'active' ? 'online' : 'offline'; return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor[s] + '20', color: statusColor[s] }}>{statusLabel[s]}</span>; })()}
           </div>
 
           {/* Quick actions */}
           <div className="p-4 border-b border-surface-100">
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</div>
             {[
-              { icon: Phone, label: 'Voice Call', action: () => { setCallType('phone'); setShowCallBanner(true); } },
-              { icon: Video, label: 'Video Call', action: () => { setCallType('video'); setShowCallBanner(true); } },
               { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
               { icon: Trash2, label: 'Clear Chat', action: () => {
                 const msgs = chats[activeId] ?? [];

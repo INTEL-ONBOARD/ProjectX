@@ -322,9 +322,13 @@ const SettingsPage: React.FC = () => {
     });
   };
 
+  const [saving, setSaving] = useState(false);
+
   const handleSave = async () => {
-    if (currentUser?.id) {
-      try {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (currentUser?.id) {
         const newName = nameValue.trim() || currentUser.name;
         await updateMember(currentUser.id, {
           name: newName,
@@ -332,17 +336,18 @@ const SettingsPage: React.FC = () => {
           location: locationValue.trim() || undefined,
           designation: roleValue.trim() || undefined,
         });
-        authApi().updateName(currentUser.id, newName)
-          .catch((err: unknown) => console.error('[SettingsPage] Failed to sync auth name:', err));
+        await authApi().updateName(currentUser.id, newName);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
         showToast('Profile saved!', 'success');
-      } catch {
-        showToast('Failed to save profile.', 'error');
+      } else {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
       }
-    } else {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      showToast('Failed to save profile.', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 

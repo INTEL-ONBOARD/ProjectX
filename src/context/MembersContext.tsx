@@ -11,6 +11,7 @@ interface MembersContextValue {
   addMember: (member: Omit<User, 'id'>) => Promise<void>;
   updateMember: (id: string, changes: Partial<Omit<User, 'id'>>) => Promise<void>;
   removeMember: (id: string) => Promise<void>;
+  refetchMembers: () => Promise<void>;
 }
 
 const MembersContext = createContext<MembersContextValue | null>(null);
@@ -52,8 +53,13 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMembers(prev => prev.filter(m => m.id !== id));
   };
 
+  const refetchMembers = async () => {
+    const docs = await api().getMembers() as User[];
+    setMembers(docs);
+  };
+
   return (
-    <MembersContext.Provider value={{ members, getMemberColor, addMember, updateMember, removeMember }}>
+    <MembersContext.Provider value={{ members, getMemberColor, addMember, updateMember, removeMember, refetchMembers }}>
       {children}
     </MembersContext.Provider>
   );

@@ -10,6 +10,10 @@ export interface User {
     role: string;
     designation?: string;
     status?: 'active' | 'inactive';
+    phone?: string;
+    department?: string;
+    bio?: string;
+    joinedAt?: string;
 }
 
 export interface TaskComment {

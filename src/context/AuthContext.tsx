@@ -46,42 +46,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasSeenWalkthrough, setHasSeenWalkthrough] = useState(false);
 
   useEffect(() => {
-    const init = async () => {
-      // Seed default admin account in MongoDB
-      try {
-        await authApi().seedDefault();
-      } catch { /* ignore seed errors */ }
+    // Restore session synchronously from localStorage so the app shows immediately
+    let restoredUser: AuthUser | null = null;
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (raw) restoredUser = JSON.parse(raw) as AuthUser;
+    } catch { /* ignore */ }
 
-      // Restore session from localStorage token
-      let restoredUser: AuthUser | null = null;
-      try {
-        const raw = localStorage.getItem(SESSION_KEY);
-        if (raw) {
-          restoredUser = JSON.parse(raw) as AuthUser;
-          setUser(restoredUser);
-        }
-      } catch { /* ignore */ }
+    // Restore walkthrough flag synchronously
+    const walkthroughSeen = localStorage.getItem('pm_walkthrough_seen') === 'true';
 
-      // Load walkthrough flag — localStorage first (works even pre-login), then DB
-      if (localStorage.getItem('pm_walkthrough_seen') === 'true') {
-        setHasSeenWalkthrough(true);
-      } else if (restoredUser) {
-        try {
-          const prefs = await prefsApi().get(restoredUser.id);
-          if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true);
-        } catch {
-          setHasSeenWalkthrough(false);
-        }
-      }
-    };
-
-    // Keep splash duration — resolve after 2500ms minimum
-    const timer = setTimeout(async () => {
-      await init();
+    if (restoredUser) {
+      // Returning user — restore immediately, no splash
+      setUser(restoredUser);
+      setHasSeenWalkthrough(walkthroughSeen);
       setIsLoading(false);
-    }, 2500);
-
-    return () => clearTimeout(timer);
+      // Seed and load prefs in the background (non-blocking)
+      authApi().seedDefault().catch(() => {});
+      if (!walkthroughSeen) {
+        prefsApi().get(restoredUser.id)
+          .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
+          .catch(() => {});
+      }
+    } else {
+      // New user — show splash for 2500ms then seed
+      setHasSeenWalkthrough(walkthroughSeen);
+      const timer = setTimeout(async () => {
+        try { await authApi().seedDefault(); } catch { /* ignore */ }
+        setIsLoading(false);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

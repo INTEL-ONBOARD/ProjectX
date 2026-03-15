@@ -23,6 +23,7 @@ interface ElectronDB {
   getMembers(): Promise<User[]>;
   addMember(member: Omit<User, 'id'>): Promise<User>;
   updateMember(id: string, changes: Partial<Omit<User, 'id'>>): Promise<User | null>;
+  updateMemberRole(id: string, role: string): Promise<unknown>;
   removeMember(id: string): Promise<boolean>;
 
   // Attendance

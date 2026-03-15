@@ -218,6 +218,12 @@ function registerDbHandlers() {
     ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
     ipcMain.handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
     ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toUser(d)) : null; });
+    ipcMain.handle('db:members:updateRole', async (_e, id, role) => {
+        const d = await UserModel.findOneAndUpdate({ appId: id }, { role }, { new: true }).lean();
+        if (!d) throw new Error(`Member not found: ${id}`);
+        await AuthUserModel.findOneAndUpdate({ appId: id }, { role });
+        return safe(toUser(d));
+    });
     ipcMain.handle('db:members:remove', async (_e, id) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
 
     ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map(d => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })) }))));

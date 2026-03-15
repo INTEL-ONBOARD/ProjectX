@@ -52,6 +52,7 @@ export const RoleDetailPanel: React.FC<Props> = ({ selectedRoleId, onDeleteCompl
         try {
             const result = await dbApi().renameRole({ appId: role.appId, newName: trimmed }) as { ok: boolean; oldName: string };
             if (!result.ok) throw new Error('rename returned ok:false');
+            if (!result.oldName) throw new Error('rename: missing oldName in response');
             renameRoleLocal(role.appId, trimmed);
             renameRolePerms(result.oldName, trimmed);
         } catch {
@@ -79,8 +80,12 @@ export const RoleDetailPanel: React.FC<Props> = ({ selectedRoleId, onDeleteCompl
         const affected = members.filter(m => m.role === role.name);
         try {
             for (const m of affected) {
-                await updateMember(m.id, { role: 'member' });
-                await authApi().updateRole(m.id, 'member');
+                await updateMember(m.id, { role: 'guest' });
+                try {
+                    await authApi().updateRole(m.id, 'guest');
+                } catch {
+                    console.error(`[RoleDetailPanel] Failed to sync auth role for user ${m.id}`);
+                }
             }
             await dbApi().deleteRole({ appId: role.appId });
             await dbApi().deleteRolePerms({ roleName: role.name });
@@ -161,7 +166,7 @@ export const RoleDetailPanel: React.FC<Props> = ({ selectedRoleId, onDeleteCompl
                     ) : (
                         <div className="space-y-3">
                             <p className="text-sm text-gray-600">
-                                Reassign <strong>{memberCount}</strong> {memberCount === 1 ? 'member' : 'members'} to &ldquo;member&rdquo; and delete this role?
+                                Reassign <strong>{memberCount}</strong> {memberCount === 1 ? 'member' : 'members'} to &ldquo;guest&rdquo; and delete this role?
                             </p>
                             <div className="flex gap-2">
                                 <button
