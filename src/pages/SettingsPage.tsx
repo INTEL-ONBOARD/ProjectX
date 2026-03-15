@@ -1,12 +1,14 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Save, User, Bell, Palette, Shield, CreditCard, Key, LogOut,
-  Check, Globe, Clock, Moon, Sun, Monitor,
+  User, Bell, Palette, Shield, CreditCard,
+  Check, Clock, Moon, Sun, Monitor,
   Smartphone, Mail, Eye, EyeOff, AlertTriangle,
-  Download, Trash2, Edit3, Briefcase,
-  Link, Zap, Star, X,
-  Lock, ChevronRight, Info, RefreshCw, CheckCircle2,
+  Download, Trash2, Briefcase,
+  Link, X,
+  Lock, Info, RefreshCw, CheckCircle2,
+  LogOut, AtSign, Layers, BarChart2, MessageSquare, Key,
+  Edit3, Save, Globe, ChevronRight,
 } from 'lucide-react';
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import PageHeader from '../components/ui/PageHeader';
@@ -58,80 +60,6 @@ const Toggle: React.FC<{ on: boolean; onChange?: () => void }> = ({ on, onChange
   </button>
 );
 
-const SectionHeader: React.FC<{ title: string; subtitle?: string; action?: React.ReactNode }> = ({ title, subtitle, action }) => (
-  <div className="flex items-start justify-between px-5 py-3.5 border-b border-surface-100">
-    <div>
-      <h2 className="font-bold text-gray-900 text-sm">{title}</h2>
-      {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
-    </div>
-    {action}
-  </div>
-);
-
-interface FieldRowProps {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  editable?: boolean;
-  onSave?: (val: string) => void;
-}
-
-const FieldRow: React.FC<FieldRowProps> = ({ icon: Icon, label, value, editable, onSave }) => {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  const commit = () => {
-    if (draft.trim()) onSave?.(draft.trim());
-    setEditing(false);
-  };
-  const cancel = () => {
-    setDraft(value);
-    setEditing(false);
-  };
-
-  return (
-    <div className="flex items-center justify-between px-5 py-3 border-b border-surface-100 last:border-0 group">
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="w-7 h-7 rounded-lg bg-surface-100 flex items-center justify-center shrink-0">
-          <Icon size={13} className="text-gray-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{label}</div>
-          {editing ? (
-            <input
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel(); }}
-              className="text-sm font-semibold text-gray-900 border-b-2 border-primary-400 focus:outline-none bg-transparent w-full"
-              autoFocus
-            />
-          ) : (
-            <div className="text-sm font-semibold text-gray-900 truncate">{value}</div>
-          )}
-        </div>
-      </div>
-      {editable && (
-        editing ? (
-          <div className="flex items-center gap-1 ml-2 shrink-0">
-            <button onClick={commit} className="w-6 h-6 rounded-md bg-primary-500 text-white flex items-center justify-center hover:bg-primary-600 transition-colors">
-              <Check size={11} />
-            </button>
-            <button onClick={cancel} className="w-6 h-6 rounded-md bg-surface-200 text-gray-500 flex items-center justify-center hover:bg-surface-300 transition-colors">
-              <X size={11} />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => { setDraft(value); setEditing(true); }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-primary-400 hover:text-primary-600 p-1 rounded-lg hover:bg-primary-50 ml-2 shrink-0"
-          >
-            <Edit3 size={13} />
-          </button>
-        )
-      )}
-    </div>
-  );
-};
 
 // ── Password strength ────────────────────────────────────────────────────────
 
@@ -149,28 +77,76 @@ function calcStrength(pwd: string): { score: number; label: string; color: strin
   return { score: Math.min(score, 4), label: 'Strong', color: '#68B266' };
 }
 
-// ── Nav ──────────────────────────────────────────────────────────────────────
+// ── Tab definitions ───────────────────────────────────────────────────────────
 
-const NAV_GROUPS_BASE = [
-  {
-    label: 'Account',
-    adminOnly: false,
-    items: [
-      { id: 'profile', label: 'Profile', icon: User },
-      { id: 'notifications', label: 'Notifications', icon: Bell },
-      { id: 'appearance', label: 'Appearance', icon: Palette },
-      { id: 'security', label: 'Security', icon: Shield },
-    ],
-  },
-  {
-    label: 'Workspace',
-    adminOnly: false,
-    items: [
-      { id: 'billing', label: 'Billing', icon: CreditCard },
-      { id: 'about', label: 'About', icon: Info },
-    ],
-  },
-];
+const TABS = [
+  { id: 'profile',       label: 'Profile',       Icon: User       },
+  { id: 'notifications', label: 'Notifications', Icon: Bell       },
+  { id: 'appearance',    label: 'Appearance',    Icon: Palette    },
+  { id: 'security',      label: 'Security',      Icon: Shield     },
+  { id: 'billing',       label: 'Billing',       Icon: CreditCard },
+  { id: 'about',         label: 'About',         Icon: Info       },
+] as const;
+
+// ── SettingCard ───────────────────────────────────────────────────────────────
+
+const SettingCard: React.FC<{
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}> = ({ title, description, children, action, className = '' }) => (
+  <div className={`bg-white rounded-2xl border border-surface-200 p-6 ${className}`}>
+    <div className="flex items-start justify-between mb-4">
+      <div>
+        <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
+        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+      </div>
+      {action}
+    </div>
+    {children}
+  </div>
+);
+
+// ── InputField ────────────────────────────────────────────────────────────────
+
+const InputField: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onBlur?: () => void;
+  placeholder?: string;
+  readOnly?: boolean;
+  type?: string;
+  suffix?: React.ReactNode;
+}> = ({ label, value, onChange, onBlur, placeholder, readOnly, type = 'text', suffix }) => (
+  <div>
+    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5 block">
+      {label}
+    </label>
+    <div className="relative">
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        className={`w-full px-3 py-2.5 rounded-xl border border-surface-200 text-sm text-gray-900
+          placeholder:text-gray-300 outline-none transition-all
+          ${suffix ? 'pr-10' : ''}
+          ${readOnly
+            ? 'bg-surface-50 text-gray-400 cursor-not-allowed'
+            : 'bg-white focus:ring-2 focus:ring-[#5030E5]/20 focus:border-[#5030E5]'
+          }`}
+      />
+      {suffix && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">{suffix}</div>
+      )}
+    </div>
+  </div>
+);
 
 const ACCENT_COLORS = [
   { hex: '#5030E5', label: 'Violet' },
@@ -181,7 +157,76 @@ const ACCENT_COLORS = [
   { hex: '#8B5CF6', label: 'Purple' },
 ];
 
+// ── Section header ────────────────────────────────────────────────────────────
+
+const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
+  <div className="px-6 py-4 border-b border-surface-100">
+    <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+    {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+  </div>
+);
+
+// ── Field row ─────────────────────────────────────────────────────────────────
+
+interface FieldRowProps {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  editable?: boolean;
+  onSave?: (v: string) => void;
+}
+
+const FieldRow: React.FC<FieldRowProps> = ({ icon: Icon, label, value, editable, onSave }) => {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+  React.useEffect(() => { setDraft(value); }, [value]);
+  return (
+    <div className="flex items-center gap-4 px-6 py-3.5 border-b border-surface-50 last:border-0 group hover:bg-surface-50 transition-colors">
+      <Icon size={15} className="text-gray-400 shrink-0" />
+      <span className="text-xs text-gray-400 w-28 shrink-0">{label}</span>
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => { onSave?.(draft); setEditing(false); }}
+          onKeyDown={e => { if (e.key === 'Enter') { onSave?.(draft); setEditing(false); } if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+          className="flex-1 text-sm text-gray-700 bg-transparent border-b border-primary-300 focus:outline-none"
+        />
+      ) : (
+        <span className="flex-1 text-sm text-gray-700">{value || '—'}</span>
+      )}
+      {editable && !editing && (
+        <button onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-surface-200">
+          <Edit3 size={12} className="text-gray-400" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 // ── Main component ───────────────────────────────────────────────────────────
+
+// ── Nav groups for sidebar ────────────────────────────────────────────────────
+
+const navGroups = [
+  {
+    label: 'Account',
+    items: [
+      { id: 'profile',       label: 'Profile',       icon: User    },
+      { id: 'notifications', label: 'Notifications', icon: Bell    },
+      { id: 'security',      label: 'Security',      icon: Shield  },
+    ],
+  },
+  {
+    label: 'App',
+    items: [
+      { id: 'appearance', label: 'Appearance', icon: Palette    },
+      { id: 'billing',    label: 'Billing',    icon: CreditCard },
+      { id: 'about',      label: 'About',      icon: Info       },
+    ],
+  },
+];
 
 const SettingsPage: React.FC = () => {
   const { currentUser, theme, setTheme: setAppTheme } = useContext(AppContext);
@@ -190,8 +235,6 @@ const SettingsPage: React.FC = () => {
   const { projects, allTasks } = useProjects();
 
 
-  const isAdmin = authUser?.role === 'admin';
-  const navGroups = NAV_GROUPS_BASE.filter(g => !g.adminOnly || isAdmin);
   const { showToast } = useToast();
 
   const userColor = '#5030E5';
@@ -203,7 +246,6 @@ const SettingsPage: React.FC = () => {
   const [nameValue,     setNameValue]     = useState(() => currentUser?.name        || '');
   const [emailValue,    setEmailValue]    = useState(() => currentUser?.email       || '');
   const [locationValue, setLocationValue] = useState(() => currentUser?.location   || '');
-  const [timezoneValue] = useState('UTC');
   const [roleValue,     setRoleValue]     = useState(() => currentUser?.designation || '');
 
   // Sync profile fields when currentUser loads (it may be null on first render)
@@ -232,6 +274,7 @@ const SettingsPage: React.FC = () => {
   const [accentColor, setAccentColor] = useState('#5030E5');
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
   const [compactMode, setCompactMode] = useState(false);
+  const [timezoneValue] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const appearLoaded = useRef(false);
 
   useEffect(() => {
@@ -335,21 +378,83 @@ const SettingsPage: React.FC = () => {
     setConfirmDelete(true);
   };
 
+  const isAdmin = authUser?.role === 'admin';
+
   const stats = [
-    { label: 'Tasks Done', value: String(currentUser ? allTasks.filter(t => t.status === 'done' && t.assignees?.includes(currentUser.id)).length : 0), icon: Check, color: '#68B266', bg: 'bg-[#83C29D20]' },
-    { label: 'Projects', value: String(projects.length), icon: Briefcase, color: '#5030E5', bg: 'bg-primary-50' },
-    { label: 'Tasks Total', value: String(currentUser ? allTasks.filter(t => t.assignees?.includes(currentUser.id)).length : 0), icon: Zap, color: '#FFA500', bg: 'bg-[#FFA50020]' },
-    { label: 'In Progress', value: String(currentUser ? allTasks.filter(t => t.status === 'in-progress' && t.assignees?.includes(currentUser.id)).length : 0), icon: Star, color: '#30C5E5', bg: 'bg-[#30C5E520]' },
+    { label: 'Projects', value: projects.length, icon: Layers, bg: '#EDE9FE', color: '#7C3AED' },
+    { label: 'Tasks', value: allTasks.filter(t => t.assignees?.includes(currentUser?.id ?? '')).length, icon: Check, bg: '#DCFCE7', color: '#16A34A' },
+    { label: 'Team', value: members.length, icon: User, bg: '#DBEAFE', color: '#2563EB' },
   ];
+
+  // ── Auto-save feedback ──────────────────────────────────────────────────────
+  const [savedField, setSavedField] = React.useState<string | null>(null);
+  const flashSaved = (key: string) => {
+    setSavedField(key);
+    setTimeout(() => setSavedField(null), 2000);
+  };
+
+  // SavedBadge — defined here (inside component) to close over savedField
+  const SavedBadge = ({ id }: { id: string }) => (
+    <AnimatePresence>
+      {savedField === id && (
+        <motion.span
+          className="flex items-center gap-1 text-xs font-medium text-[#68B266]"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.15 }}
+        >
+          <CheckCircle2 size={12} /> Saved
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
 
 
   return (
     <motion.div
-      className="flex-1 flex flex-col overflow-hidden px-8 bg-white"
+      className="flex-1 flex flex-col overflow-hidden bg-white"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       transition={{ duration: 0.3, delay: 0.1 }}
     >
-      <div className="flex flex-col h-full bg-white">
+      {/* ── Header ── */}
+      <div className="px-8 pt-8 pb-5 shrink-0">
+        <PageHeader
+          eyebrow="Home / Settings"
+          title="Settings"
+          description="Manage your account and preferences"
+        />
+      </div>
+
+      {/* ── Tab bar ── */}
+      <div className="px-8 shrink-0">
+        <div className="flex items-center gap-1 bg-surface-50 rounded-2xl p-1 border border-surface-200 w-fit">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSection(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap
+                ${activeSection === tab.id
+                  ? 'bg-[#5030E5] text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-white'
+                }`}
+            >
+              <tab.Icon size={15} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div className="max-w-3xl mx-auto">
+          <AnimatePresence mode="wait">
+            {/* Section content — Tasks 2–4 will fill this in */}
+            {null}
+          </AnimatePresence>
+        </div>
+      </div>
         <div className="pt-8 pb-5 shrink-0">
           <PageHeader
             eyebrow="Home / Settings"
@@ -1151,7 +1256,6 @@ const SettingsPage: React.FC = () => {
             </AnimatePresence>
           </div>
         </div>
-      </div>
     </motion.div>
   );
 };
