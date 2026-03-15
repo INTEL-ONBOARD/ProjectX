@@ -3,18 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send, Eye, UserCog, Trash2 } from 'lucide-react';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const authApi = () => (window as any).electronAPI.auth as { updateRole: (userId: string, role: string) => Promise<void> };
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
-import { useRoles } from '../context/RolesContext';
 import InviteMemberModal from '../components/modals/InviteMemberModal';
 import { downloadCsv } from '../utils/exportCsv';
 import { User } from '../types';
 import { useToast } from '../components/ui/Toast';
+import { getPresenceStatus } from '../context/PresenceContext';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
@@ -31,7 +29,6 @@ const MembersPage: React.FC = () => {
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const { scrubAssignee, allTasks } = useProjects();
-  const { roles } = useRoles();
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
 
@@ -66,7 +63,7 @@ const MembersPage: React.FC = () => {
   const adminCount = members.filter(m => m.role === 'admin').length;
   const managerCount = members.filter(m => m.role === 'manager').length;
   const memberCount = members.filter(m => m.role === 'member').length;
-  const onlineCount = members.filter(m => m.status === 'active').length;
+  const onlineCount = members.filter(m => getPresenceStatus(m.lastSeen) === 'online').length;
 
   const metrics = [
     { label: 'Total Members', value: String(members.length), trend: `${members.length} in team`, trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
@@ -166,7 +163,7 @@ const MembersPage: React.FC = () => {
                   const role = getRoleStyle(member.role);
                   const tc = memberTaskCounts[member.id] ?? { assigned: 0, total: 5 };
                   const pct = tc.total > 0 ? (tc.assigned / tc.total) * 100 : 0;
-                  const status: 'online' | 'offline' = member.status === 'active' ? 'online' : 'offline';
+                  const status: 'online' | 'away' | 'offline' = getPresenceStatus(member.lastSeen);
                   const isConfirmingRemove = confirmRemoveId === member.id;
                   return (
                     <motion.tr
@@ -334,8 +331,8 @@ const MembersPage: React.FC = () => {
               initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.35, delay: 0.16, ease: [0.4, 0, 0.2, 1] }}>
               <h3 className="font-bold text-gray-900 text-sm mb-3">Availability</h3>
-              {(['online', 'offline'] as const).map(s => {
-                const count = members.filter(m => (m.status === 'active' ? 'online' : 'offline') === s).length;
+              {(['online', 'away', 'offline'] as const).map(s => {
+                const count = members.filter(m => getPresenceStatus(m.lastSeen) === s).length;
                 return (
                   <div key={s} className="flex items-center gap-2 py-2 border-b border-surface-100 last:border-0">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[s] }} />
@@ -378,47 +375,11 @@ const MembersPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-surface-100">
                     <span className="text-xs text-gray-400">Role</span>
-                    {isAdmin ? (
-                      <select
-                        value={selectedMember.role}
-                        disabled={saving}
-                        onChange={async e => {
-                          const newRole = e.target.value as User['role'];
-                          const prevRole = selectedMember.role;
-                          setSaving(true);
-                          try {
-                            await updateMember(selectedMember.id, { role: newRole });
-                            try {
-                              await authApi().updateRole(selectedMember.id, newRole);
-                            } catch {
-                              // Revert member update if auth sync fails
-                              await updateMember(selectedMember.id, { role: prevRole }).catch(() => {});
-                              showToast('Role update failed: auth sync error. Role reverted.', 'error');
-                              setSaving(false);
-                              return;
-                            }
-                            setSelectedMember(prev => prev ? { ...prev, role: newRole } : prev);
-                            showToast('Role updated.', 'success');
-                          } catch {
-                            showToast('Failed to update role.', 'error');
-                          }
-                          setSaving(false);
-                        }}
-                        className="text-xs font-semibold text-gray-700 border border-surface-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-primary-400 disabled:opacity-50"
-                      >
-                        {roles.map(r => (
-                          <option key={r.appId} value={r.name}>
-                            {r.name.charAt(0).toUpperCase() + r.name.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-xs font-semibold text-gray-700 capitalize">{selectedMember.role}</span>
-                    )}
+                    <span className="text-xs font-semibold text-gray-700 capitalize">{selectedMember.role}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-surface-100">
                     <span className="text-xs text-gray-400">Status</span>
-                    <span className={`text-xs font-semibold ${selectedMember.status === 'active' ? 'text-[#68B266]' : 'text-gray-400'}`}>{selectedMember.status ?? 'active'}</span>
+                    <span className={`text-xs font-semibold ${getPresenceStatus(selectedMember.lastSeen) === 'online' ? 'text-[#68B266]' : getPresenceStatus(selectedMember.lastSeen) === 'away' ? 'text-[#FFA500]' : 'text-gray-400'}`}>{getPresenceStatus(selectedMember.lastSeen)}</span>
                   </div>
                 </div>
                 <motion.button
