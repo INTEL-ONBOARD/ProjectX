@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, FolderKanban, BarChart2, Settings2, Users, ChevronRight, Building2 } from 'lucide-react';
+import { Lock, FolderKanban, BarChart2, Settings2, Users, ChevronRight } from 'lucide-react';
 import { RoleDoc } from '../../context/RolesContext';
 import { useRolePerms } from '../../context/RolePermsContext';
 import { useToast } from '../ui/Toast';
@@ -14,7 +14,7 @@ const ALL_PERM_ROUTES = [
     { id: '/members',      label: 'Members',      icon: Users        },
     { id: '/attendance',   label: 'Attendance',   icon: ChevronRight },
     { id: '/reports',      label: 'Reports',      icon: BarChart2    },
-    { id: '/organization', label: 'Organization', icon: Building2    },
+    { id: '/users',        label: 'Users',        icon: Users        },
     { id: '/settings',     label: 'Settings',     icon: Settings2    },
 ];
 
