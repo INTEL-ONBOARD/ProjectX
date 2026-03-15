@@ -5,13 +5,45 @@
 **Goal:** A new admin-only `/users` screen with three tabs (Users, Roles, Permissions) that lets admins manage user role assignments, define/rename/delete roles, and control which routes each role can access.
 
 **Architecture:**
-- New page: `src/pages/UsersPage.tsx` — three-tab layout (Users / Roles / Permissions)
-- New components: `src/components/users/UserRoleDrawer.tsx`, `src/components/users/RoleDetailPanel.tsx`, `src/components/users/PermissionsPanel.tsx`
+- New page: `src/pages/UsersPage.tsx` — three-tab layout (Users / Roles / Permissions), owns shared `selectedRoleId` state
+- New components: `src/components/users/UserRoleDrawer.tsx`, `src/components/users/RoleDetailPanel.tsx`, `src/components/users/PermissionsPanel.tsx`, `src/components/users/RoleListPanel.tsx`
 - Re-uses existing contexts: `MembersContext`, `RolesContext`, `RolePermsContext`, `AuthContext`
-- No new IPC handlers needed — reuses existing `window.electronAPI.auth.updateRole(userId, role)`
+- No new IPC handlers needed — all required methods already exist
 - Route `/users` added to `App.tsx`, admin's `allowedRoutes` in `RolePermsContext`, and sidebar
 
 **Tech Stack:** React + TypeScript, Framer Motion (AnimatePresence, motion, layoutId tab indicator), Tailwind CSS, Lucide icons, Electron IPC
+
+---
+
+## IPC Reference (existing — no new handlers needed)
+
+All calls go via `(window as any).electronAPI.db` or `window.electronAPI.auth`:
+
+| Method | Signature | Notes |
+|---|---|---|
+| `db.getRoles()` | `() => Promise<RoleDoc[]>` | Already used by RolesContext on mount |
+| `db.createRole(data)` | `(data: object) => Promise<RoleDoc>` | Returns full `RoleDoc` with server-generated `appId` |
+| `db.renameRole(data)` | `(data: object) => Promise<unknown>` | Pass `{ appId, newName }` — cascades to UserModel + AuthUserModel |
+| `db.updateRoleColor(data)` | `(data: object) => Promise<unknown>` | Pass `{ appId, color }` |
+| `db.deleteRole(data)` | `(data: object) => Promise<unknown>` | Pass `{ appId }` — deletes RoleDoc only, does NOT cascade members |
+| `db.deleteRolePerms(data)` | `(data: object) => Promise<unknown>` | Pass `{ role: roleName }` |
+| `auth.updateRole(userId, role)` | `(userId: string, role: string) => Promise<void>` | Updates AuthUserModel |
+| `db.updateMember(id, changes)` | `(id: string, changes: object) => Promise<User\|null>` | Updates UserModel — NOT optimistic in MembersContext |
+
+**Important:** `MembersContext.updateMember` is DB-first (calls `api().updateMember` before updating local state). It is NOT optimistic. Do not attempt to "rollback" it by calling it again — that would make an extra DB write. If a subsequent IPC call fails, use `setMembers` directly via a local state setter pattern, or re-fetch.
+
+**Important:** `db.deleteRole` does NOT cascade member reassignment to UserModel or AuthUserModel. The calling code must do this explicitly (see delete sequence below).
+
+**Note on `vite-env.d.ts`:** The `ElectronDB` interface does not currently declare `createRole`, `renameRole`, `updateRoleColor`, `deleteRole`, or `deleteRolePerms`. These are called via `(window as any).electronAPI.db` in RolesContext (bypasses TypeScript). New components should follow the same pattern for these calls — cast to `any` or add the types to `ElectronDB`. If adding types, use:
+```typescript
+// Add to ElectronDB interface in src/vite-env.d.ts
+getRoles(): Promise<RoleDoc[]>;
+createRole(data: { name: string; color: string }): Promise<RoleDoc>;
+renameRole(data: { appId: string; newName: string }): Promise<unknown>;
+updateRoleColor(data: { appId: string; color: string }): Promise<unknown>;
+deleteRole(data: { appId: string }): Promise<unknown>;
+deleteRolePerms(data: { role: string }): Promise<unknown>;
+```
 
 ---
 
@@ -21,15 +53,23 @@
 
 - Route: `/users`
 - Registered in `App.tsx` as `<ProtectedRoute path="/users"><Layout><UsersPage /></Layout></ProtectedRoute>`
-- `App.tsx` must also re-add `RolesProvider` (was removed with Organization feature). Wrap it around `MembersProvider`: `<RolesProvider><MembersProvider>...</MembersProvider></RolesProvider>`
-- Added to `RolePermsContext` DEFAULT_PERMS for `admin` role only (add `'/users'` to admin's allowedRoutes array). Note: `allowedRoutes` is frontend-only — there is no backend seed to update.
-- `Sidebar.tsx` `ALL_NAV_ITEMS` entry: `{ id: '/users', label: 'Users', icon: Users2 }` — visible only when route is in allowedRoutes (existing filter mechanism handles this automatically)
+- `App.tsx` must re-add `RolesProvider` (was removed with Organization feature). Insert it between `RolePermsProvider` and `MembersProvider`:
+  ```tsx
+  <RolePermsProvider>
+    <RolesProvider>          {/* ← add here */}
+      <MembersProvider>
+        <ProjectProvider>
+          ...
+  ```
+- Added to `RolePermsContext` DEFAULT_PERMS for `admin` role only (add `'/users'` to admin's allowedRoutes array). `allowedRoutes` is frontend-only — no backend to update.
+- `Sidebar.tsx` `ALL_NAV_ITEMS` entry: `{ id: '/users', label: 'Users', icon: Users2 }` — existing filter mechanism shows it only when in allowedRoutes.
 
 ### Tab Bar
 
 - Three tabs: **Users · Roles · Permissions**
-- Horizontal tab bar at top of page, same pattern as previously used: `layoutId="users-tab-ind"` bottom border indicator with Framer Motion
-- Shared `selectedRoleId: string | null` state (stores `role.appId`, NOT `role.name`) across Roles and Permissions tabs — using `appId` ensures the selection survives renames. Selecting a role on the left list in either tab persists as you switch between those two tabs.
+- Horizontal tab bar at top of page: `layoutId="users-tab-ind"` bottom border indicator with Framer Motion
+- `selectedRoleId: string | null` state lives in `UsersPage` — stores `role.appId` (NOT `role.name`), so it survives renames
+- `selectedRoleId` is passed as a prop to `RoleListPanel`, `RoleDetailPanel`, and `PermissionsPanel`
 
 ---
 
@@ -38,113 +78,165 @@
 **Layout:** Full-width table + slide-out drawer overlay
 
 **Table columns:**
-- Member (avatar circle with initials + name + designation)
+- Member (avatar circle with initials fallback + name + designation)
 - Email
-- Role (colored badge — look up color via `RolesContext.roles.find(r => r.name === member.role)?.color`, fallback to `'#9ca3af'` gray if roles not yet loaded or role not found)
+- Role (colored badge — derive color via `roles.find(r => r.name === member.role)?.color ?? '#9ca3af'`)
 - Status (active/inactive dot indicator)
 - Action (chevron icon to open drawer)
 
-**Data source:** `MembersContext.members`
+**Data sources:** `useMembersContext().members`, `useRoles().roles`
 
 **UserRoleDrawer (`src/components/users/UserRoleDrawer.tsx`):**
+
+Props: `{ member: User; onClose: () => void }`
+
 - 420px fixed-width panel sliding in from the right (Framer Motion `x: 420 → 0`)
-- Shows: avatar, name, email, designation, current role
-- Role selector: `<select>` dropdown populated from `RolesContext.roles`
-- Save button: calls `MembersContext.updateMember(id, { role: newRole })` then `window.electronAPI.auth.updateRole(member.id, newRole)` (existing IPC — no new handler needed). On failure, rollback `updateMember` via another call to restore original role and show error toast.
-- Admin cannot change their own role (Save button disabled + tooltip if `member.id === authUser.id`)
+- Shows: avatar, name, email, designation, current role label
+- Role selector: `<select>` dropdown populated from `useRoles().roles`
+- Local state: `selectedRole: string` initialised to `member.role`
+- Save sequence:
+  1. Set `saving: true`
+  2. `await (window as any).electronAPI.db.updateMember(member.id, { role: selectedRole })` — this also updates MembersContext local state internally
+  3. `await (window as any).electronAPI.auth.updateRole(member.id, selectedRole)` — if this fails, the member's UserModel is already updated but AuthUserModel is not; show error toast explaining partial failure, do NOT attempt to reverse the UserModel update (MembersContext.updateMember is not reversible without an extra DB write)
+  4. On full success: show success toast, call `onClose()`
+  5. Set `saving: false` in finally block
+- Admin cannot change their own role: disable Save + show note "You cannot change your own role" if `member.id === authUser.id`
 - Close on backdrop click or X button
-- Toast on success/error
+
+---
+
+### Shared: RoleListPanel (`src/components/users/RoleListPanel.tsx`)
+
+Props: `{ selectedRoleId: string | null; onSelect: (appId: string) => void }`
+
+Both Tab 2 (Roles) and Tab 3 (Permissions) use this same component as the left column. Extract it to avoid duplication.
+
+- Renders from `useRoles().roles`
+- Each item: `● RoleName (N members)` where N = `useMembersContext().members.filter(m => m.role === role.name).length`
+- Color dot: `role.color`
+- Selected state: `role.appId === selectedRoleId` → `bg-primary-50 border-primary-200`
+- "Add Role" button at bottom (only shown in Tab 2 context — pass `showAddRole?: boolean` prop)
 
 ---
 
 ### Tab 2: Roles
 
-**Layout:** Two-panel — 280px left list + flex-1 right detail panel
+**Layout:** `<RoleListPanel showAddRole />` (280px) + `<RoleDetailPanel>` (flex-1)
 
-**Left panel:**
-- Scrollable list of role pills: `● RoleName (N members)`
-  - Color dot uses `role.color`
-  - Member count = `members.filter(m => m.role === role.name).length`
-  - Selected role highlighted with `bg-primary-50 border-primary-200` (match by `role.appId === selectedRoleId`)
-- "Add Role" button at bottom:
-  1. Call `window.electronAPI.db.createRole({ name: 'New Role', color: '#6366f1' })` — returns full `RoleDoc` including server-generated `appId`
-  2. Call `RolesContext.addRole(returnedRoleDoc)` to add to local state
-  3. Call `RolePermsContext.addRolePerms({ role: 'New Role', allowedRoutes: ['/settings'] })`
-  4. Set `selectedRoleId` to `returnedRoleDoc.appId`
-  - Disable button while the async call is in flight to prevent duplicate creation
+**Add Role flow (triggered from RoleListPanel "Add Role" button, handled in UsersPage):**
+1. Disable Add button while in flight
+2. `const newRole = await (window as any).electronAPI.db.createRole({ name: 'New Role', color: '#6366f1' })` — returns full `RoleDoc` with `appId`
+3. `useRoles().addRole(newRole as RoleDoc)`
+4. `useRolePerms().setRolePerms('New Role', ['/settings'])` — uses `setRolePerms` (not `addRolePerms`) because `setRolePerms` persists to DB and upserts in local state. Note: `setRolePerms` does `prev.map(...)` which only updates if entry exists. Since this is a new role, use `addRolePerms` for the local state update and call `dbApi().setRolePerms({ role: 'New Role', allowedRoutes: ['/settings'] })` directly for DB persistence.
+5. Set `selectedRoleId` to `newRole.appId`
+6. On error: show toast, re-enable button
 
-**Right panel (`src/components/users/RoleDetailPanel.tsx`):**
-- Empty state when no role selected: "Select a role to edit"
-- When role selected (looked up via `RolesContext.roles.find(r => r.appId === selectedRoleId)`):
-  - Editable name field (text input). On blur: call `window.electronAPI.db.renameRole(role.appId, newName)` (this IPC cascades to UserModel + AuthUserModel in the DB), then `RolesContext.renameRoleLocal(role.appId, newName)` + `RolePermsContext.renameRolePerms(role.name, newName)`. On failure: revert input and show error toast.
-  - Color picker: 8 preset color swatches + custom hex input. On pick: call `window.electronAPI.db.updateRoleColor(role.appId, newColor)` first; on success call `RolesContext.updateRoleLocal(role.appId, { color: newColor })`; on failure show error toast (no local update until IPC succeeds — avoids stale state).
-  - Member count display: "X members with this role"
-  - Delete button (red, bottom): shows inline "Are you sure? Members with this role will be reassigned to 'member'." confirm. On confirm:
-    1. Collect affected: `const affected = members.filter(m => m.role === role.name)`
-    2. For each affected member: call `MembersContext.updateMember(m.id, { role: 'member' })` + `window.electronAPI.auth.updateRole(m.id, 'member')` — this ensures DB is updated for both UserModel and AuthUserModel
-    3. Call `window.electronAPI.db.deleteRole(role.appId)` — deletes the RoleDoc
-    4. Call `RolesContext.removeRole(role.appId)`
-    5. Call `RolePermsContext.removeRolePerms(role.name)`
-    6. Set `selectedRoleId` to `null`
-    - On any failure: rollback all local state changes and show error toast
-  - `admin`, `manager`, `member` built-in roles: delete button hidden/disabled (check `['admin','manager','member'].includes(role.name)`)
+**Duplicate name prevention:** Before creating or saving a rename, check `roles.some(r => r.name === candidateName && r.appId !== currentRole.appId)`. If duplicate, show inline error "A role with this name already exists" and do not proceed.
+
+**RoleDetailPanel (`src/components/users/RoleDetailPanel.tsx`):**
+
+Props: `{ selectedRoleId: string | null }`
+
+- Derives selected role: `const role = roles.find(r => r.appId === selectedRoleId) ?? null`
+- Empty state: "Select a role to edit"
+- When role loaded:
+  - **Name field:** controlled input, local `nameValue` state initialised from `role.name` (sync via `useEffect([role?.appId])` to handle external changes). On blur:
+    1. If `nameValue === role.name` → no-op
+    2. Check duplicate (see above)
+    3. `await (window as any).electronAPI.db.renameRole({ appId: role.appId, newName: nameValue })`
+    4. On success: `renameRoleLocal(role.appId, nameValue)` + `renameRolePerms(role.name, nameValue)`
+    5. On failure: revert `nameValue` to `role.name`, show error toast
+  - **Rename blocked for built-ins:** if `['admin', 'manager', 'member'].includes(role.name)`, name field is `readOnly` and shows a lock icon + "Built-in role"
+  - **Color picker:** 8 preset swatches + hex input. On pick:
+    1. `await (window as any).electronAPI.db.updateRoleColor({ appId: role.appId, color: newColor })`
+    2. On success: `updateRoleLocal(role.appId, { color: newColor })`
+    3. On failure: show error toast (no local update until IPC succeeds)
+  - **Member count:** "X members with this role"
+  - **Delete button** (red, bottom): hidden/disabled for `['admin', 'manager', 'member']`
+    - Show inline confirm: "Reassign X members to 'member' and delete this role?"
+    - On confirm (entire sequence, abort on first failure):
+      1. For each `affected = members.filter(m => m.role === role.name)`:
+         - `await (window as any).electronAPI.db.updateMember(m.id, { role: 'member' })`
+         - `await (window as any).electronAPI.auth.updateRole(m.id, 'member')`
+         - On failure: show error toast "Failed to reassign [name]. Aborting." — stop loop, do NOT proceed to deleteRole (DB already partially updated — show message "Some members may have been reassigned. Please check the Users tab.")
+      2. `await (window as any).electronAPI.db.deleteRole({ appId: role.appId })`
+      3. `await (window as any).electronAPI.db.deleteRolePerms({ role: role.name })`
+      4. `removeRole(role.appId)` — local update
+      5. `removeRolePerms(role.name)` — local update
+      6. `setSelectedRoleId(null)` (via callback prop `onDeleteComplete`)
+      7. Show success toast
 
 ---
 
 ### Tab 3: Permissions
 
-**Layout:** Same two-panel as Tab 2 — same left role list (same `selectedRoleId`), different right panel
+**Layout:** `<RoleListPanel />` (280px, no Add Role button) + `<PermissionsPanel>` (flex-1)
 
-**Right panel (`src/components/users/PermissionsPanel.tsx`):**
-- Empty state when no role selected: "Select a role to manage permissions"
-- When role selected (looked up via `RolesContext.roles.find(r => r.appId === selectedRoleId)`):
-  - "Grant All" / "Revoke All" buttons at top right
-  - List of all app routes with toggle switches:
-    - `/` — Task Board
-    - `/dashboard` — Dashboard
-    - `/messages` — Messages
-    - `/tasks` — Tasks
-    - `/teams` — Projects
-    - `/members` — Members
-    - `/attendance` — Attendance
-    - `/reports` — Reports
-    - `/users` — Users
-    - `/settings` — Settings (always locked on, cannot revoke)
-  - Each toggle: checked if route in `RolePermsContext.getAllowedRoutes(role.name)`
-  - Toggle change: calls `RolePermsContext.setRolePerms(role.name, updatedRoutes)` — this persists to DB and updates local state
-  - Admin role: all toggles locked on (disabled), show note "Admin always has full access"
-  - `/settings` toggle: always locked on for all roles (cannot be revoked)
+**PermissionsPanel (`src/components/users/PermissionsPanel.tsx`):**
+
+Props: `{ selectedRoleId: string | null }`
+
+- Derives selected role: `const role = roles.find(r => r.appId === selectedRoleId) ?? null`
+- Empty state: "Select a role to manage permissions"
+- When role loaded:
+  - Uses `useRolePerms()`: `{ getAllowedRoutes, setRolePerms }`
+  - Local `localRoutes: string[]` state, initialised from `getAllowedRoutes(role.name)`, re-synced when `role.appId` changes
+  - "Grant All" button: sets all routes (except those already locked); "Revoke All": keeps only locked routes (`['/settings']`)
+  - Route list (10 routes):
+    ```
+    /           Task Board
+    /dashboard  Dashboard
+    /messages   Messages
+    /tasks      Tasks
+    /teams      Projects
+    /members    Members
+    /attendance Attendance
+    /reports    Reports
+    /users      Users
+    /settings   Settings  ← always locked on
+    ```
+  - Each toggle:
+    - `checked`: `localRoutes.includes(route.id)`
+    - Locked: `route.id === '/settings'` OR `role.name === 'admin'`
+    - On change: update `localRoutes` locally, then `await setRolePerms(role.name, newRoutes)` — `setRolePerms` persists to DB. On failure: revert `localRoutes`, show error toast.
+  - Admin role: all toggles disabled + banner "Admin always has full access to all routes"
 
 ---
 
 ### Data Flow Summary
 
 ```
-UsersPage
+UsersPage (owns: activeTab, selectedRoleId)
   ├── Tab: Users
-  │     MembersContext.members → table rows
-  │     UserRoleDrawer → updateMember + window.electronAPI.auth.updateRole (existing IPC)
+  │     useMembersContext().members → table rows
+  │     useRoles().roles → badge color lookup
+  │     UserRoleDrawer
+  │       → db.updateMember + auth.updateRole
   │
-  ├── Tab: Roles  [selectedRoleId: string|null — stores appId]
-  │     RolesContext.roles → left list
-  │     RoleDetailPanel → db.createRole / db.renameRole / db.updateRoleColor / db.deleteRole
-  │                      → RolesContext local updates
-  │                      → RolePermsContext.addRolePerms / renameRolePerms / removeRolePerms
-  │                      → auth.updateRole per affected member on delete
+  ├── Tab: Roles  [selectedRoleId ← stores appId]
+  │     RoleListPanel (showAddRole)
+  │       → db.createRole → addRole + addRolePerms (local) + db.setRolePerms (DB)
+  │     RoleDetailPanel
+  │       → db.renameRole → renameRoleLocal + renameRolePerms
+  │       → db.updateRoleColor → updateRoleLocal
+  │       → db.updateMember + auth.updateRole (per affected member) → db.deleteRole + db.deleteRolePerms → removeRole + removeRolePerms
   │
   └── Tab: Permissions  [same selectedRoleId]
-        RolesContext.roles → left list
-        PermissionsPanel → RolePermsContext.setRolePerms per toggle
+        RoleListPanel
+        PermissionsPanel
+          → setRolePerms (persists to DB + updates local state)
 ```
 
 ---
 
 ### Error Handling
 
-- All async operations wrapped in try/catch with `useToast` error toasts
-- Color picker: no optimistic update — only update local state after IPC succeeds
-- All other mutations: optimistic local update first, rollback on IPC failure
-- Drawer/panel shows loading spinner on save
+- All async ops in try/catch with `useToast` error toasts
+- Color picker: IPC-first (no optimistic update)
+- Name rename: optimistic local after IPC succeeds
+- Role assignment (drawer): DB-first via `updateMember` — partial failure on `auth.updateRole` is noted in toast
+- Role delete: abort-on-first-failure with informative toast about partial DB state
+- Loading spinner on Save/Delete buttons while in flight
 
 ---
 
@@ -152,16 +244,17 @@ UsersPage
 
 New files:
 ```
-src/pages/UsersPage.tsx                    — page shell, tab bar, shared selectedRoleId state
-src/components/users/UserRoleDrawer.tsx    — slide-out drawer for role assignment
-src/components/users/RoleDetailPanel.tsx   — name/color/delete panel for a role
-src/components/users/PermissionsPanel.tsx  — route toggle panel for a role
+src/pages/UsersPage.tsx                     — page shell, tab bar, selectedRoleId state
+src/components/users/UserRoleDrawer.tsx     — slide-out drawer for role assignment
+src/components/users/RoleListPanel.tsx      — shared left-column role list (Tabs 2 & 3)
+src/components/users/RoleDetailPanel.tsx    — name/color/delete panel for a role
+src/components/users/PermissionsPanel.tsx   — route toggle panel for a role
 ```
 
 Files to modify:
-- `src/App.tsx` — add `/users` route + `UsersPage` import + re-add `RolesProvider` wrapping `MembersProvider`
+- `src/App.tsx` — add `/users` route + `UsersPage` import + `RolesProvider` wrapping `MembersProvider` (inside `RolePermsProvider`)
 - `src/components/layout/Sidebar.tsx` — add `{ id: '/users', label: 'Users', icon: Users2 }` to `ALL_NAV_ITEMS`
 - `src/context/RolePermsContext.tsx` — add `'/users'` to admin's `allowedRoutes` in `DEFAULT_PERMS`
-- `src/vite-env.d.ts` — no changes needed (reusing existing `window.electronAPI.auth.updateRole`)
+- `src/vite-env.d.ts` — add `getRoles`, `createRole`, `renameRole`, `updateRoleColor`, `deleteRole`, `deleteRolePerms` to `ElectronDB` interface (optional but recommended for type safety)
 
-No changes needed to `electron/main.ts`, `electron/main.js`, `electron/preload.ts`, or `electron/preload.js` — all required IPC methods already exist.
+No changes needed to `electron/` files — all IPC handlers already exist.
