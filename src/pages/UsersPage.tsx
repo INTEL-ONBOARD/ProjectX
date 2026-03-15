@@ -3,8 +3,12 @@ import { motion } from 'framer-motion';
 import { ChevronRight, Users2 } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { useMembersContext } from '../context/MembersContext';
+import { useRolePerms } from '../context/RolePermsContext';
+import { useToast } from '../components/ui/Toast';
 import { User } from '../types';
 import { UserRoleDrawer } from '../components/users/UserRoleDrawer';
+import { RoleListPanel } from '../components/users/RoleListPanel';
+import { RoleDetailPanel } from '../components/users/RoleDetailPanel';
 
 const initials = (name: string) => name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
@@ -88,8 +92,59 @@ const UsersTab: React.FC = () => {
     );
 };
 
+interface RolesTabProps {
+    selectedRoleId: string | null;
+    onSelect: (id: string) => void;
+    onDeleteComplete: () => void;
+    onAddRole: () => void;
+    addingRole: boolean;
+}
+
+const RolesTab: React.FC<RolesTabProps> = ({ selectedRoleId, onSelect, onDeleteComplete, onAddRole, addingRole }) => {
+    const { roles } = useRoles();
+    const { members } = useMembersContext();
+    return (
+        <div className="flex h-full">
+            <RoleListPanel
+                roles={roles}
+                members={members}
+                selectedRoleId={selectedRoleId}
+                onSelect={onSelect}
+                showAddRole
+                addRoleDisabled={addingRole}
+                onAddRole={onAddRole}
+            />
+            <RoleDetailPanel selectedRoleId={selectedRoleId} onDeleteComplete={onDeleteComplete} />
+        </div>
+    );
+};
+
 const UsersPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('Users');
+    const { roles, addRole } = useRoles();
+    const { members } = useMembersContext();
+    const { addRolePerms } = useRolePerms();
+    const { showToast } = useToast();
+    const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+    const [addingRole, setAddingRole] = useState(false);
+
+    const handleAddRole = async () => {
+        if (addingRole) return;
+        setAddingRole(true);
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const db = (window as any).electronAPI.db;
+            const newRole = await db.createRole({ name: 'New Role', color: '#6366f1' });
+            addRole(newRole);
+            await db.setRolePerms({ role: newRole.name, allowedRoutes: ['/settings'] });
+            addRolePerms({ role: newRole.name, allowedRoutes: ['/settings'] });
+            setSelectedRoleId(newRole.appId);
+        } catch {
+            showToast('Failed to create role.', 'error');
+        } finally {
+            setAddingRole(false);
+        }
+    };
 
     return (
         <motion.div
@@ -124,7 +179,15 @@ const UsersPage: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto">
                 {activeTab === 'Users' && <UsersTab />}
-                {activeTab === 'Roles' && <div className="text-gray-400 text-sm">Roles tab — coming soon</div>}
+                {activeTab === 'Roles' && (
+                    <RolesTab
+                        selectedRoleId={selectedRoleId}
+                        onSelect={setSelectedRoleId}
+                        onDeleteComplete={() => setSelectedRoleId(null)}
+                        onAddRole={handleAddRole}
+                        addingRole={addingRole}
+                    />
+                )}
                 {activeTab === 'Permissions' && <div className="text-gray-400 text-sm">Permissions tab — coming soon</div>}
             </div>
         </motion.div>
