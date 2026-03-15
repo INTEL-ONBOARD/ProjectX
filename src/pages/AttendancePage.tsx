@@ -1,10 +1,11 @@
 import React, { useContext } from 'react';
 import { motion } from 'framer-motion';
-import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee } from 'lucide-react';
+import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee, Trash2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AppContext, AttendanceRecord } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
+import { useAuth } from '../context/AuthContext';
 import { downloadCsv } from '../utils/exportCsv';
 
 function addDays(dateStr: string, n: number): string {
@@ -212,8 +213,13 @@ const TodaySessionCard: React.FC = () => {
 };
 
 const AttendancePage: React.FC = () => {
-    const { attendanceRecords, selectedWeekStart } = useContext(AppContext);
-    const { members, getMemberColor } = useMembersContext();
+    const { attendanceRecords, selectedWeekStart, currentUser, deleteAttendanceRecord } = useContext(AppContext);
+    const { members: allMembers, getMemberColor } = useMembersContext();
+
+    const isAdmin = currentUser?.role === 'admin';
+    const members = isAdmin
+        ? allMembers
+        : allMembers.filter(m => m.id === currentUser?.id);
 
     const WEEK_DATES = [0, 1, 2, 3, 4].map(i => addDays(selectedWeekStart, i));
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -363,11 +369,26 @@ const AttendancePage: React.FC = () => {
                     <td className="px-4 py-3 text-xs text-gray-500">{member.designation ?? '—'}</td>
                     {dayStatuses.map((status, di) => (
                         <td key={days[di]} className="px-3 py-3 text-center">
-                            <div className={`w-2.5 h-2.5 rounded-full mx-auto ${
-                                isPresent(status) ? 'bg-[#68B266]' :
-                                status === 'absent' ? 'bg-[#D8727D]' :
-                                'bg-gray-300'
-                            }`} />
+                            {isAdmin && status !== undefined ? (
+                                <button
+                                    onClick={() => deleteAttendanceRecord(member.id, WEEK_DATES[di])}
+                                    className="group relative w-5 h-5 rounded-full mx-auto flex items-center justify-center"
+                                    title="Delete record"
+                                >
+                                    <div className={`w-2.5 h-2.5 rounded-full group-hover:hidden ${
+                                        isPresent(status) ? 'bg-[#68B266]' :
+                                        status === 'absent' ? 'bg-[#D8727D]' :
+                                        'bg-gray-300'
+                                    }`} />
+                                    <Trash2 size={12} className="hidden group-hover:block text-gray-400 hover:text-[#D8727D] transition-colors" />
+                                </button>
+                            ) : (
+                                <div className={`w-2.5 h-2.5 rounded-full mx-auto ${
+                                    isPresent(status) ? 'bg-[#68B266]' :
+                                    status === 'absent' ? 'bg-[#D8727D]' :
+                                    'bg-gray-300'
+                                }`} />
+                            )}
                         </td>
                     ))}
                     <td className="px-4 py-3 text-center">

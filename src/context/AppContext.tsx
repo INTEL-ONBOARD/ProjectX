@@ -89,6 +89,7 @@ interface AppContextType {
     setSidebarCollapsed: (collapsed: boolean) => void;
     attendanceRecords: AttendanceRecord[];
     setAttendanceRecord: (record: Omit<AttendanceRecord, 'id'>) => Promise<void>;
+    deleteAttendanceRecord: (userId: string, date: string) => Promise<void>;
     selectedWeekStart: string;
     setSelectedWeekStart: (date: string) => void;
 }
@@ -104,6 +105,7 @@ export const AppContext = createContext<AppContextType>({
     setSidebarCollapsed: () => { },
     attendanceRecords: [],
     setAttendanceRecord: () => Promise.resolve(),
+    deleteAttendanceRecord: () => Promise.resolve(),
     selectedWeekStart: currentWeekMonday(),
     setSelectedWeekStart: () => {},
 });
@@ -193,6 +195,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             .catch((err: unknown) => { console.error('[AppContext] Failed to persist attendance record:', err); });
     }, []);
 
+    const deleteAttendanceRecord = useCallback((userId: string, date: string): Promise<void> => {
+        setAttendanceRecords(prev => prev.filter(r => !(r.userId === userId && r.date === date)));
+        return dbApi().deleteAttendance(userId, date)
+            .then(() => {})
+            .catch((err: unknown) => { console.error('[AppContext] Failed to delete attendance record:', err); });
+    }, []);
+
     const value = useMemo(
         () => ({
             org,
@@ -205,6 +214,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setSidebarCollapsed,
             attendanceRecords,
             setAttendanceRecord,
+            deleteAttendanceRecord,
             selectedWeekStart,
             setSelectedWeekStart,
         }),
