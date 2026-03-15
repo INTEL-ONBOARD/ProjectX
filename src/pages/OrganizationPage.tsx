@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     Building2, Users, User, MapPin, BarChart2, FolderKanban, Settings2, X, Plus,
-    ChevronDown, Shield, Search, RefreshCw,
+    ChevronDown, Shield, Search, RefreshCw, Clock, Save,
 } from 'lucide-react';
 import { Avatar } from '../components/ui/Avatar';
 import { useMembersContext } from '../context/MembersContext';
@@ -15,6 +15,7 @@ import { PROJECT_COLORS } from '../data/mockData';
 import { UserProfileDrawer } from '../components/org/UserProfileDrawer';
 import { RoleCard } from '../components/org/RoleCard';
 import { PermissionsMatrix } from '../components/org/PermissionsMatrix';
+import { AppContext } from '../context/AppContext';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dbApi   = () => (window as any).electronAPI.db;
@@ -117,13 +118,14 @@ const DepartmentDirectory: React.FC<{
 };
 
 // ── Nav ────────────────────────────────────────────────────────────────────────
-type SectionId = 'overview' | 'users' | 'roles' | 'permissions';
+type SectionId = 'overview' | 'users' | 'roles' | 'permissions' | 'settings';
 interface OrgNavItem { id: SectionId; label: string; icon: React.ElementType; adminOnly?: boolean; }
 const NAV_ITEMS: OrgNavItem[] = [
     { id: 'overview',    label: 'Overview',     icon: Building2 },
     { id: 'users',       label: 'Users',        icon: Users,    adminOnly: true },
     { id: 'roles',       label: 'Roles',        icon: User,     adminOnly: true },
     { id: 'permissions', label: 'Permissions',  icon: Shield,   adminOnly: true },
+    { id: 'settings',    label: 'Settings',     icon: Settings2, adminOnly: true },
 ];
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ const OrganizationPage: React.FC = () => {
     const { members, getMemberColor } = useMembersContext();
     const { allTasks } = useProjects();
     const { user: authUser } = useAuth();
+    const { org, setOrg } = useContext(AppContext);
     const { perms, addRolePerms, renameRolePerms, removeRolePerms } = useRolePerms();
     const { roles, addRole, updateRoleLocal, renameRoleLocal, removeRole } = useRoles();
     const { showToast } = useToast();
@@ -245,6 +248,27 @@ const OrganizationPage: React.FC = () => {
             removeRolePerms(name);
             showToast(`Role "${name}" deleted.`, 'success');
         } catch { showToast('Failed to delete role.', 'error'); throw new Error('delete failed'); }
+    };
+
+    // ── Org Settings tab state ───────────────────────────────────────────────────
+    const [orgForm, setOrgForm] = useState({ name: '', address: '', workStart: '09:00', workEnd: '18:00' });
+    const [orgSaving, setOrgSaving] = useState(false);
+
+    useEffect(() => {
+        if (org) setOrgForm({ name: org.name ?? '', address: org.address ?? '', workStart: org.workStart ?? '09:00', workEnd: org.workEnd ?? '18:00' });
+    }, [org?.id]);
+
+    const handleSaveOrg = async () => {
+        setOrgSaving(true);
+        try {
+            const updated = await dbApi().setOrg({ id: org?.id ?? 'org-toursurv', ...orgForm });
+            setOrg(updated);
+            showToast('Organization settings saved.', 'success');
+        } catch {
+            showToast('Failed to save organization settings.', 'error');
+        } finally {
+            setOrgSaving(false);
+        }
     };
 
     const visibleNavItems = NAV_ITEMS.filter(n => !n.adminOnly || isAdmin);
@@ -445,6 +469,66 @@ const OrganizationPage: React.FC = () => {
                                         onDelete={handleDeleteRole}
                                     />
                                 ))}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ── Org Settings ── */}
+                    {section === 'settings' && isAdmin && (
+                        <motion.div key="settings" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+                            <div className="mb-6">
+                                <h2 className="text-xl font-bold text-gray-900">Organization Settings</h2>
+                                <p className="text-sm text-gray-400 mt-0.5">Update your workspace details</p>
+                            </div>
+                            <div className="max-w-lg bg-white border border-surface-200 rounded-2xl p-6 flex flex-col gap-5">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Organization Name</label>
+                                    <input
+                                        value={orgForm.name}
+                                        onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))}
+                                        placeholder="e.g. Acme Corp"
+                                        className="w-full px-4 py-2.5 text-sm border border-surface-200 rounded-xl focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Address</label>
+                                    <input
+                                        value={orgForm.address}
+                                        onChange={e => setOrgForm(f => ({ ...f, address: e.target.value }))}
+                                        placeholder="e.g. 123 Main St, City"
+                                        className="w-full px-4 py-2.5 text-sm border border-surface-200 rounded-xl focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5"><Clock size={12} /> Work Start</label>
+                                        <input
+                                            type="time"
+                                            value={orgForm.workStart}
+                                            onChange={e => setOrgForm(f => ({ ...f, workStart: e.target.value }))}
+                                            className="w-full px-4 py-2.5 text-sm border border-surface-200 rounded-xl focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5"><Clock size={12} /> Work End</label>
+                                        <input
+                                            type="time"
+                                            value={orgForm.workEnd}
+                                            onChange={e => setOrgForm(f => ({ ...f, workEnd: e.target.value }))}
+                                            className="w-full px-4 py-2.5 text-sm border border-surface-200 rounded-xl focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
+                                        />
+                                    </div>
+                                </div>
+                                <motion.button
+                                    onClick={handleSaveOrg}
+                                    disabled={orgSaving}
+                                    whileHover={!orgSaving ? { scale: 1.015 } : {}}
+                                    whileTap={!orgSaving ? { scale: 0.985 } : {}}
+                                    className="self-start flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-primary-600 disabled:opacity-50 transition-colors"
+                                >
+                                    <Save size={14} />
+                                    {orgSaving ? 'Saving…' : 'Save Changes'}
+                                </motion.button>
                             </div>
                         </motion.div>
                     )}
