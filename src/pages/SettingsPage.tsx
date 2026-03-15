@@ -450,812 +450,604 @@ const SettingsPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="max-w-3xl mx-auto">
           <AnimatePresence mode="wait">
-            {/* Section content — Tasks 2–4 will fill this in */}
-            {null}
-          </AnimatePresence>
-        </div>
-      </div>
-        <div className="pt-8 pb-5 shrink-0">
-          <PageHeader
-            eyebrow="Home / Settings"
-            title="Settings"
-            description="Manage your account and preferences"
-            actions={
-              <motion.button
-                onClick={handleSave}
-                className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-all ${saved ? 'bg-[#68B266] text-white' : 'bg-primary-500 text-white hover:bg-primary-600'}`}
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            {/* ══ Profile ══ */}
+            {activeSection === 'profile' && (
+              <motion.div key="profile"
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4"
               >
-                {saved ? <><Check size={16} /> Saved!</> : <><Save size={16} /> Save Changes</>}
-              </motion.button>
-            }
-          />
-        </div>
+                {/* Card 1 — Identity */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+                  <SettingCard
+                    title="Profile"
+                    description="Your personal information and public profile"
+                    action={<SavedBadge id="profile" />}
+                  >
+                    <div className="grid grid-cols-[auto_1fr] gap-6">
+                      {/* Left: avatar */}
+                      <div className="flex flex-col items-center gap-2">
+                        <Avatar name={nameValue} color="#5030E5" size="xl" />
+                        <span className="text-xs font-semibold text-gray-900 text-center max-w-[80px] truncate">{nameValue}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#5030E523] text-[#5030E5] font-semibold">
+                          {authUser?.role ?? 'Member'}
+                        </span>
+                      </div>
 
-        <div className="flex gap-6 flex-1 min-h-0 pb-6 overflow-hidden bg-white">
-          {/* ── Left nav ── */}
-          <motion.div
-            className="w-52 shrink-0 overflow-y-auto"
-            initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-          >
-            <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
-              {/* User mini-card */}
-              <div className="p-4 border-b border-surface-100">
-                <div className="flex items-center gap-3">
-                  <div className="relative shrink-0">
-                    <Avatar name={nameValue} color={userColor} size="md" />
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#68B266] border-2 border-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold text-gray-900 truncate">{nameValue.split(' ')[0]}</div>
-                    <div className="text-[10px] text-gray-400">Admin</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Nav groups */}
-              <div className="p-2">
-                {navGroups.map((group, gi) => (
-                  <div key={group.label}>
-                    {gi > 0 && <hr className="border-surface-100 mx-1 my-1" />}
-                    <div className="px-2 pt-3 pb-1">
-                      <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">{group.label}</span>
+                      {/* Right: fields */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <InputField
+                          label="Display Name"
+                          value={nameValue}
+                          onChange={setNameValue}
+                          onBlur={() => { handleSave(); flashSaved('profile'); }}
+                          placeholder="Your name"
+                        />
+                        <InputField
+                          label="Email"
+                          value={emailValue}
+                          onChange={setEmailValue}
+                          onBlur={() => { handleSave(); flashSaved('profile'); }}
+                          placeholder="you@example.com"
+                        />
+                        <InputField
+                          label="Location"
+                          value={locationValue}
+                          onChange={setLocationValue}
+                          onBlur={() => { handleSave(); flashSaved('profile'); }}
+                          placeholder="City, Country"
+                        />
+                        <InputField
+                          label="Designation"
+                          value={roleValue}
+                          onChange={setRoleValue}
+                          onBlur={() => { handleSave(); flashSaved('profile'); }}
+                          placeholder="e.g. Senior Engineer"
+                        />
+                      </div>
                     </div>
-                    {group.items.map(item => {
-                      const Icon = item.icon;
-                      const isActive = activeSection === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => setActiveSection(item.id)}
-                          className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all overflow-hidden ${
-                            isActive ? 'bg-primary-50/70 text-primary-600 font-semibold' : 'text-gray-500 hover:bg-surface-100 hover:text-gray-700'
-                          }`}
-                        >
-                          {isActive && (
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4/5 bg-primary-500 rounded-r-full" />
-                          )}
-                          <Icon size={16} strokeWidth={isActive ? 2.2 : 1.8} />
-                          {item.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
 
-              {/* Sign out */}
-              <div className="p-2 border-t border-surface-100">
-                <button
-                  onClick={() => logout()}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#D8727D] hover:bg-[#D8727D08] transition-all"
-                >
-                  <LogOut size={16} strokeWidth={1.8} />
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* ── Main content ── */}
-          <div className="flex-1 min-w-0 overflow-y-auto bg-white">
-            <AnimatePresence mode="wait">
-
-              {/* ══ Profile ══ */}
-              {activeSection === 'profile' && (
-                <motion.div key="profile" className="flex flex-col gap-4 bg-white pb-4"
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}>
-
-                  {/* Profile card */}
-                  <div className="rounded-2xl border border-surface-200 overflow-hidden">
-                    {/* Slim accent bar */}
-                    <div className="h-1.5 w-full bg-gradient-to-r from-primary-500 via-primary-400 to-[#30C5E5]" />
-
-                    <div className="p-6 flex items-center gap-5">
-                      {/* Avatar */}
-                      <div className="relative shrink-0">
-                        <div className="rounded-full p-[2.5px]" style={{ background: 'linear-gradient(135deg, #5030E5, #30C5E5)' }}>
-                          <div className="rounded-full p-[2px] bg-white">
-                            <Avatar name={nameValue} color={userColor} size="xl" />
-                          </div>
-                        </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#68B266] border-2 border-white" />
-                      </div>
-
-                      {/* Name + role */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <h2 className="text-lg font-bold text-gray-900 tracking-tight">{nameValue}</h2>
-                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full text-primary-600 bg-primary-50 border border-primary-100 tracking-wider uppercase">
-                            {authUser?.role ?? 'Member'}
-                          </span>
-                        </div>
-                        <div className="text-sm text-gray-400 mt-0.5">{emailValue}</div>
-                      </div>
-
-                      {/* Stats */}
-                      <div className="flex items-center gap-5 shrink-0">
-                        {stats.map((s) => {
-                          const Icon = s.icon;
-                          return (
-                            <div key={s.label} className="flex flex-col items-center gap-0.5">
-                              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: s.bg }}>
-                                <Icon size={14} style={{ color: s.color }} strokeWidth={2} />
-                              </div>
-                              <span className="text-base font-bold text-gray-900 leading-none">{s.value}</span>
-                              <span className="text-[10px] text-gray-400 whitespace-nowrap">{s.label}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Share */}
+                    {/* Share Profile button */}
+                    <div className="pt-4 mt-4 border-t border-surface-100">
                       <button
                         onClick={handleShareProfile}
-                        className="flex items-center gap-1.5 text-xs font-medium text-gray-400 hover:text-primary-600 px-3 py-1.5 rounded-xl border border-surface-200 hover:border-primary-200 hover:bg-primary-50 transition-all shrink-0"
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-surface-200 text-gray-500 hover:bg-surface-50 transition-colors"
                       >
-                        <Link size={11} /> Share
+                        <Link size={12} /> Share Profile
                       </button>
                     </div>
-                  </div>
 
-                  {/* Personal info */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader
-                      title="Personal Information"
-                      subtitle="Hover over a field and click the pencil to edit"
-                    />
-                    <FieldRow icon={User} label="Full Name" value={nameValue} editable onSave={setNameValue} />
-                    <FieldRow icon={Mail} label="Email" value={emailValue} editable onSave={setEmailValue} />
-                    <FieldRow icon={Briefcase} label="Role" value={authUser?.role ? authUser.role.charAt(0).toUpperCase() + authUser.role.slice(1) : ''} />
-                    <FieldRow icon={Globe} label="Member since" value="—" />
-                  </div>
-
-                </motion.div>
-              )}
-
-              {/* ══ Notifications ══ */}
-              {activeSection === 'notifications' && (
-                <motion.div key="notifications" className="flex flex-col gap-4 bg-white pb-4"
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}>
-
-                  {/* Delivery channels */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Delivery Channels" subtitle="How you want to receive alerts" />
-                    <div className="px-5 py-1">
-                      {[
-                        { key: 'emailNotifs' as const, icon: Mail,       label: 'Email',        sub: emailValue },
-                        { key: 'pushNotifs'  as const, icon: Bell,       label: 'Push',         sub: 'Browser & desktop' },
-                        { key: 'smsNotifs'   as const, icon: Smartphone, label: 'SMS',          sub: 'Critical alerts only' },
-                      ].map(row => {
-                        const Icon = row.icon;
-                        return (
-                          <div key={row.key} className="flex items-center justify-between py-3.5 border-b border-surface-50 last:border-0">
-                            <div className="flex items-center gap-3">
-                              <Icon size={15} className={notifications[row.key] ? 'text-primary-400' : 'text-gray-300'} />
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{row.label}</div>
-                                <div className="text-[11px] text-gray-400">{row.sub}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <Toggle on={notifications[row.key]} onChange={() => toggleNotif(row.key)} />
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {/* Quiet Hours */}
-                      <div className="flex items-center justify-between py-3.5">
-                        <div className="flex items-center gap-3">
-                          <Moon size={15} className={notifications.quietHours ? 'text-primary-400' : 'text-gray-300'} />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">Quiet Hours</div>
-                            <div className="text-[11px] text-gray-400">
-                              {notifications.quietHours ? '10:00 PM – 8:00 AM' : 'All day'}
-                            </div>
-                          </div>
-                        </div>
-                        <Toggle on={notifications.quietHours} onChange={() => toggleNotif('quietHours')} />
-                      </div>
+                    {/* Sign Out footer row */}
+                    <div className="flex items-center justify-between pt-3 mt-1">
+                      <span className="text-xs text-gray-400">Signed in as {authUser?.email}</span>
+                      <button
+                        onClick={() => logout()}
+                        className="flex items-center gap-1.5 text-xs font-medium text-[#D8727D] hover:text-[#c05a65] transition-colors"
+                      >
+                        <LogOut size={13} /> Sign Out
+                      </button>
                     </div>
-                  </div>
+                  </SettingCard>
+                </motion.div>
 
-                  {/* Activity Events */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Activity Events" subtitle="Choose which events trigger notifications" />
-                    <div className="px-5 py-2">
-                      {[
-                        { key: 'taskUpdates'    as const, label: 'Task updates',    sub: 'When tasks are created, updated or completed' },
-                        { key: 'teamMentions'   as const, label: 'Team mentions',   sub: 'When someone @mentions you' },
-                        { key: 'projectUpdates' as const, label: 'Project updates', sub: 'New milestones and project changes' },
-                        { key: 'securityAlerts' as const, label: 'Security alerts', sub: 'New logins and suspicious activity' },
-                        { key: 'weeklyDigest'   as const, label: 'Weekly digest',   sub: 'Summary email every Monday morning' },
-                      ].map(row => (
-                        <div key={row.key} className="flex items-center justify-between py-3.5 border-b border-surface-50 last:border-0">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full transition-colors ${notifications[row.key] ? 'bg-[#68B266]' : 'bg-surface-300'}`} />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{row.label}</div>
-                              <div className="text-xs text-gray-400 mt-0.5">{row.sub}</div>
-                            </div>
-                          </div>
-                          <Toggle on={notifications[row.key]} onChange={() => toggleNotif(row.key)} />
+                {/* Card 2 — Stats */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                  <SettingCard title="Activity" description="Your contribution statistics">
+                    <div className="grid grid-cols-3 gap-3">
+                      {stats.map(s => (
+                        <div key={s.label} className="flex-1 bg-surface-50 rounded-xl p-4 text-center border border-surface-200">
+                          <div className="text-2xl font-bold text-gray-900">{s.value}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </SettingCard>
                 </motion.div>
-              )}
+              </motion.div>
+            )}
 
-              {/* ══ Appearance ══ */}
-              {activeSection === 'appearance' && (
-                <motion.div key="appearance" className="flex flex-col gap-4 bg-white pb-4"
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}>
+            {/* ══ Notifications ══ */}
+            {activeSection === 'notifications' && (
+              <motion.div key="notifications"
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4"
+              >
+                {/* Card 1 — Delivery Channels */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+                  <SettingCard
+                    title="Delivery Channels"
+                    description="Choose how you want to receive notifications"
+                    action={<SavedBadge id="notif" />}
+                  >
+                    {([
+                      { icon: Mail,          label: 'Email Notifications', description: authUser?.email ?? 'Your email address', key: 'emailNotifs' },
+                      { icon: Smartphone,    label: 'Push Notifications',  description: 'Desktop & mobile alerts',               key: 'pushNotifs'  },
+                      { icon: MessageSquare, label: 'SMS Notifications',   description: 'Text message alerts',                    key: 'smsNotifs'   },
+                      { icon: Clock,         label: 'Quiet Hours',         description: 'Mute notifications 10 PM \u2013 8 AM',        key: 'quietHours'  },
+                    ] as { icon: React.ElementType; label: string; description: string; key: keyof NotifPrefs }[]).map(row => (
+                      <div key={row.key} className="flex items-center justify-between py-3 border-b border-surface-100 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-surface-50 border border-surface-200 flex items-center justify-center">
+                            <row.icon size={14} className="text-gray-500" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{row.label}</div>
+                            <div className="text-xs text-gray-400">{row.description}</div>
+                          </div>
+                        </div>
+                        <Toggle on={notifications[row.key]} onChange={() => { toggleNotif(row.key); flashSaved('notif'); }} />
+                      </div>
+                    ))}
+                  </SettingCard>
+                </motion.div>
 
-                  {/* Theme selector */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Theme" subtitle="Select the interface appearance" />
-                    <div className="px-6 py-5 grid grid-cols-3 gap-4">
-                      {[
-                        { id: 'light', label: 'Light', icon: Sun, preview: (
-                          <div className="w-full h-20 rounded-xl bg-white border border-surface-200 flex flex-col p-2.5 gap-1.5">
-                            <div className="h-1.5 bg-surface-300 rounded w-3/4" />
-                            <div className="h-1.5 bg-surface-200 rounded w-1/2" />
-                            <div className="mt-auto flex gap-1.5">
-                              <div className="h-2.5 w-6 bg-primary-200 rounded" />
-                              <div className="h-2.5 flex-1 bg-surface-200 rounded" />
-                            </div>
+                {/* Card 2 — Activity Events */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                  <SettingCard
+                    title="Activity Events"
+                    description="Select which events trigger a notification"
+                    action={<SavedBadge id="notif" />}
+                  >
+                    {([
+                      { icon: CheckCircle2, label: 'Task Updates',    description: 'When tasks are assigned or updated', key: 'taskUpdates'    },
+                      { icon: AtSign,       label: 'Team Mentions',   description: 'When someone @mentions you',         key: 'teamMentions'   },
+                      { icon: Layers,       label: 'Project Updates', description: 'New projects and milestones',        key: 'projectUpdates' },
+                      { icon: Shield,       label: 'Security Alerts', description: 'Login attempts and changes',         key: 'securityAlerts' },
+                      { icon: BarChart2,    label: 'Weekly Digest',   description: 'Summary email every Monday',         key: 'weeklyDigest'   },
+                    ] as { icon: React.ElementType; label: string; description: string; key: keyof NotifPrefs }[]).map(row => (
+                      <div key={row.key} className="flex items-center justify-between py-3 border-b border-surface-100 last:border-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-surface-50 border border-surface-200 flex items-center justify-center">
+                            <row.icon size={14} className="text-gray-500" />
                           </div>
-                        )},
-                        { id: 'dark', label: 'Dark', icon: Moon, preview: (
-                          <div className="w-full h-20 rounded-xl bg-gray-900 flex flex-col p-2.5 gap-1.5">
-                            <div className="h-1.5 bg-gray-600 rounded w-3/4" />
-                            <div className="h-1.5 bg-gray-700 rounded w-1/2" />
-                            <div className="mt-auto flex gap-1.5">
-                              <div className="h-2.5 w-6 bg-primary-400 rounded" />
-                              <div className="h-2.5 flex-1 bg-gray-700 rounded" />
-                            </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{row.label}</div>
+                            <div className="text-xs text-gray-400">{row.description}</div>
                           </div>
-                        )},
-                        { id: 'system', label: 'System', icon: Monitor, preview: (
-                          <div className="w-full h-20 rounded-xl overflow-hidden flex">
-                            <div className="w-1/2 bg-white flex flex-col p-2.5 gap-1.5">
-                              <div className="h-1.5 bg-surface-300 rounded" />
-                              <div className="h-1.5 bg-surface-200 rounded w-2/3" />
-                            </div>
-                            <div className="w-1/2 bg-gray-900 flex flex-col p-2.5 gap-1.5">
-                              <div className="h-1.5 bg-gray-600 rounded" />
-                              <div className="h-1.5 bg-gray-700 rounded w-2/3" />
-                            </div>
-                          </div>
-                        )},
-                      ].map(opt => {
-                        const Icon = opt.icon;
-                        const active = themeMode === opt.id;
-                        return (
-                          <button
-                            key={opt.id}
-                            onClick={() => { const m = opt.id as typeof themeMode; setThemeMode(m); if (m !== 'system') setAppTheme(m); saveAppearance({ themeMode: m }); }}
-                            className={`rounded-xl p-3 flex flex-col gap-2.5 border-2 transition-all ${
-                              active
-                                ? 'border-primary-400 bg-primary-50 shadow-[0_0_0_3px_rgba(80,48,229,0.12)]'
-                                : 'border-surface-200 hover:border-surface-300 bg-surface-50'
+                        </div>
+                        <Toggle on={notifications[row.key]} onChange={() => { toggleNotif(row.key); flashSaved('notif'); }} />
+                      </div>
+                    ))}
+                  </SettingCard>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* ══ Appearance ══ */}
+            {activeSection === 'appearance' && (
+              <motion.div key="appearance"
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4"
+              >
+                {/* Card 1 — Theme */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+                  <SettingCard
+                    title="Theme"
+                    description="Choose your preferred color scheme"
+                    action={<SavedBadge id="appear" />}
+                  >
+                    <div className="flex gap-3">
+                      {([
+                        { id: 'light',  label: 'Light',  Icon: Sun     },
+                        { id: 'dark',   label: 'Dark',   Icon: Moon    },
+                        { id: 'system', label: 'System', Icon: Monitor },
+                      ] as { id: 'light'|'dark'|'system'; label: string; Icon: React.ElementType }[]).map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => {
+                            setThemeMode(t.id);
+                            setAppTheme(t.id === 'dark' ? 'dark' : 'light');
+                            saveAppearance({ themeMode: t.id });
+                            flashSaved('appear');
+                          }}
+                          className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all
+                            ${themeMode === t.id
+                              ? 'border-[#5030E5] bg-[#5030E510]'
+                              : 'border-surface-200 hover:border-surface-300'
                             }`}
-                          >
-                            {opt.preview}
-                            <div className="flex items-center justify-center gap-1.5">
-                              <Icon size={12} className={active ? 'text-primary-600' : 'text-gray-400'} />
-                              <span className={`text-xs font-semibold ${active ? 'text-primary-600' : 'text-gray-500'}`}>{opt.label}</span>
-                              {active && (
-                                <span className="w-5 h-5 rounded-full bg-primary-500 flex items-center justify-center">
-                                  <Check size={10} className="text-white" />
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
+                        >
+                          <t.Icon size={20} className={themeMode === t.id ? 'text-[#5030E5]' : 'text-gray-400'} />
+                          <span className={`text-xs font-medium ${themeMode === t.id ? 'text-[#5030E5]' : 'text-gray-500'}`}>
+                            {t.label}
+                          </span>
+                          {themeMode === t.id && <Check size={12} className="text-[#5030E5]" />}
+                        </button>
+                      ))}
                     </div>
-                  </div>
+                  </SettingCard>
+                </motion.div>
 
-                  {/* Accent Color */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Accent Color" subtitle="Applies to buttons, links and highlights" />
-                    <div className="px-6 py-5 flex items-center gap-4">
+                {/* Card 2 — Accent Color */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                  <SettingCard title="Accent Color" description="Personalize your interface color" action={<SavedBadge id="appear" />}>
+                    <div className="flex items-center gap-3">
                       {ACCENT_COLORS.map(c => (
                         <button
                           key={c.hex}
-                          onClick={() => { setAccentColor(c.hex); saveAppearance({ accentColor: c.hex }); }}
                           title={c.label}
-                          className="relative w-9 h-9 rounded-full transition-transform hover:scale-110 focus:outline-none"
-                          style={{ backgroundColor: c.hex }}
-                        >
-                          {accentColor === c.hex && (
-                            <>
-                              <span className="absolute inset-0 flex items-center justify-center">
-                                <Check size={14} className="text-white" strokeWidth={3} />
-                              </span>
-                              <span
-                                className="absolute -inset-1.5 rounded-full border-2"
-                                style={{ borderColor: c.hex + '66' }}
-                              />
-                            </>
-                          )}
-                        </button>
+                          onClick={() => {
+                            setAccentColor(c.hex);
+                            saveAppearance({ accentColor: c.hex });
+                            flashSaved('appear');
+                          }}
+                          className={`w-7 h-7 rounded-full transition-all ${accentColor === c.hex ? 'ring-2 ring-offset-2' : 'opacity-70 hover:opacity-100'}`}
+                          style={{ background: c.hex, ...(accentColor === c.hex ? { ringColor: c.hex } : {}) }}
+                        />
                       ))}
-                      <div className="ml-2 text-xs text-gray-400">
-                        {ACCENT_COLORS.find(c => c.hex === accentColor)?.label ?? 'Custom'}
-                      </div>
                     </div>
-                  </div>
+                  </SettingCard>
+                </motion.div>
 
-                  {/* Display Preferences */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Display Preferences" subtitle="Customize how content is shown" />
-
-                    {/* Font Size */}
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
+                {/* Card 3 — Display */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+                  <SettingCard title="Display" description="Text size and layout density" action={<SavedBadge id="appear" />}>
+                    {/* Font size */}
+                    <div className="flex items-center justify-between py-3 border-b border-surface-100">
                       <div>
-                        <div className="text-sm font-semibold text-gray-900">Font Size</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Interface text size</div>
+                        <div className="text-sm font-medium text-gray-900">Font Size</div>
+                        <div className="text-xs text-gray-400">Adjust interface text size</div>
                       </div>
-                      <div className="flex gap-1 bg-surface-100 rounded-xl p-1">
-                        {(['sm', 'md', 'lg'] as const).map(size => (
+                      <div className="flex items-center gap-1 bg-surface-50 rounded-xl p-1 border border-surface-200">
+                        {(['sm', 'md', 'lg'] as const).map((s, i) => (
                           <button
-                            key={size}
-                            onClick={() => { setFontSize(size); saveAppearance({ fontSize: size }); }}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                              fontSize === size
-                                ? 'bg-white text-primary-600 shadow-sm'
-                                : 'text-gray-400 hover:text-gray-600'
-                            }`}
+                            key={s}
+                            onClick={() => { setFontSize(s); saveAppearance({ fontSize: s }); flashSaved('appear'); }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${fontSize === s ? 'bg-[#5030E5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
                           >
-                            {size === 'sm' ? 'Small' : size === 'md' ? 'Medium' : 'Large'}
+                            {['S', 'M', 'L'][i]}
                           </button>
                         ))}
                       </div>
                     </div>
-
-                    {/* Compact Mode */}
-                    <div className="flex items-center justify-between px-6 py-4">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">Compact Mode</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Reduce spacing in lists and cards</div>
+                    {/* Compact mode */}
+                    <div className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-surface-50 border border-surface-200 flex items-center justify-center">
+                          <Layers size={14} className="text-gray-500" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Compact Mode</div>
+                          <div className="text-xs text-gray-400">Reduce spacing for denser layout</div>
+                        </div>
                       </div>
-                      <Toggle on={compactMode} onChange={() => { setCompactMode(c => { saveAppearance({ compactMode: !c }); return !c; }); }} />
+                      <Toggle on={compactMode} onChange={() => { setCompactMode(p => { const next = !p; saveAppearance({ compactMode: next }); flashSaved('appear'); return next; })} } />
                     </div>
-                  </div>
-
-                  {/* Localization */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Localization" subtitle="Regional preferences" />
-                    {[
-                      { label: 'Language', value: 'English (US)', icon: Globe },
-                      { label: 'Timezone', value: timezoneValue, icon: Clock },
-                      { label: 'Date format', value: 'DD/MM/YYYY', icon: Clock },
-                    ].map(row => {
-                      const Icon = row.icon;
-                      return (
-                        <button
-                          key={row.label}
-                          onClick={() => showToast(`${row.label} changes are saved locally.`, 'info')}
-                          className="w-full flex items-center justify-between px-6 py-4 border-b border-surface-100 last:border-0 hover:bg-surface-50 transition-colors group text-left"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-surface-100 flex items-center justify-center">
-                              <Icon size={14} className="text-gray-400" />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700">{row.label}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500">{row.value}</span>
-                            <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  </SettingCard>
                 </motion.div>
-              )}
+              </motion.div>
+            )}
 
-              {/* ══ Security ══ */}
-              {activeSection === 'security' && (
-                <motion.div key="security" className="grid grid-cols-[1fr_auto] gap-4 items-start bg-white pb-4"
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}>
-
-                  {/* Left — Password */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Change Password" subtitle="Update your login password" />
-                    <div className="px-5 py-4 flex flex-col gap-3">
-                      {(
-                        [
-                          { key: 'current', label: 'Current password', icon: Lock },
-                          { key: 'next',    label: 'New password',     icon: Key },
-                          { key: 'confirm', label: 'Confirm new password', icon: Check },
-                        ] as { key: 'current' | 'next' | 'confirm'; label: string; icon: React.ElementType }[]
-                      ).map(({ key, label, icon: FieldIcon }) => (
-                        <div key={key}>
-                          <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 mb-1.5">
-                            <span className="w-5 h-5 rounded-md bg-surface-100 flex items-center justify-center">
-                              <FieldIcon size={10} className="text-gray-400" />
-                            </span>
-                            {label}
-                          </label>
-                          <div className="relative">
-                            <input
-                              type={showPassword[key] ? 'text' : 'password'}
-                              value={passwords[key]}
-                              onChange={e => setPasswords(p => ({ ...p, [key]: e.target.value }))}
-                              placeholder="••••••••"
-                              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all bg-surface-50 focus:bg-white pr-10"
-                            />
-                            <button
-                              onClick={() => setShowPassword(p => ({ ...p, [key]: !p[key] }))}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                            >
-                              {showPassword[key] ? <EyeOff size={15} /> : <Eye size={15} />}
+            {/* ══ Security ══ */}
+            {activeSection === 'security' && (
+              <motion.div key="security"
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4"
+              >
+                {/* Card 1 — Change Password */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+                  <SettingCard title="Change Password" description="Update your account password">
+                    <div className="flex flex-col gap-4">
+                      <InputField
+                        label="Current Password"
+                        type={showPassword['current'] ? 'text' : 'password'}
+                        value={passwords.current}
+                        onChange={v => setPasswords(p => ({ ...p, current: v }))}
+                        suffix={
+                          <button onClick={() => setShowPassword(p => ({ ...p, current: !p['current'] }))} className="text-gray-400 hover:text-gray-600">
+                            {showPassword['current'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        }
+                      />
+                      <div>
+                        <InputField
+                          label="New Password"
+                          type={showPassword['next'] ? 'text' : 'password'}
+                          value={passwords.next}
+                          onChange={v => setPasswords(p => ({ ...p, next: v }))}
+                          suffix={
+                            <button onClick={() => setShowPassword(p => ({ ...p, next: !p['next'] }))} className="text-gray-400 hover:text-gray-600">
+                              {showPassword['next'] ? <EyeOff size={14} /> : <Eye size={14} />}
                             </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {passwords.next && (
-                        <div>
-                          <div className="flex items-center justify-between text-[11px] mb-2">
-                            <span className="font-semibold text-gray-400">Password strength</span>
-                            <span className="font-semibold" style={{ color: strength.color }}>{strength.label}</span>
-                          </div>
-                          <div className="flex gap-1 mb-1.5">
-                            {[1, 2, 3, 4].map(i => (
-                              <div key={i} className="h-1.5 flex-1 rounded-full transition-all"
-                                style={{ backgroundColor: i <= strength.score ? strength.color : '#E0E0E0' }} />
-                            ))}
-                          </div>
-                          <p className="text-[10px] text-gray-400">
-                            {strength.score < 3 ? 'Add symbols and numbers to strengthen your password' : 'Your password looks strong!'}
-                          </p>
-                        </div>
-                      )}
-
-                      <motion.button
-                        onClick={handleUpdatePassword}
-                        className="bg-primary-500 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors"
-                        whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                      >
-                        Update Password
-                      </motion.button>
-                    </div>
-                  </div>
-
-                  {/* Right — 2FA + Sessions + Login History */}
-                  <div className="flex flex-col gap-4 w-64">
-                    {/* 2FA */}
-                    <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                      <SectionHeader title="Two-Factor Auth" subtitle="Account protection" />
-                      <div className="px-4 py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-[#83C29D20] flex items-center justify-center shrink-0">
-                            <Key size={14} className="text-[#68B266]" />
-                          </div>
-                          <div>
-                            <div className="text-xs font-semibold text-gray-900">Authenticator app</div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                              <span className="text-[10px] text-gray-400 font-medium">Not set up</span>
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => showToast('Two-factor authentication is not available in this version.', 'info')}
-                          className="text-[10px] font-semibold text-primary-500 hover:text-primary-700 bg-primary-50 px-2.5 py-1.5 rounded-lg shrink-0"
-                        >
-                          Manage
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Active Sessions */}
-                    <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-100">
-                        <div>
-                          <div className="text-xs font-bold text-gray-900">Active Sessions</div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">Logged-in devices</div>
-                        </div>
-                      </div>
-                      <div className="px-4 py-4 text-center text-xs text-gray-400">Session tracking is not available in this version.</div>
-                    </div>
-
-                    {/* Login History */}
-                    <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                      <SectionHeader title="Login History" subtitle="Recent account access" />
-                      <div className="px-4 py-4 text-center text-xs text-gray-400">Login history is not available in this version.</div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* ══ Billing ══ */}
-              {activeSection === 'billing' && (
-                <motion.div key="billing" className="flex flex-col gap-4 bg-white pb-4"
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}>
-
-                  <div className="bg-white rounded-2xl overflow-hidden border border-surface-200">
-                    <SectionHeader title="Current Plan" subtitle="Manage your subscription" />
-
-                    {/* Active plan banner */}
-                    <div className="mx-5 my-4 p-4 rounded-xl bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] text-primary-400 font-bold uppercase tracking-wider mb-0.5">Active Plan</div>
-                        <div className="font-bold text-gray-900 text-base">Free Plan</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Up to 3 projects · 5 GB storage · 3 members</div>
-                      </div>
-                      <motion.button
-                        onClick={() => showToast('Pro plan coming soon. Contact sales@projectm.io.', 'info')}
-                        className="bg-gradient-to-r from-primary-500 to-primary-400 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity shrink-0"
-                        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                      >
-                        Upgrade to Pro →
-                      </motion.button>
-                    </div>
-
-                    {/* Plans grid */}
-                    <div className="px-5 pb-4 grid grid-cols-3 gap-3">
-                      {[
-                        { name: 'Free',       price: '$0',     period: '/month', features: ['3 projects', '5 GB storage', '3 members', 'Basic analytics'],      current: true,  accent: null },
-                        { name: 'Pro',        price: '$12',    period: '/month', features: ['Unlimited projects', '50 GB storage', '25 members', 'Advanced analytics'], current: false, accent: 'primary' },
-                        { name: 'Enterprise', price: 'Custom', period: '',       features: ['Unlimited everything', '500 GB storage', 'SSO + audit log', 'Dedicated support'], current: false, accent: 'amber' },
-                      ].map(plan => (
-                        <div
-                          key={plan.name}
-                          className={`rounded-xl overflow-hidden border-2 ${
-                            plan.current
-                              ? 'border-primary-300 bg-primary-50 shadow-[0_0_0_2px_rgba(80,48,229,0.15),0_4px_20px_rgba(80,48,229,0.08)]'
-                              : 'border-surface-200 hover:border-surface-300 transition-colors'
-                          }`}
-                        >
-                          {plan.accent === 'primary' && <div className="h-1 bg-gradient-to-r from-primary-500 to-primary-300" />}
-                          {plan.accent === 'amber'   && <div className="h-1 bg-gradient-to-r from-[#F59E0B] to-[#FCD34D]" />}
-                          <div className="p-5">
-                            <div className="flex items-start justify-between mb-3">
-                              <div>
-                                <div className="font-bold text-gray-900 text-sm">{plan.name}</div>
-                                <div className="flex items-baseline gap-0.5 mt-1">
-                                  <span className={`text-xl font-extrabold ${plan.current ? 'text-primary-600' : 'text-gray-800'}`}>{plan.price}</span>
-                                  {plan.period && <span className="text-xs text-gray-400">{plan.period}</span>}
-                                </div>
-                              </div>
-                              {plan.current && <span className="text-[9px] bg-primary-500 text-white px-1.5 py-0.5 rounded-full font-bold">Current</span>}
-                            </div>
-                            <div className="flex flex-col gap-2 mb-4">
-                              {plan.features.map(f => (
-                                <div key={f} className="flex items-center gap-1.5 text-xs text-gray-500">
-                                  <Check size={10} className={plan.current ? 'text-primary-500' : 'text-gray-400'} />
-                                  {f}
-                                </div>
-                              ))}
-                            </div>
-                            {plan.current
-                              ? <div className="text-center text-xs font-semibold text-primary-400 bg-primary-50 border border-primary-200 py-2 rounded-lg">Current Plan</div>
-                              : plan.name === 'Pro'
-                              ? (
-                                <motion.button
-                                  onClick={() => showToast('Pro plan coming soon. Contact sales@projectm.io.', 'info')}
-                                  className="w-full bg-gradient-to-r from-primary-500 to-primary-400 text-white text-xs font-bold py-2 rounded-lg hover:opacity-90 transition-opacity"
-                                  whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                                >
-                                  Upgrade →
-                                </motion.button>
-                              )
-                              : (
-                                <button
-                                  onClick={() => showToast('Contact sales@projectm.io for pricing', 'info')}
-                                  className="w-full bg-surface-100 text-gray-600 text-xs font-bold py-2 rounded-lg hover:bg-surface-200 transition-colors"
-                                >
-                                  Contact Sales
-                                </button>
-                              )
-                            }
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Usage meters */}
-                    <div className="px-5 pb-5 border-t border-surface-100 pt-5">
-                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-4">Usage This Month</div>
-                      <div className="flex flex-col gap-4">
-                        {[
-                          { label: 'Storage',   used: 2.3,  max: 5,     unit: 'GB',    color: '#5030E5', pct: 46  },
-                          { label: 'API Calls', used: 4200, max: 10000, unit: 'calls', color: '#30C5E5', pct: 42  },
-                          { label: 'Members',   used: members.length, max: 3, unit: '', color: '#FFA500', pct: Math.min(100, Math.round((members.length / 3) * 100)) },
-                        ].map(meter => (
-                          <div key={meter.label}>
-                            <div className="flex justify-between text-xs mb-1.5">
-                              <span className="font-semibold text-gray-700">{meter.label}</span>
-                              <span className="text-gray-400">
-                                {meter.used}{meter.unit ? ' ' + meter.unit : ''} <span className="text-gray-300">of</span> {meter.max}{meter.unit ? ' ' + meter.unit : ''}
-                              </span>
-                            </div>
-                            <div className="h-2 bg-surface-200 rounded-full overflow-hidden">
+                          }
+                        />
+                        {passwords.next && (
+                          <div className="mt-1.5">
+                            <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
                               <motion.div
                                 className="h-full rounded-full"
-                                style={{ backgroundColor: meter.color }}
-                                initial={{ width: 0 }}
-                                animate={{ width: `${meter.pct}%` }}
-                                transition={{ duration: 0.7, delay: 0.2 }}
+                                style={{ width: `${(strength.score / 4) * 100}%`, background: strength.color }}
+                                layout
                               />
                             </div>
-                            {meter.pct >= 100 && (
-                              <div className="text-[10px] text-[#D8727D] mt-1 font-medium">Limit reached — upgrade for more</div>
-                            )}
+                            <span className="text-xs mt-0.5 block" style={{ color: strength.color }}>{strength.label}</span>
                           </div>
-                        ))}
+                        )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Danger Zone */}
-                  <div className="bg-white rounded-2xl overflow-hidden border border-[#D8727D22]">
-                    <div className="px-5 py-4 border-b border-[#D8727D22] flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-[#D8727D15] flex items-center justify-center">
-                        <AlertTriangle size={13} className="text-[#D8727D]" />
-                      </div>
-                      <div>
-                        <h2 className="font-bold text-[#D8727D] text-sm">Danger Zone</h2>
-                        <p className="text-[10px] text-[#D8727D80]">These actions are permanent and cannot be undone</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-surface-100">
-                          <Download size={14} className="text-gray-400" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-gray-900">Export all data</div>
-                          <div className="text-xs text-gray-400 mt-0.5">Download a full copy of your workspace data</div>
-                        </div>
-                      </div>
-                      <button onClick={handleExportData} className="text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors text-gray-600 bg-surface-100 hover:bg-surface-200">
-                        Export
+                      <InputField
+                        label="Confirm New Password"
+                        type={showPassword['confirm'] ? 'text' : 'password'}
+                        value={passwords.confirm}
+                        onChange={v => setPasswords(p => ({ ...p, confirm: v }))}
+                        suffix={
+                          <button onClick={() => setShowPassword(p => ({ ...p, confirm: !p['confirm'] }))} className="text-gray-400 hover:text-gray-600">
+                            {showPassword['confirm'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        }
+                      />
+                      <button
+                        onClick={handleUpdatePassword}
+                        className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-[#5030E5] hover:bg-[#4020C5] transition-colors"
+                      >
+                        Update Password
                       </button>
                     </div>
-                    <div className="flex items-center justify-between px-5 py-4">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#D8727D15]">
-                          <Trash2 size={14} className="text-[#D8727D]" />
+                  </SettingCard>
+                </motion.div>
+
+                {/* Card 2 — 2FA placeholder */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                  <SettingCard title="Two-Factor Authentication" description="Add an extra layer of security to your account">
+                    <div className="flex items-center justify-between py-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-surface-50 border border-surface-200 flex items-center justify-center">
+                          <Lock size={14} className="text-gray-500" />
                         </div>
                         <div>
-                          <div className="text-sm font-semibold text-gray-900">Delete account</div>
-                          <div className="text-xs text-gray-400 mt-0.5">Permanently delete your account and all data</div>
+                          <div className="text-sm font-medium text-gray-900">Authenticator App</div>
+                          <div className="text-xs text-gray-400">Use an app like Google Authenticator</div>
                         </div>
                       </div>
-                      {confirmDelete ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-gray-500">Are you sure?</span>
-                          <button onClick={() => { showToast('Account deleted.', 'info'); setConfirmDelete(false); logout(); }}
-                            className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50">Yes</button>
-                          <button onClick={() => setConfirmDelete(false)}
-                            className="text-[10px] font-bold text-gray-500 px-1.5 py-0.5 rounded bg-gray-100">Cancel</button>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 font-medium">Coming Soon</span>
+                    </div>
+                  </SettingCard>
+                </motion.div>
+
+                {/* Card 3 — Sessions placeholder */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+                  <SettingCard title="Sessions & Login History" description="Manage your active sessions">
+                    <div className="flex items-center justify-between py-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-surface-50 border border-surface-200 flex items-center justify-center">
+                          <Key size={14} className="text-gray-500" />
                         </div>
-                      ) : (
-                        <button onClick={handleDeleteAccount} className="text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors text-[#D8727D] bg-[#D8727D0A] hover:bg-[#D8727D18] border border-[#D8727D33]">
-                          Delete
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Active Sessions</div>
+                          <div className="text-xs text-gray-400">View and revoke active sessions</div>
+                        </div>
+                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 font-medium">Coming Soon</span>
+                    </div>
+                  </SettingCard>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* ══ Billing ══ */}
+            {activeSection === 'billing' && (
+              <motion.div key="billing"
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4"
+              >
+                {/* Card 1 — Current Plan banner */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+                  <div className="rounded-2xl p-6 bg-gradient-to-r from-[#5030E5] to-[#7C3AED] text-white">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-widest opacity-70 mb-1">Current Plan</div>
+                        <div className="text-2xl font-bold">Free Plan</div>
+                        <div className="text-sm opacity-75 mt-1">Basic features for personal use</div>
+                      </div>
+                      <button className="px-4 py-2 rounded-xl border border-white/40 text-sm font-semibold text-white hover:bg-white/10 transition-colors">
+                        Upgrade
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Card 2 — Plan comparison */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                  <SettingCard title="Plans" description="Choose the plan that's right for you">
+                    <div className="grid grid-cols-3 gap-4">
+                      {([
+                        { name: 'Free', price: '$0/mo', features: ['Up to 3 projects', '5 team members', 'Basic analytics'], cta: 'Current Plan', active: true, highlight: false },
+                        { name: 'Pro', price: '$12/mo', features: ['Unlimited projects', '25 team members', 'Advanced analytics'], cta: 'Upgrade to Pro', active: false, highlight: true },
+                        { name: 'Enterprise', price: 'Custom', features: ['Unlimited everything', 'SSO & SAML', 'Dedicated support'], cta: 'Contact Us', active: false, highlight: false },
+                      ]).map(plan => (
+                        <div key={plan.name} className={`relative rounded-xl p-4 border-2 ${plan.highlight ? 'border-[#5030E5] bg-[#5030E508]' : 'border-surface-200'}`}>
+                          {plan.highlight && (
+                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#5030E5] text-white">Popular</span>
+                          )}
+                          <div className={`text-sm font-bold mb-1 ${plan.highlight ? 'text-[#5030E5]' : 'text-gray-900'}`}>{plan.name}</div>
+                          <div className="text-xl font-bold text-gray-900 mb-3">{plan.price}</div>
+                          <ul className="space-y-1.5 mb-4">
+                            {plan.features.map(f => (
+                              <li key={f} className="flex items-center gap-2 text-xs text-gray-600">
+                                <Check size={11} className="text-[#68B266] shrink-0" /> {f}
+                              </li>
+                            ))}
+                          </ul>
+                          <button className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors ${
+                            plan.active ? 'bg-surface-100 text-gray-400 cursor-default' :
+                            plan.highlight ? 'bg-[#5030E5] text-white hover:bg-[#4020C5]' :
+                            'border border-surface-200 text-gray-600 hover:bg-surface-50'
+                          }`}>
+                            {plan.cta}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </SettingCard>
+                </motion.div>
+
+                {/* Card 3 — Usage meters */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+                  <SettingCard title="Usage" description="Your current resource consumption">
+                    <div className="flex flex-col gap-4">
+                      {([
+                        { label: 'Storage',   used: 2.1,  total: 5,   unit: 'GB',  pct: 42 },
+                        { label: 'API Calls', used: 1240, total: 5000, unit: '/mo', pct: 25 },
+                        { label: 'Members',   used: members.length, total: 5, unit: 'seats', pct: Math.min(100, Math.round((members.length / 5) * 100)) },
+                      ]).map(m => (
+                        <div key={m.label}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-medium text-gray-700">{m.label}</span>
+                            <span className="text-xs text-gray-400">{m.used} / {m.total} {m.unit}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
+                            <motion.div
+                              className="h-full rounded-full bg-[#5030E5]"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${m.pct}%` }}
+                              transition={{ duration: 0.6, ease: 'easeOut' }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </SettingCard>
+                </motion.div>
+
+                {/* Danger zone */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
+                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                    <h3 className="font-semibold text-gray-900 text-sm mb-1">Danger Zone</h3>
+                    <p className="text-xs text-gray-500 mb-4">These actions are irreversible. Proceed with caution.</p>
+                    <div className="flex items-center gap-3 pt-4 border-t border-[#D8727D20]">
+                      <button
+                        onClick={handleExportData}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-surface-200 text-gray-600 hover:bg-surface-50 transition-colors"
+                      >
+                        <Download size={14} /> Export Data
+                      </button>
+                      {!confirmDelete ? (
+                        <button
+                          onClick={handleDeleteAccount}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors"
+                        >
+                          <Trash2 size={14} /> Delete Account
                         </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Are you sure?</span>
+                          <button
+                            onClick={() => { setConfirmDelete(false); showToast('Account deletion is disabled in this version.', 'info'); }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors"
+                          >
+                            Yes, delete
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(false)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-surface-200 text-gray-500 hover:bg-surface-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
                 </motion.div>
-              )}
+              </motion.div>
+            )}
 
-
-              {/* ══ About ══ */}
-              {activeSection === 'about' && (
-                <motion.div key="about" className="flex flex-col gap-4 bg-white pb-4"
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.2 }}>
-
-                  {/* App identity card */}
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
-                    <div className="h-1.5 w-full bg-gradient-to-r from-primary-500 via-[#8B5CF6] to-[#0EA5E9]" />
-                    <div className="p-6 flex items-center gap-5">
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-[#8B5CF6] flex items-center justify-center shadow-lg shrink-0">
-                        <span className="text-white font-bold text-2xl tracking-tight">P</span>
+            {/* ══ About ══ */}
+            {activeSection === 'about' && (
+              <motion.div key="about"
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
+                className="flex flex-col gap-4"
+              >
+                {/* Card 1 — App identity */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+                  <SettingCard title="App Info">
+                    <div className="flex flex-col items-center py-4 gap-3">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold bg-gradient-to-br from-[#5030E5] to-[#7C3AED]">
+                        PX
                       </div>
-                      <div>
-                        <div className="text-lg font-bold text-gray-900">ProjectX</div>
-                        <div className="text-sm text-gray-400 mt-0.5">
-                          Version {updateState.appVersion ?? '1.0.0'}
-                        </div>
-                        <div className="text-xs text-gray-400 mt-1">Project planning for high-performance teams</div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-gray-900">Project X</div>
+                        <div className="text-sm text-gray-500 mt-0.5">Version {updateState.appVersion ?? '\u2014'}</div>
+                        <div className="text-xs text-gray-400 mt-1">Built with Electron + React</div>
                       </div>
                     </div>
-                  </div>
+                  </SettingCard>
+                </motion.div>
 
-                  {/* Update status */}
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
-                    <SectionHeader title="Software Update" subtitle="Keep ProjectX up to date" />
-                    <div className="px-6 py-5">
+                {/* Card 2 — Software updates */}
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                  <SettingCard title="Software Updates" description="Keep your app up to date">
+                    <div className="flex flex-col gap-4">
                       {/* Status row */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                            updateState.status === 'downloaded' ? 'bg-[#68B26615]' :
-                            updateState.status === 'error'      ? 'bg-red-50' :
-                            'bg-primary-50'
-                          }`}>
-                            {updateState.status === 'downloaded' ? (
-                              <CheckCircle2 size={16} className="text-[#68B266]" />
-                            ) : updateState.status === 'error' ? (
-                              <AlertTriangle size={16} className="text-red-500" />
-                            ) : (
-                              <RefreshCw size={16} className={`text-primary-500 ${updateState.status === 'checking' || updateState.status === 'downloading' ? 'animate-spin' : ''}`} />
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold text-gray-800">
-                              {updateState.status === 'idle'          && 'Up to date'}
-                              {updateState.status === 'checking'      && 'Checking for updates…'}
-                              {updateState.status === 'not-available' && 'Already on the latest version'}
-                              {updateState.status === 'available'     && `v${updateState.version} available — downloading…`}
-                              {updateState.status === 'downloading'   && `Downloading… ${updateState.progress ?? 0}%`}
-                              {updateState.status === 'downloaded'    && `v${updateState.version} ready to install`}
-                              {updateState.status === 'error'         && 'Update check failed'}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              {updateState.status === 'error'
-                                ? updateState.errorMessage ?? 'An error occurred.'
-                                : `Current version: ${updateState.appVersion ?? '1.0.0'}`}
-                            </div>
-                          </div>
+                      <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-50 border border-surface-200">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          updateState.status === 'downloaded' ? 'bg-[#83C29D33]' :
+                          updateState.status === 'available' ? 'bg-[#5030E510]' :
+                          updateState.status === 'error' ? 'bg-[#D8727D15]' :
+                          'bg-surface-100'
+                        }`}>
+                          {updateState.status === 'error' ? <AlertTriangle size={14} className="text-[#D8727D]" /> :
+                           updateState.status === 'downloaded' ? <CheckCircle2 size={14} className="text-[#68B266]" /> :
+                           updateState.status === 'downloading' ? <RefreshCw size={14} className="text-[#5030E5] animate-spin" /> :
+                           <CheckCircle2 size={14} className="text-gray-400" />}
                         </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900">
+                            {updateState.status === 'idle' && 'Up to date'}
+                            {updateState.status === 'checking' && 'Checking for updates\u2026'}
+                            {updateState.status === 'not-available' && 'Already on the latest version'}
+                            {updateState.status === 'available' && `Update available: v${updateState.version}`}
+                            {updateState.status === 'downloading' && 'Downloading update\u2026'}
+                            {updateState.status === 'downloaded' && `Update ready: v${updateState.version}`}
+                            {updateState.status === 'error' && 'Update check failed'}
+                          </div>
+                          <div className="text-xs text-gray-400">{updateState.errorMessage ?? ''}</div>
+                        </div>
+                      </div>
 
-                        {/* Action button */}
-                        {updateState.status === 'downloaded' ? (
-                          <button
-                            onClick={installUpdate}
-                            className="px-4 py-2 bg-primary-500 text-white text-xs font-semibold rounded-xl hover:bg-primary-600 transition-colors"
-                          >
-                            Restart & install
-                          </button>
-                        ) : (
+                      {/* Download progress */}
+                      {updateState.status === 'downloading' && updateState.progress != null && (
+                        <div>
+                          <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
+                            <motion.div
+                              className="h-full rounded-full bg-[#5030E5]"
+                              animate={{ width: `${updateState.progress}%` }}
+                              transition={{ duration: 0.3 }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-400 mt-1">{Math.round(updateState.progress)}%</span>
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex gap-3">
+                        {(updateState.status === 'idle' || updateState.status === 'error' || updateState.status === 'not-available') && (
                           <button
                             onClick={checkForUpdate}
-                            disabled={updateState.status === 'checking' || updateState.status === 'downloading'}
-                            className="px-4 py-2 bg-surface-100 text-gray-700 text-xs font-semibold rounded-xl hover:bg-surface-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-surface-200 text-gray-600 hover:bg-surface-50 transition-colors"
                           >
-                            Check for updates
+                            <RefreshCw size={14} /> Check for Updates
+                          </button>
+                        )}
+                        {updateState.status === 'downloaded' && (
+                          <button
+                            onClick={installUpdate}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-[#5030E5] text-white hover:bg-[#4020C5] transition-colors"
+                          >
+                            <Download size={14} /> Install & Restart
                           </button>
                         )}
                       </div>
-
-                      {/* Progress bar */}
-                      {(updateState.status === 'downloading' || updateState.status === 'available') && (
-                        <div className="mt-4 h-1.5 bg-surface-100 rounded-full overflow-hidden">
-                          <motion.div
-                            className="h-full bg-primary-500 rounded-full"
-                            initial={{ width: '0%' }}
-                            animate={{ width: `${updateState.progress ?? 0}%` }}
-                            transition={{ ease: 'linear', duration: 0.3 }}
-                          />
-                        </div>
-                      )}
                     </div>
-                  </div>
-
+                  </SettingCard>
                 </motion.div>
-              )}
-
-
-            </AnimatePresence>
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+      </div>
     </motion.div>
   );
 };
