@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import dotenv from 'dotenv';
 import mongoose, { Schema } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
@@ -242,6 +243,12 @@ function registerDbHandlers() {
     ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
     ipcMain.handle('db:members:add', async (_e, member: object) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
     ipcMain.handle('db:members:update', async (_e, id: string, changes: object) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { new: true }).lean(); return d ? safe(toUser(d)) : null; });
+    ipcMain.handle('db:members:updateRole', async (_e, id: string, role: string) => {
+        const d = await UserModel.findOneAndUpdate({ appId: id }, { role }, { new: true }).lean();
+        if (!d) throw new Error(`Member not found: ${id}`);
+        await AuthUserModel.findOneAndUpdate({ appId: id }, { role });
+        return safe(toUser(d));
+    });
     ipcMain.handle('db:members:remove', async (_e, id: string) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
 
     // Attendance
@@ -308,22 +315,28 @@ function registerDbHandlers() {
     // Auth
     ipcMain.handle('db:auth:login', async (_e, email: string, password: string) => {
         const found = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean() as any;
-        if (!found || found.password !== password) throw new Error('Invalid email or password.');
+        if (!found) throw new Error('Invalid email or password.');
+        const valid = await bcrypt.compare(password, found.password);
+        if (!valid) throw new Error('Invalid email or password.');
         return safe(toAuthUser(found));
     });
     ipcMain.handle('db:auth:register', async (_e, name: string, email: string, password: string, _role: string) => {
         const existing = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (existing) throw new Error('An account with this email already exists.');
         const appId = `auth-${Date.now()}`;
+        const hashed = await bcrypt.hash(password, 10);
         // All new registrations start as 'guest' — an admin must upgrade them
-        const d = await AuthUserModel.create({ appId, name, email: email.toLowerCase(), password, role: 'guest' });
+        const d = await AuthUserModel.create({ appId, name, email: email.toLowerCase(), password: hashed, role: 'guest' });
         await UserModel.create({ appId, name, email: email.toLowerCase(), role: 'guest', status: 'active' });
         return safe(toAuthUser(d.toObject()));
     });
     ipcMain.handle('db:auth:updatePassword', async (_e, userId: string, currentPassword: string, newPassword: string) => {
         const found = await AuthUserModel.findOne({ appId: userId }).lean() as any;
-        if (!found || found.password !== currentPassword) throw new Error('Current password is incorrect.');
-        await AuthUserModel.findOneAndUpdate({ appId: userId }, { password: newPassword });
+        if (!found) throw new Error('Current password is incorrect.');
+        const valid = await bcrypt.compare(currentPassword, found.password);
+        if (!valid) throw new Error('Current password is incorrect.');
+        const hashed = await bcrypt.hash(newPassword, 10);
+        await AuthUserModel.findOneAndUpdate({ appId: userId }, { password: hashed });
         return true;
     });
     ipcMain.handle('db:auth:updateName', async (_e, userId: string, newName: string) => {
@@ -339,9 +352,10 @@ function registerDbHandlers() {
         return true;
     });
     ipcMain.handle('db:auth:seedDefault', async () => {
-        const existing = await AuthUserModel.findOne({ email: 'admin@projectm.com' }).lean();
+        const existing = await AuthUserModel.findOne({ email: 'admin@projectm.com' }).lean() as any;
         if (!existing) {
-            await AuthUserModel.create({ appId: 'auth-default', name: 'Admin User', email: 'admin@projectm.com', password: 'password123', role: 'admin' });
+            const hashed = await bcrypt.hash('password123', 10);
+            await AuthUserModel.create({ appId: 'auth-default', name: 'Admin User', email: 'admin@projectm.com', password: hashed, role: 'admin' });
         }
         // Ensure a User (member) record exists for every AuthUser
         const allAuthUsers = await AuthUserModel.find().lean() as any[];
@@ -353,7 +367,16 @@ function registerDbHandlers() {
         }
         const adminExists = await AuthUserModel.findOne({ email: 'admin@gmail.com' }).lean();
         if (!adminExists) {
-            await AuthUserModel.create({ appId: 'auth-toursurv-admin', name: 'Admin', email: 'admin@gmail.com', password: 'Admin@123', role: 'admin' });
+            const hashed2 = await bcrypt.hash('Admin@123', 10);
+            await AuthUserModel.create({ appId: 'auth-toursurv-admin', name: 'Admin', email: 'admin@gmail.com', password: hashed2, role: 'admin' });
+        }
+        // Re-hash any existing plain-text passwords (accounts created before hashing was added)
+        const allAuthDocs = await AuthUserModel.find().lean() as any[];
+        for (const doc of allAuthDocs) {
+            if (doc.password && !doc.password.startsWith('$2')) {
+                const rehashed = await bcrypt.hash(doc.password, 10);
+                await AuthUserModel.updateOne({ appId: doc.appId }, { password: rehashed });
+            }
         }
         const orgExists = await OrgModel.findOne({ orgId: 'org-toursurv' }).lean();
         if (!orgExists) {
