@@ -8,6 +8,7 @@ import { AppContext } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
+import { getPresenceStatus } from '../context/PresenceContext';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
@@ -275,7 +276,7 @@ const MessagesPage: React.FC = () => {
               const isActive = member.id === activeId;
               const isPinned = pinnedIds.includes(member.id);
               const isStarred = starredIds.includes(member.id);
-              const status: 'online' | 'offline' = member.status === 'active' ? 'online' : 'offline';
+              const status: 'online' | 'away' | 'offline' = getPresenceStatus(member.lastSeen);
               return (
                 <motion.button
                   key={member.id}
@@ -316,11 +317,11 @@ const MessagesPage: React.FC = () => {
           <div className="flex items-center gap-3 px-5 py-3.5 border-b border-surface-100 shrink-0">
             <div className="relative">
               <Avatar name={activeMember?.name ?? '—'} color={activeColor} size="md" />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[activeMember?.status === 'active' ? 'online' : 'offline'] }} />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[getPresenceStatus(activeMember?.lastSeen)] }} />
             </div>
             <div className="flex-1">
               <div className="font-bold text-sm text-gray-900">{activeMember?.name ?? '—'}</div>
-              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor[activeMember?.status === 'active' ? 'online' : 'offline'] }}>{statusLabel[activeMember?.status === 'active' ? 'online' : 'offline']}</span></div>
+              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor[getPresenceStatus(activeMember?.lastSeen)] }}>{statusLabel[getPresenceStatus(activeMember?.lastSeen)]}</span></div>
             </div>
             {/* Action icons */}
             <div className="flex items-center gap-1">
@@ -489,11 +490,11 @@ const MessagesPage: React.FC = () => {
           <div className="p-4 flex flex-col items-center text-center border-b border-surface-100">
             <div className="relative mb-3">
               <Avatar name={activeMember?.name ?? '—'} color={activeColor} size="xl" />
-              {(() => { const s = activeMember?.status === 'active' ? 'online' : 'offline'; return <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[s] }} />; })()}
+              {(() => { const s = getPresenceStatus(activeMember?.lastSeen); return <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white" style={{ backgroundColor: statusColor[s] }} />; })()}
             </div>
             <div className="font-bold text-gray-900 text-sm">{activeMember?.name ?? '—'}</div>
             <div className="text-xs text-gray-400 mt-0.5">{activeMember?.designation ?? ''}</div>
-            {(() => { const s = activeMember?.status === 'active' ? 'online' : 'offline'; return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor[s] + '20', color: statusColor[s] }}>{statusLabel[s]}</span>; })()}
+            {(() => { const s = getPresenceStatus(activeMember?.lastSeen); return <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full mt-2 inline-block" style={{ backgroundColor: statusColor[s] + '20', color: statusColor[s] }}>{statusLabel[s]}</span>; })()}
           </div>
 
           {/* Quick actions */}
