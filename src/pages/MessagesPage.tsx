@@ -326,7 +326,15 @@ const MessagesPage: React.FC = () => {
             {/* Action icons */}
             <div className="flex items-center gap-1">
               <motion.button
-                onClick={e => { e.stopPropagation(); setPinnedIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: !pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
+                onClick={e => {
+                  e.stopPropagation();
+                  const newPinned = pinnedIds.includes(activeId) ? pinnedIds.filter(x => x !== activeId) : [...pinnedIds, activeId];
+                  setPinnedIds(newPinned);
+                  if (activeMember) {
+                    dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: newPinned.includes(activeId), starred: starredIds.includes(activeId), archived: archivedIds.has(activeId) })
+                      .catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err));
+                  }
+                }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${pinnedIds.includes(activeId) ? 'text-primary-500 bg-primary-50' : 'text-gray-400 hover:bg-surface-100'}`}
                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
                 title="Pin conversation"
@@ -334,7 +342,15 @@ const MessagesPage: React.FC = () => {
                 <Pin size={16} />
               </motion.button>
               <motion.button
-                onClick={e => { e.stopPropagation(); setStarredIds(p => p.includes(activeId) ? p.filter(x => x !== activeId) : [...p, activeId]); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: !starredIds.includes(activeMember.id), archived: archivedIds.has(activeMember.id) }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } }}
+                onClick={e => {
+                  e.stopPropagation();
+                  const newStarred = starredIds.includes(activeId) ? starredIds.filter(x => x !== activeId) : [...starredIds, activeId];
+                  setStarredIds(newStarred);
+                  if (activeMember) {
+                    dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeId), starred: newStarred.includes(activeId), archived: archivedIds.has(activeId) })
+                      .catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err));
+                  }
+                }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${starredIds.includes(activeId) ? 'text-[#FFA500] bg-[#FFA50015]' : 'text-gray-400 hover:bg-surface-100'}`}
                 whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
                 title="Star conversation"

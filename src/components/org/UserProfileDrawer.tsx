@@ -51,6 +51,7 @@ export const UserProfileDrawer: React.FC<Props> = ({ user, member, getMemberColo
     const [saving, setSaving]       = useState(false);
 
     const isSelf = user.id === authUser?.id;
+    const isAdmin = authUser?.role === 'admin';
 
     const assignedTasks = allTasks.filter(t => t.assignees.includes(user.id));
     const totalTasks = allTasks.length;
@@ -167,11 +168,7 @@ export const UserProfileDrawer: React.FC<Props> = ({ user, member, getMemberColo
                     </div>
                     <div>
                         <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Role</label>
-                        {isSelf ? (
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${rs.bg} ${rs.text}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${rs.dot}`} />{role}<span className="opacity-40 text-[9px]">you</span>
-                            </span>
-                        ) : (
+                        {isAdmin && !isSelf ? (
                             <select
                                 value={role} onChange={e => setRole(e.target.value)}
                                 className="w-full border border-surface-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary-400 bg-white transition-all"
@@ -180,6 +177,10 @@ export const UserProfileDrawer: React.FC<Props> = ({ user, member, getMemberColo
                                     <option key={r.appId} value={r.name}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                                 ))}
                             </select>
+                        ) : (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${rs.bg} ${rs.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${rs.dot}`} />{role}{isSelf && <span className="opacity-40 text-[9px]">you</span>}
+                            </span>
                         )}
                     </div>
 
