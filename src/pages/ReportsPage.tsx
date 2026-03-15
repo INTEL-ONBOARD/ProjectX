@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, BarChart3, TrendingUp, Users, AlertCircle, ChevronDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
@@ -30,6 +30,7 @@ const ReportsPage: React.FC = () => {
   const { user } = useAuth();
 
   const previousCounts = useRef<Record<string, number>>({});
+  const [snapshotLoaded, setSnapshotLoaded] = useState(false);
 
   // Load snapshot from MongoDB on mount
   useEffect(() => {
@@ -39,8 +40,9 @@ const ReportsPage: React.FC = () => {
         if (prefs?.taskBreakdownSnapshot) {
           previousCounts.current = prefs.taskBreakdownSnapshot;
         }
+        setSnapshotLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => { setSnapshotLoaded(true); });
   }, [user?.id]);
 
   const allTasks = ctxAllTasks;
@@ -51,8 +53,8 @@ const ReportsPage: React.FC = () => {
   const completionTrendUp = completionRate >= 50;
   const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY && t.status !== 'done').length;
 
-  const perProjectStats = ctxProjects.map(project => {
-    const tasks = allTasks.filter(t => t.projectId === project.id);
+  const perProjectStats = useMemo(() => ctxProjects.map(project => {
+    const tasks = ctxAllTasks.filter(t => t.projectId === project.id);
     const total = tasks.length;
     const statuses = STATUS_META.map(s => {
       const matched = tasks.filter(t => t.status === s.key);
@@ -69,17 +71,17 @@ const ReportsPage: React.FC = () => {
       widthPct: total > 0 ? (tasks.filter(t => t.status === s.key).length / total) * 100 : 0,
     }));
     return { project, statuses, total, summaryBar };
-  });
+  }), [ctxProjects, ctxAllTasks]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !snapshotLoaded) return;
     const counts: Record<string, number> = {};
     perProjectStats.forEach(({ project, statuses }) =>
       statuses.forEach(s => { counts[`${project.id}:${s.key}`] = s.count; })
     );
     previousCounts.current = counts;
     userPrefsApi().set({ userId: user.id, taskBreakdownSnapshot: counts }).catch(() => {});
-  }, [perProjectStats, user?.id]);
+  }, [perProjectStats, user?.id, snapshotLoaded]);
 
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
   const toggleProject = (id: string) =>
