@@ -39,7 +39,23 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
 
     useEffect(() => {
         dbApi().getRolePerms()
-            .then((data: RolePerms[]) => { if (data && data.length > 0) setPerms(data); })
+            .then((data: RolePerms[]) => {
+                if (!data || data.length === 0) return;
+                // Ensure any routes present in DEFAULT_PERMS but missing from DB are added
+                // (handles cases where new routes are added to defaults after DB was seeded)
+                const merged = data.map((p: RolePerms) => {
+                    const def = DEFAULT_PERMS.find(d => d.role === p.role);
+                    if (!def) return p;
+                    const missingRoutes = def.allowedRoutes.filter(r => !p.allowedRoutes.includes(r));
+                    if (missingRoutes.length === 0) return p;
+                    const updated = { ...p, allowedRoutes: [...p.allowedRoutes, ...missingRoutes] };
+                    // Persist the merged routes back to DB silently
+                    dbApi().setRolePerms({ role: updated.role, allowedRoutes: updated.allowedRoutes })
+                        .catch((err: unknown) => console.error('[RolePermsContext] Failed to sync new default routes:', err));
+                    return updated;
+                });
+                setPerms(merged);
+            })
             .catch((err: unknown) => console.error('[RolePermsContext] Failed to load role perms:', err));
     }, []);
 
