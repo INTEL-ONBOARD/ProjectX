@@ -26,9 +26,11 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [members, setMembers] = useState<User[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     api().getMembers()
-      .then((docs: User[]) => setMembers(docs))
+      .then((docs: User[]) => { if (!cancelled) setMembers(docs as User[]); })
       .catch((err: unknown) => console.error('[MembersContext] Failed to load members:', err));
+    return () => { cancelled = true; };
   }, []);
 
   const getMemberColor = (id: string): string => {

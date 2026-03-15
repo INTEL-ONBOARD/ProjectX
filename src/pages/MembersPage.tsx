@@ -10,6 +10,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
 import { useAuth } from '../context/AuthContext';
+import { useRoles } from '../context/RolesContext';
 import InviteMemberModal from '../components/modals/InviteMemberModal';
 import { downloadCsv } from '../utils/exportCsv';
 import { User } from '../types';
@@ -23,12 +24,14 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
   manager: { bg: 'bg-[#FFFBEB]', text: 'text-[#D97706]' },
   member: { bg: 'bg-surface-200', text: 'text-gray-500' },
 };
+const getRoleStyle = (role: string) => roleStyles[role] ?? { bg: 'bg-surface-200', text: 'text-gray-500' };
 
 const MembersPage: React.FC = () => {
   const { members, getMemberColor, addMember, updateMember, removeMember, refetchMembers } = useMembersContext();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const { scrubAssignee, allTasks } = useProjects();
+  const { roles } = useRoles();
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
 
@@ -160,7 +163,7 @@ const MembersPage: React.FC = () => {
               <tbody>
                 {members.map((member, i) => {
                   const color = getMemberColor(member.id);
-                  const role = roleStyles[member.role] ?? roleStyles.member;
+                  const role = getRoleStyle(member.role);
                   const tc = memberTaskCounts[member.id] ?? { assigned: 0, total: 5 };
                   const pct = tc.total > 0 ? (tc.assigned / tc.total) * 100 : 0;
                   const status: 'online' | 'offline' = member.status === 'active' ? 'online' : 'offline';
@@ -399,9 +402,11 @@ const MembersPage: React.FC = () => {
                         }}
                         className="text-xs font-semibold text-gray-700 border border-surface-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-primary-400 disabled:opacity-50"
                       >
-                        <option value="admin">Admin</option>
-                        <option value="manager">Manager</option>
-                        <option value="member">Member</option>
+                        {roles.map(r => (
+                          <option key={r.appId} value={r.name}>
+                            {r.name.charAt(0).toUpperCase() + r.name.slice(1)}
+                          </option>
+                        ))}
                       </select>
                     ) : (
                       <span className="text-xs font-semibold text-gray-700 capitalize">{selectedMember.role}</span>
