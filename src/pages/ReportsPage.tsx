@@ -4,6 +4,7 @@ import { Download, BarChart3, TrendingUp, Users, AlertCircle, ChevronDown } from
 import PageHeader from '../components/ui/PageHeader';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
+import { useAuth } from '../context/AuthContext';
 import { downloadCsv } from '../utils/exportCsv';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -17,20 +18,30 @@ const STATUS_META = [
   { key: 'done',               label: 'Done',                color: '#68B266' },
 ] as const;
 
-function loadSnapshot(): Record<string, number> {
-  try { return JSON.parse(localStorage.getItem('task-breakdown-snapshot') ?? '{}'); }
-  catch { return {}; }
-}
-
-function saveSnapshot(counts: Record<string, number>) {
-  localStorage.setItem('task-breakdown-snapshot', JSON.stringify(counts));
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const userPrefsApi = () => (window as any).electronAPI.userPrefs as {
+  get: (userId: string) => Promise<{ taskBreakdownSnapshot?: Record<string, number> } | null>;
+  set: (prefs: object) => Promise<void>;
+};
 
 const ReportsPage: React.FC = () => {
   const { projects: ctxProjects, allTasks: ctxAllTasks } = useProjects();
   const { members, getMemberColor } = useMembersContext();
+  const { user } = useAuth();
 
-  const previousCounts = useRef<Record<string, number>>(loadSnapshot());
+  const previousCounts = useRef<Record<string, number>>({});
+
+  // Load snapshot from MongoDB on mount
+  useEffect(() => {
+    if (!user) return;
+    userPrefsApi().get(user.id)
+      .then(prefs => {
+        if (prefs?.taskBreakdownSnapshot) {
+          previousCounts.current = prefs.taskBreakdownSnapshot;
+        }
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   const allTasks = ctxAllTasks;
   const totalTasks = allTasks.length;
@@ -61,12 +72,14 @@ const ReportsPage: React.FC = () => {
   });
 
   useEffect(() => {
+    if (!user) return;
     const counts: Record<string, number> = {};
     perProjectStats.forEach(({ project, statuses }) =>
       statuses.forEach(s => { counts[`${project.id}:${s.key}`] = s.count; })
     );
-    saveSnapshot(counts);
-  }, [perProjectStats]);
+    previousCounts.current = counts;
+    userPrefsApi().set({ userId: user.id, taskBreakdownSnapshot: counts }).catch(() => {});
+  }, [perProjectStats, user?.id]);
 
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
   const toggleProject = (id: string) =>
