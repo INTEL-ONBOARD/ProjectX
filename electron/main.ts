@@ -17,6 +17,7 @@ const UserSchema = new Schema({
     role:        { type: String, default: 'member' },
     designation: String,
     status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
+    lastSeen:    { type: Date, default: null },
 });
 
 const TaskSchema = new Schema({
@@ -168,7 +169,7 @@ const RoleModel = mongoose.model('Role', RoleSchema);
 const safe = (v: unknown) => JSON.parse(JSON.stringify(v));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toUser        = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email: d.email ?? '', location: d.location ?? '', role: d.role, designation: d.designation ?? '', status: d.status });
+const toUser = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email: d.email ?? '', location: d.location ?? '', role: d.role, designation: d.designation ?? '', status: d.status, lastSeen: d.lastSeen?.toISOString() ?? null });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

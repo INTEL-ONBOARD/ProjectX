@@ -18,6 +18,7 @@ const UserSchema = new Schema({
     role: { type: String, default: 'member' },
     designation: String,
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+    lastSeen: { type: Date, default: null },
 });
 
 const TaskSchema = new Schema({
@@ -166,7 +167,7 @@ const ProjectRichModel = mongoose.model('ProjectRich', ProjectRichSchema);
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-const toUser = d => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email: d.email ?? '', location: d.location ?? '', role: d.role, designation: d.designation ?? '', status: d.status });
+const toUser = d => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email: d.email ?? '', location: d.location ?? '', role: d.role, designation: d.designation ?? '', status: d.status, lastSeen: d.lastSeen?.toISOString() ?? null });
 const toProject = d => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 const toRole = d => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, commentData: (d.commentData ?? []).map(c => ({ id: c.id, author: c.author, text: c.text, time: c.time })), files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });

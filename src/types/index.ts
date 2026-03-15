@@ -14,6 +14,7 @@ export interface User {
     department?: string;
     bio?: string;
     joinedAt?: string;
+    lastSeen?: string | null;
 }
 
 export interface TaskComment {
