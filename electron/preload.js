@@ -115,5 +115,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         renameRole:      (data) => ipcRenderer.invoke('db:roles:rename', data),
         deleteRole:      (data) => ipcRenderer.invoke('db:roles:delete', data),
         deleteRolePerms: (data) => ipcRenderer.invoke('db:roleperms:delete', data),
+
+        // Presence
+        heartbeat: (userId) => ipcRenderer.invoke('db:presence:heartbeat', userId),
     },
 });

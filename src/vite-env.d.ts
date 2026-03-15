@@ -68,6 +68,7 @@ interface ElectronDB {
   deleteRole(data: { appId: string }): Promise<unknown>;
   // NOTE: handler reads data.roleName (not data.role) — pass { roleName: string }
   deleteRolePerms(data: { roleName: string }): Promise<unknown>;
+  heartbeat(userId: string): Promise<boolean>;
 }
 
 interface ElectronAuth {

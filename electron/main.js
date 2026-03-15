@@ -226,6 +226,10 @@ function registerDbHandlers() {
         return safe(toUser(d));
     });
     ipcMain.handle('db:members:remove', async (_e, id) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
+    ipcMain.handle('db:presence:heartbeat', async (_e, userId) => {
+        await UserModel.updateOne({ appId: userId }, { lastSeen: new Date() });
+        return true;
+    });
 
     ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map(d => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: (d.breakSessions ?? []).map(b => ({ start: b.start, end: b.end ?? null })) }))));
     ipcMain.handle('db:attendance:set', async (_e, record) => {

@@ -264,6 +264,10 @@ function registerDbHandlers() {
         return safe(toUser(d));
     });
     ipcMain.handle('db:members:remove', async (_e, id: string) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
+    ipcMain.handle('db:presence:heartbeat', async (_e, userId: string) => {
+        await UserModel.updateOne({ appId: userId }, { lastSeen: new Date() });
+        return true;
+    });
 
     // Attendance
     ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map((d: any) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
