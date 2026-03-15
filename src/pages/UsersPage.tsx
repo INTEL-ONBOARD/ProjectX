@@ -9,6 +9,7 @@ import { User } from '../types';
 import { UserRoleDrawer } from '../components/users/UserRoleDrawer';
 import { RoleListPanel } from '../components/users/RoleListPanel';
 import { RoleDetailPanel } from '../components/users/RoleDetailPanel';
+import { PermissionsPanel } from '../components/users/PermissionsPanel';
 
 const initials = (name: string) => name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
@@ -119,6 +120,27 @@ const RolesTab: React.FC<RolesTabProps> = ({ selectedRoleId, onSelect, onDeleteC
     );
 };
 
+interface PermissionsTabProps {
+    selectedRoleId: string | null;
+    onSelect: (id: string) => void;
+}
+
+const PermissionsTab: React.FC<PermissionsTabProps> = ({ selectedRoleId, onSelect }) => {
+    const { roles } = useRoles();
+    const { members } = useMembersContext();
+    return (
+        <div className="flex h-full">
+            <RoleListPanel
+                roles={roles}
+                members={members}
+                selectedRoleId={selectedRoleId}
+                onSelect={onSelect}
+            />
+            <PermissionsPanel selectedRoleId={selectedRoleId} />
+        </div>
+    );
+};
+
 const UsersPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<Tab>('Users');
     const { roles, addRole } = useRoles();
@@ -188,7 +210,12 @@ const UsersPage: React.FC = () => {
                         addingRole={addingRole}
                     />
                 )}
-                {activeTab === 'Permissions' && <div className="text-gray-400 text-sm">Permissions tab — coming soon</div>}
+                {activeTab === 'Permissions' && (
+                    <PermissionsTab
+                        selectedRoleId={selectedRoleId}
+                        onSelect={setSelectedRoleId}
+                    />
+                )}
             </div>
         </motion.div>
     );
