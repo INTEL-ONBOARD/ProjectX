@@ -97,7 +97,7 @@ const SettingCard: React.FC<{
   action?: React.ReactNode;
   className?: string;
 }> = ({ title, description, children, action, className = '' }) => (
-  <div className={`bg-white rounded-2xl border border-surface-200 p-6 ${className}`}>
+  <div className={`bg-white rounded-2xl p-6 ${className}`}>
     <div className="flex items-start justify-between mb-4">
       <div>
         <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
@@ -447,8 +447,8 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* ── Content ── */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-3xl mx-auto">
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="max-w-5xl mx-auto">
           <AnimatePresence mode="wait">
 
             {/* ══ Profile ══ */}
@@ -456,11 +456,11 @@ const SettingsPage: React.FC = () => {
               <motion.div key="profile"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
-                className="flex flex-col gap-4"
+                className="grid grid-cols-[1fr_280px] gap-4 items-start"
               >
                 {/* Card 1 — Identity hero */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden">
                     {/* Gradient accent bar */}
                     <div className="h-1.5 w-full bg-gradient-to-r from-[#5030E5] to-[#7C3AED]" />
                     <div className="p-6">
@@ -516,23 +516,25 @@ const SettingsPage: React.FC = () => {
 
                 {/* Card 2 — Activity stats */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden">
                     <div className="px-6 pt-5 pb-2">
                       <h3 className="font-semibold text-gray-900 text-sm">Activity</h3>
                       <p className="text-xs text-gray-500 mt-0.5">Your contribution statistics</p>
                     </div>
-                    <div className="flex divide-x divide-surface-100">
+                    <div className="flex flex-col divide-y divide-surface-100">
                       {[
                         { label: 'Projects', value: stats[0].value, icon: Layers,       bg: '#EDE9FE', color: '#7C3AED' },
                         { label: 'Tasks',    value: stats[1].value, icon: CheckCircle2, bg: '#DCFCE7', color: '#16A34A' },
                         { label: 'Team',     value: stats[2].value, icon: Users,        bg: '#DBEAFE', color: '#2563EB' },
                       ].map((s) => (
-                        <div key={s.label} className="flex-1 flex flex-col items-center gap-2 py-5">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: s.bg }}>
+                        <div key={s.label} className="flex items-center gap-4 px-6 py-4">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: s.bg }}>
                             <s.icon size={16} style={{ color: s.color }} />
                           </div>
-                          <div className="text-2xl font-extrabold tracking-tight text-gray-900">{s.value}</div>
-                          <div className="text-xs text-gray-500">{s.label}</div>
+                          <div>
+                            <div className="text-xl font-extrabold tracking-tight text-gray-900 leading-none">{s.value}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -546,11 +548,11 @@ const SettingsPage: React.FC = () => {
               <motion.div key="notifications"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
-                className="flex flex-col gap-4"
+                className="grid grid-cols-2 gap-4 items-start"
               >
                 {/* Card 1 — Delivery Channels */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#5030E510]">
@@ -589,7 +591,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Card 2 — Activity Events */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
                       <div>
                         <h3 className="font-semibold text-gray-900 text-sm">Activity Events</h3>
@@ -631,9 +633,9 @@ const SettingsPage: React.FC = () => {
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
                 className="flex flex-col gap-4"
               >
-                {/* Card 1 — Theme */}
+                {/* Card 1 — Theme (full width) */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                  <div className="bg-white rounded-2xl p-6">
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="font-semibold text-gray-900 text-sm">Theme</h3>
@@ -702,79 +704,80 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </motion.div>
 
-                {/* Card 2 — Accent Color */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-sm">Accent Color</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">Personalize your interface color</p>
+                {/* Row 2 — Accent Color + Display side-by-side */}
+                <div className="grid grid-cols-2 gap-4 items-start">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                    <div className="bg-white rounded-2xl p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 text-sm">Accent Color</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">Personalize your interface color</p>
+                        </div>
+                        <SavedBadge id="appear" />
                       </div>
-                      <SavedBadge id="appear" />
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {ACCENT_COLORS.map(c => (
-                        <button key={c.hex} title={c.label}
-                          onClick={() => { setAccentColor(c.hex); saveAppearance({ accentColor: c.hex }); flashSaved('appear'); }}
-                          className={`w-8 h-8 rounded-full transition-all relative ${accentColor === c.hex ? 'ring-2 ring-offset-2' : 'opacity-60 hover:opacity-100 hover:scale-110'}`}
-                          style={{ background: c.hex, ...(accentColor === c.hex ? { ringColor: c.hex } : {}) }}
-                        >
-                          {accentColor === c.hex && (
-                            <span className="absolute inset-0 flex items-center justify-center">
-                              <Check size={12} className="text-white" strokeWidth={3} />
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                      <span className="ml-2 text-xs font-medium text-gray-500">
-                        {ACCENT_COLORS.find(c => c.hex === accentColor)?.label ?? 'Custom'}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Card 3 — Display */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-sm">Display</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">Text size and layout density</p>
-                      </div>
-                      <SavedBadge id="appear" />
-                    </div>
-                    {/* Font size */}
-                    <div className="flex items-center justify-between py-3 border-b border-surface-100">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">Font Size</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Adjust interface text size</div>
-                      </div>
-                      <div className="flex items-center gap-1 bg-surface-50 rounded-xl p-1 border border-surface-200">
-                        {(['sm', 'md', 'lg'] as const).map((s, i) => (
-                          <button key={s}
-                            onClick={() => { setFontSize(s); saveAppearance({ fontSize: s }); flashSaved('appear'); }}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${fontSize === s ? 'bg-[#5030E5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {ACCENT_COLORS.map(c => (
+                          <button key={c.hex} title={c.label}
+                            onClick={() => { setAccentColor(c.hex); saveAppearance({ accentColor: c.hex }); flashSaved('appear'); }}
+                            className={`w-8 h-8 rounded-full transition-all relative ${accentColor === c.hex ? 'ring-2 ring-offset-2' : 'opacity-60 hover:opacity-100 hover:scale-110'}`}
+                            style={{ background: c.hex, ...(accentColor === c.hex ? { ringColor: c.hex } : {}) }}
                           >
-                            {['S', 'M', 'L'][i]}
+                            {accentColor === c.hex && (
+                              <span className="absolute inset-0 flex items-center justify-center">
+                                <Check size={12} className="text-white" strokeWidth={3} />
+                              </span>
+                            )}
                           </button>
                         ))}
+                        <span className="ml-1 text-xs font-medium text-gray-500">
+                          {ACCENT_COLORS.find(c => c.hex === accentColor)?.label ?? 'Custom'}
+                        </span>
                       </div>
                     </div>
-                    {/* Compact mode */}
-                    <div className="flex items-center justify-between py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#EDE9FE]">
-                          <Layers size={14} className="text-[#7C3AED]" />
-                        </div>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+                    <div className="bg-white rounded-2xl p-6">
+                      <div className="flex items-start justify-between mb-4">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">Compact Mode</div>
-                          <div className="text-xs text-gray-400">Reduce spacing for denser layout</div>
+                          <h3 className="font-semibold text-gray-900 text-sm">Display</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">Text size and layout density</p>
+                        </div>
+                        <SavedBadge id="appear" />
+                      </div>
+                      {/* Font size */}
+                      <div className="flex items-center justify-between py-3 border-b border-surface-100">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Font Size</div>
+                          <div className="text-xs text-gray-400 mt-0.5">Adjust interface text size</div>
+                        </div>
+                        <div className="flex items-center gap-1 bg-surface-50 rounded-xl p-1 border border-surface-200">
+                          {(['sm', 'md', 'lg'] as const).map((s, i) => (
+                            <button key={s}
+                              onClick={() => { setFontSize(s); saveAppearance({ fontSize: s }); flashSaved('appear'); }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${fontSize === s ? 'bg-[#5030E5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                            >
+                              {['S', 'M', 'L'][i]}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                      <Toggle on={compactMode} onChange={() => { setCompactMode(p => { const next = !p; saveAppearance({ compactMode: next }); flashSaved('appear'); return next; })}} />
+                      {/* Compact mode */}
+                      <div className="flex items-center justify-between py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#EDE9FE]">
+                            <Layers size={14} className="text-[#7C3AED]" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">Compact Mode</div>
+                            <div className="text-xs text-gray-400">Reduce spacing for denser layout</div>
+                          </div>
+                        </div>
+                        <Toggle on={compactMode} onChange={() => { setCompactMode(p => { const next = !p; saveAppearance({ compactMode: next }); flashSaved('appear'); return next; })}} />
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                </div>
               </motion.div>
             )}
 
@@ -783,11 +786,11 @@ const SettingsPage: React.FC = () => {
               <motion.div key="security"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
-                className="flex flex-col gap-4"
+                className="grid grid-cols-2 gap-4 items-start"
               >
                 {/* Card 1 — Change Password */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                  <div className="bg-white rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#FEE2E2]">
                         <Lock size={18} className="text-[#D8727D]" />
@@ -851,61 +854,62 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </motion.div>
 
-                {/* Card 2 — 2FA */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-surface-100">
-                      <h3 className="font-semibold text-gray-900 text-sm">Two-Factor Authentication</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">Add an extra layer of security to your account</p>
+                {/* Right column: 2FA + Sessions */}
+                <div className="flex flex-col gap-4">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                    <div className="bg-white rounded-2xl overflow-hidden">
+                      <div className="px-6 py-4 border-b border-surface-100">
+                        <h3 className="font-semibold text-gray-900 text-sm">Two-Factor Authentication</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">Add an extra layer of security to your account</p>
+                      </div>
+                      <div className="px-6 py-2">
+                        {[
+                          { icon: Shield, label: 'Authenticator App', description: 'Use an app like Google Authenticator', bg: '#DCFCE7', color: '#16A34A' },
+                          { icon: Key,    label: 'Backup Codes',       description: 'Store one-time recovery codes',       bg: '#FEF3C7', color: '#D97706' },
+                        ].map(row => (
+                          <div key={row.label} className="flex items-center justify-between py-3.5 border-b border-surface-100 last:border-0">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: row.bg }}>
+                                <row.icon size={14} style={{ color: row.color }} />
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{row.label}</div>
+                                <div className="text-xs text-gray-400">{row.description}</div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">Coming Soon</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="px-6 py-2">
-                      {[
-                        { icon: Shield, label: 'Authenticator App', description: 'Use an app like Google Authenticator', bg: '#DCFCE7', color: '#16A34A' },
-                        { icon: Key,    label: 'Backup Codes',       description: 'Store one-time recovery codes',       bg: '#FEF3C7', color: '#D97706' },
-                      ].map(row => (
-                        <div key={row.label} className="flex items-center justify-between py-3.5 border-b border-surface-100 last:border-0">
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+                    <div className="bg-white rounded-2xl overflow-hidden">
+                      <div className="px-6 py-4 border-b border-surface-100">
+                        <h3 className="font-semibold text-gray-900 text-sm">Sessions & Login History</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">Manage your active sessions</p>
+                      </div>
+                      <div className="px-6 py-2">
+                        <div className="flex items-center justify-between py-3.5 border-b border-surface-100">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: row.bg }}>
-                              <row.icon size={14} style={{ color: row.color }} />
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#DBEAFE]">
+                              <Monitor size={14} className="text-[#2563EB]" />
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-gray-900">{row.label}</div>
-                              <div className="text-xs text-gray-400">{row.description}</div>
+                              <div className="text-sm font-medium text-gray-900">This device</div>
+                              <div className="text-xs text-gray-400">Current session</div>
                             </div>
                           </div>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">Coming Soon</span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A]">Active now</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Card 3 — Sessions */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-surface-100">
-                      <h3 className="font-semibold text-gray-900 text-sm">Sessions & Login History</h3>
-                      <p className="text-xs text-gray-500 mt-0.5">Manage your active sessions</p>
-                    </div>
-                    <div className="px-6 py-2">
-                      <div className="flex items-center justify-between py-3.5 border-b border-surface-100">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#DBEAFE]">
-                            <Monitor size={14} className="text-[#2563EB]" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">This device</div>
-                            <div className="text-xs text-gray-400">Current session</div>
-                          </div>
+                        <div className="text-xs text-gray-400 text-center py-4">
+                          Full login history is not available in this version.
                         </div>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#16A34A]">Active now</span>
-                      </div>
-                      <div className="text-xs text-gray-400 text-center py-4">
-                        Full login history is not available in this version.
                       </div>
                     </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                </div>
               </motion.div>
             )}
 
@@ -938,7 +942,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Plans */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                  <div className="bg-white rounded-2xl p-6">
                     <h3 className="font-semibold text-gray-900 text-sm mb-1">Plans</h3>
                     <p className="text-xs text-gray-500 mb-4">Choose the plan that's right for you</p>
                     <div className="grid grid-cols-3 gap-4">
@@ -972,72 +976,73 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </motion.div>
 
-                {/* Usage meters */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
-                    <h3 className="font-semibold text-gray-900 text-sm mb-1">Usage</h3>
-                    <p className="text-xs text-gray-500 mb-4">Your current resource consumption</p>
-                    <div className="flex flex-col gap-4">
-                      {([
-                        { label: 'Storage',   used: 2.1,            total: 5,    unit: 'GB',    pct: 42,  icon: HardDrive, bg: '#DBEAFE', color: '#2563EB' },
-                        { label: 'API Calls', used: 1240,           total: 5000, unit: '/mo',   pct: 25,  icon: Zap,       bg: '#FEF3C7', color: '#D97706' },
-                        { label: 'Members',   used: members.length, total: 5,    unit: 'seats', pct: Math.min(100, Math.round((members.length / 5) * 100)), icon: Users, bg: '#EDE9FE', color: '#7C3AED' },
-                      ] as { label: string; used: number; total: number; unit: string; pct: number; icon: React.ElementType; bg: string; color: string }[]).map(m => (
-                        <div key={m.label} className="flex items-center gap-4">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: m.bg }}>
-                            <m.icon size={14} style={{ color: m.color }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-xs font-medium text-gray-700">{m.label}</span>
-                              <span className="text-xs text-gray-400">{m.used} / {m.total} {m.unit} <span className="font-semibold text-gray-600">({m.pct}%)</span></span>
+                {/* Row 2 — Usage + Danger Zone side-by-side */}
+                <div className="grid grid-cols-2 gap-4 items-start">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+                    <div className="bg-white rounded-2xl p-6">
+                      <h3 className="font-semibold text-gray-900 text-sm mb-1">Usage</h3>
+                      <p className="text-xs text-gray-500 mb-4">Your current resource consumption</p>
+                      <div className="flex flex-col gap-4">
+                        {([
+                          { label: 'Storage',   used: 2.1,            total: 5,    unit: 'GB',    pct: 42,  icon: HardDrive, bg: '#DBEAFE', color: '#2563EB' },
+                          { label: 'API Calls', used: 1240,           total: 5000, unit: '/mo',   pct: 25,  icon: Zap,       bg: '#FEF3C7', color: '#D97706' },
+                          { label: 'Members',   used: members.length, total: 5,    unit: 'seats', pct: Math.min(100, Math.round((members.length / 5) * 100)), icon: Users, bg: '#EDE9FE', color: '#7C3AED' },
+                        ] as { label: string; used: number; total: number; unit: string; pct: number; icon: React.ElementType; bg: string; color: string }[]).map(m => (
+                          <div key={m.label} className="flex items-center gap-4">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: m.bg }}>
+                              <m.icon size={14} style={{ color: m.color }} />
                             </div>
-                            <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
-                              <motion.div className="h-full rounded-full" style={{ background: m.color }}
-                                initial={{ width: 0 }} animate={{ width: `${m.pct}%` }}
-                                transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-medium text-gray-700">{m.label}</span>
+                                <span className="text-xs text-gray-400">{m.used} / {m.total} {m.unit} <span className="font-semibold text-gray-600">({m.pct}%)</span></span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-surface-100 overflow-hidden">
+                                <motion.div className="h-full rounded-full" style={{ background: m.color }}
+                                  initial={{ width: 0 }} animate={{ width: `${m.pct}%` }}
+                                  transition={{ duration: 0.6, ease: 'easeOut', delay: 0.2 }} />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
 
-                {/* Danger Zone */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
-                  <div className="bg-[#FFF5F5] rounded-2xl border border-[#D8727D30] p-6 border-l-4 border-l-[#D8727D]">
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertTriangle size={15} className="text-[#D8727D]" />
-                      <h3 className="font-semibold text-[#D8727D] text-sm">Danger Zone</h3>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-4">These actions are irreversible. Proceed with caution.</p>
-                    <div className="flex items-center gap-3">
-                      <button onClick={handleExportData}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white border border-surface-200 text-gray-600 hover:bg-surface-50 transition-colors">
-                        <Download size={14} /> Export Data
-                      </button>
-                      {!confirmDelete ? (
-                        <button onClick={handleDeleteAccount}
-                          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors">
-                          <Trash2 size={14} /> Delete Account
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
+                    <div className="bg-[#FFF5F5] rounded-2xl border border-[#D8727D30] p-6 border-l-4 border-l-[#D8727D]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <AlertTriangle size={15} className="text-[#D8727D]" />
+                        <h3 className="font-semibold text-[#D8727D] text-sm">Danger Zone</h3>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-4">These actions are irreversible. Proceed with caution.</p>
+                      <div className="flex flex-col gap-2">
+                        <button onClick={handleExportData}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-white border border-surface-200 text-gray-600 hover:bg-surface-50 transition-colors w-full">
+                          <Download size={14} /> Export Data
                         </button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">Are you sure?</span>
-                          <button onClick={() => { setConfirmDelete(false); showToast('Account deletion is disabled in this version.', 'info'); }}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors">
-                            Yes, delete
+                        {!confirmDelete ? (
+                          <button onClick={handleDeleteAccount}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors w-full">
+                            <Trash2 size={14} /> Delete Account
                           </button>
-                          <button onClick={() => setConfirmDelete(false)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-surface-200 text-gray-500 hover:bg-surface-50 transition-colors">
-                            Cancel
-                          </button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Are you sure?</span>
+                            <button onClick={() => { setConfirmDelete(false); showToast('Account deletion is disabled in this version.', 'info'); }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#D8727D] text-[#D8727D] hover:bg-[#D8727D08] transition-colors">
+                              Yes, delete
+                            </button>
+                            <button onClick={() => setConfirmDelete(false)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-surface-200 text-gray-500 hover:bg-surface-50 transition-colors">
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                </div>
               </motion.div>
             )}
 
@@ -1046,11 +1051,11 @@ const SettingsPage: React.FC = () => {
               <motion.div key="about"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
-                className="flex flex-col gap-4"
+                className="grid grid-cols-2 gap-4 items-start"
               >
                 {/* App Info hero */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+                  <div className="bg-white rounded-2xl overflow-hidden">
                     <div className="h-1.5 w-full bg-gradient-to-r from-[#5030E5] to-[#7C3AED]" />
                     <div className="p-6 flex items-center gap-5">
                       <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold bg-gradient-to-br from-[#5030E5] to-[#7C3AED] shrink-0 shadow-lg">
@@ -1072,7 +1077,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Software Updates */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                  <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                  <div className="bg-white rounded-2xl p-6">
                     <h3 className="font-semibold text-gray-900 text-sm mb-1">Software Updates</h3>
                     <p className="text-xs text-gray-500 mb-4">Keep your app up to date</p>
                     <div className="flex flex-col gap-4">

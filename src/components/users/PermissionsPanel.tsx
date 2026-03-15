@@ -47,8 +47,9 @@ export const PermissionsPanel: React.FC<Props> = ({ selectedRoleId }) => {
 
     if (!role) {
         return (
-            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-                Select a role to manage permissions
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-300 gap-3 min-h-[200px]">
+                <Lock size={32} />
+                <p className="text-sm font-medium text-gray-400">Select a role to manage permissions</p>
             </div>
         );
     }

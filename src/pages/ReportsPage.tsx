@@ -1,42 +1,80 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Download, BarChart3, TrendingUp, Users, AlertCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Download, BarChart3, TrendingUp, Users, AlertCircle, ChevronDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import { downloadCsv } from '../utils/exportCsv';
+
 const TODAY = new Date().toISOString().split('T')[0];
+
+const STATUS_META = [
+  { key: 'todo',               label: 'To Do',               color: '#5030E5' },
+  { key: 'in-progress',        label: 'In Progress',         color: '#FFA500' },
+  { key: 'ready-for-qa',       label: 'Ready for QA',        color: '#30C5E5' },
+  { key: 'deployment-pending', label: 'Deployment Pending',  color: '#9C27B0' },
+  { key: 'blocker',            label: 'Blocker',             color: '#D8727D' },
+  { key: 'done',               label: 'Done',                color: '#68B266' },
+] as const;
+
+function loadSnapshot(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem('task-breakdown-snapshot') ?? '{}'); }
+  catch { return {}; }
+}
+
+function saveSnapshot(counts: Record<string, number>) {
+  localStorage.setItem('task-breakdown-snapshot', JSON.stringify(counts));
+}
 
 const ReportsPage: React.FC = () => {
   const { projects: ctxProjects, allTasks: ctxAllTasks } = useProjects();
   const { members, getMemberColor } = useMembersContext();
 
+  const previousCounts = useRef<Record<string, number>>(loadSnapshot());
+
   const allTasks = ctxAllTasks;
   const totalTasks = allTasks.length;
   const doneTasks = allTasks.filter(t => t.status === 'done');
-  const todoTasks = allTasks.filter(t => t.status === 'todo');
-  const inProgressTasks = allTasks.filter(t => t.status === 'in-progress');
-  const readyForQaTasks = allTasks.filter(t => t.status === 'ready-for-qa');
-  const deploymentPendingTasks = allTasks.filter(t => t.status === 'deployment-pending');
-  const blockerTasks = allTasks.filter(t => t.status === 'blocker');
   const completionRate = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
   const completionTrend = completionRate >= 80 ? '↑ On track' : completionRate >= 50 ? '→ In progress' : completionRate > 0 ? '↓ Needs focus' : 'No tasks yet';
   const completionTrendUp = completionRate >= 50;
   const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY && t.status !== 'done').length;
 
-  const bars = [
-    { label: 'To Do',               count: todoTasks.length,              color: '#5030E5' },
-    { label: 'In Progress',         count: inProgressTasks.length,        color: '#FFA500' },
-    { label: 'Ready for QA',        count: readyForQaTasks.length,        color: '#30C5E5' },
-    { label: 'Deployment Pending',  count: deploymentPendingTasks.length, color: '#9C27B0' },
-    { label: 'Blocker',             count: blockerTasks.length,           color: '#D8727D' },
-    { label: 'Done',                count: doneTasks.length,              color: '#68B266' },
-  ];
-
-  const projectTaskCounts: Record<string, number> = {};
-  allTasks.forEach(t => {
-    if (t.projectId) projectTaskCounts[t.projectId] = (projectTaskCounts[t.projectId] ?? 0) + 1;
+  const perProjectStats = ctxProjects.map(project => {
+    const tasks = allTasks.filter(t => t.projectId === project.id);
+    const total = tasks.length;
+    const statuses = STATUS_META.map(s => {
+      const matched = tasks.filter(t => t.status === s.key);
+      const count = matched.length;
+      const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+      const overdueCount = matched.filter(t => t.status !== 'done' && t.dueDate && t.dueDate < TODAY).length;
+      const snapshotKey = `${project.id}:${s.key}`;
+      const prev = previousCounts.current[snapshotKey] ?? null;
+      const delta = prev === null ? null : count - prev;
+      return { ...s, count, pct, overdueCount, delta };
+    });
+    const summaryBar = STATUS_META.map(s => ({
+      color: s.color,
+      widthPct: total > 0 ? (tasks.filter(t => t.status === s.key).length / total) * 100 : 0,
+    }));
+    return { project, statuses, total, summaryBar };
   });
+
+  useEffect(() => {
+    const counts: Record<string, number> = {};
+    perProjectStats.forEach(({ project, statuses }) =>
+      statuses.forEach(s => { counts[`${project.id}:${s.key}`] = s.count; })
+    );
+    saveSnapshot(counts);
+  }, [perProjectStats]);
+
+  const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
+  const toggleProject = (id: string) =>
+    setOpenProjects(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   const highCount = allTasks.filter(t => t.priority === 'high').length;
   const lowCount = allTasks.filter(t => t.priority === 'low').length;
@@ -125,46 +163,127 @@ const ReportsPage: React.FC = () => {
 
       {/* Two-column body */}
       <div className="grid grid-cols-[1fr_300px] gap-5 flex-1 min-h-0 pb-6">
-        {/* Main: Task Breakdown + By Project */}
+        {/* Main: Task Breakdown accordion */}
         <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden overflow-y-auto">
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
             <h2 className="font-bold text-gray-900 text-sm">Task Breakdown</h2>
+            <span className="text-xs text-gray-400">{ctxProjects.length} projects</span>
           </div>
-          <div className="px-5 py-4">
-            {bars.map((bar, i) => (
-              <motion.div key={bar.label} className="flex items-center gap-4 mb-4 last:mb-0"
-                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.35, delay: i * 0.08, ease: [0.4, 0, 0.2, 1] }}>
-                <span className="text-xs text-gray-600 w-24 shrink-0">{bar.label}</span>
-                <div className="flex-1 bg-surface-200 rounded-full h-2.5 overflow-hidden">
-                  <motion.div className="h-full rounded-full" style={{ backgroundColor: bar.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${totalTasks > 0 ? (bar.count / totalTasks) * 100 : 0}%` }}
-                    transition={{ duration: 0.6, delay: i * 0.1 + 0.3, ease: [0.4, 0, 0.2, 1] }} />
-                </div>
-                <span className="text-xs text-gray-500 w-6 text-right shrink-0">{bar.count}</span>
-              </motion.div>
-            ))}
 
-            <div className="mt-5 pt-4 border-t border-surface-100">
-              <h3 className="font-bold text-gray-900 text-xs mb-3">By Project</h3>
-              {ctxProjects.map((project, i) => {
-                const count = projectTaskCounts[project.id] ?? 0;
-                const pct = totalTasks > 0 ? (count / totalTasks) * 100 : 0;
-                return (
-                  <motion.div key={project.id} className="flex items-center gap-3 mb-3 last:mb-0"
-                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.35, delay: i * 0.06 + 0.3, ease: [0.4, 0, 0.2, 1] }}>
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
-                    <span className="text-xs text-gray-600 w-28 shrink-0 truncate">{project.name}</span>
-                    <div className="flex-1 bg-surface-200 rounded-full h-1.5 overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: project.color }} />
+          {/* Column header */}
+          <div className="grid grid-cols-[1fr_auto] px-5 pt-3 pb-1">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Project</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Tasks</span>
+          </div>
+
+          <div className="px-3 pb-4">
+            {perProjectStats.map(({ project, statuses, total, summaryBar }, i) => {
+              const isOpen = openProjects.has(project.id);
+              return (
+                <motion.div
+                  key={project.id}
+                  className="mb-1 rounded-xl overflow-hidden border border-transparent hover:border-surface-200 transition-colors"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.06, ease: [0.4, 0, 0.2, 1] }}
+                >
+                  {/* Collapsed header row */}
+                  <button
+                    onClick={() => toggleProject(project.id)}
+                    className="w-full flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-surface-50 rounded-xl transition-colors text-left"
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
+                    <span className="text-xs font-medium text-gray-700 w-28 shrink-0 truncate">{project.name}</span>
+
+                    {/* Stacked status bar */}
+                    <div className="flex-1 h-2 rounded-full overflow-hidden bg-surface-200 flex">
+                      {summaryBar.map((seg, si) =>
+                        seg.widthPct > 0 ? (
+                          <div
+                            key={si}
+                            className="h-full"
+                            style={{ width: `${seg.widthPct}%`, backgroundColor: seg.color }}
+                          />
+                        ) : null
+                      )}
                     </div>
-                    <span className="text-xs text-gray-500 w-4 text-right shrink-0">{count}</span>
-                  </motion.div>
-                );
-              })}
-            </div>
+
+                    <span className="text-xs font-semibold text-gray-600 w-6 text-right shrink-0">{total}</span>
+                    <motion.div
+                      animate={{ rotate: isOpen ? 180 : 0 }}
+                      transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                      className="shrink-0 ml-1"
+                    >
+                      <ChevronDown size={14} className="text-gray-400" />
+                    </motion.div>
+                  </button>
+
+                  {/* Expanded status table */}
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        key="content"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mx-3 mb-3 rounded-xl border border-surface-100 overflow-hidden">
+                          {/* Table header */}
+                          <div className="grid grid-cols-[1fr_40px_36px_52px_36px] px-3 py-2 bg-surface-50 border-b border-surface-100">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</span>
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">#</span>
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">%</span>
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Overdue</span>
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Δ</span>
+                          </div>
+
+                          {/* Status rows */}
+                          {statuses.map((s, si) => {
+                            const deltaLabel = s.delta === null
+                              ? <span className="text-gray-300">new</span>
+                              : s.delta === 0
+                              ? <span className="text-gray-300">—</span>
+                              : s.delta > 0
+                              ? <span className="text-[#68B266] font-semibold">+{s.delta}</span>
+                              : <span className="text-[#D8727D] font-semibold">{s.delta}</span>;
+
+                            return (
+                              <div
+                                key={s.key}
+                                className={`grid grid-cols-[1fr_40px_36px_52px_36px] px-3 py-2 text-xs ${si < statuses.length - 1 ? 'border-b border-surface-100' : ''}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                                  <span className="text-gray-600 truncate">{s.label}</span>
+                                </div>
+                                <span className="text-right font-semibold text-gray-800">{s.count}</span>
+                                <span className="text-right text-gray-400">{s.pct}%</span>
+                                <div className="text-right">
+                                  {s.overdueCount > 0 ? (
+                                    <span className="inline-block bg-red-50 text-[#D8727D] font-semibold px-1.5 py-0.5 rounded text-[10px]">
+                                      {s.overdueCount}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-300">—</span>
+                                  )}
+                                </div>
+                                <div className="text-right">{deltaLabel}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
+
+            {ctxProjects.length === 0 && (
+              <div className="text-center py-10 text-xs text-gray-400">No projects yet</div>
+            )}
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Lock } from 'lucide-react';
+import { Trash2, Lock, KeyRound } from 'lucide-react';
 import { useRoles } from '../../context/RolesContext';
 import { useRolePerms } from '../../context/RolePermsContext';
 import { useMembersContext } from '../../context/MembersContext';
@@ -10,7 +10,7 @@ const dbApi = () => (window as any).electronAPI.db;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const authApi = () => (window as any).electronAPI.auth;
 
-const BUILT_IN = ['admin', 'manager', 'member'];
+const BUILT_IN = ['admin'];
 const PRESET_COLORS = ['#5030E5', '#D97706', '#68B266', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6'];
 
 interface Props {
@@ -98,14 +98,15 @@ export const RoleDetailPanel: React.FC<Props> = ({ selectedRoleId, onDeleteCompl
 
     if (!role) {
         return (
-            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-                Select a role to edit
+            <div className="flex-1 flex flex-col items-center justify-center text-gray-300 gap-3">
+                <KeyRound size={32} />
+                <p className="text-sm font-medium text-gray-400">Select a role to edit</p>
             </div>
         );
     }
 
     return (
-        <div className="flex-1 overflow-y-auto space-y-6 max-w-lg">
+        <div className="space-y-6 max-w-lg">
             <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Role Name</label>
                 {isBuiltIn ? (

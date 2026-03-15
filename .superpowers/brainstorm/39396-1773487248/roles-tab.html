@@ -1,0 +1,62 @@
+<h2>Roles Tab — How should role management work?</h2>
+<p class="subtitle">Pick the interaction style for creating and managing roles</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Role Cards with Inline Edit</h3>
+      <p>Each role is a card showing its name, color badge, member count, and assigned permissions summary. Click a card to expand it inline — rename, change color, see who's assigned, delete. A "+ New Role" button at the top opens a small creation form inline.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace;">
+        [ Admin · 2 users · Full access ]<br>
+        [ Manager · 5 users · 7/10 pages ] ▼ expanded<br>
+        &nbsp;&nbsp;Name: Manager &nbsp; Color: 🟠 &nbsp; [Delete]<br>
+        &nbsp;&nbsp;Members: Alice, Bob, +3<br>
+        [ Member · 8 users · 1/10 pages ]<br>
+        [ + New Role ]
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Role List + Side Drawer</h3>
+      <p>Left: a compact list of all roles (name, color dot, member count). Clicking a role opens a right-side drawer with full details — rename field, color picker, list of assigned members (with ability to reassign them), and a permissions summary linking to the Permissions tab. "+ New Role" opens the drawer in create mode.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace;">
+        ● Admin &nbsp;&nbsp;&nbsp; 2 members<br>
+        ● Manager &nbsp; 5 members &nbsp; ◀ selected<br>
+        ● Member &nbsp;&nbsp; 8 members<br>
+        ● Dev &nbsp;&nbsp;&nbsp;&nbsp; 3 members<br>
+        + New Role<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│ [Drawer: Manager]
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Role Cards Grid (no expand — modal for edit)</h3>
+      <p>A grid of role cards, each showing name, color, member count, and permission bar (x/10 pages). Clicking a card opens a modal for editing. Cleaner visual but requires a modal. Best when you expect many roles.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace;">
+        ┌─────────┐ ┌─────────┐ ┌─────────┐<br>
+        │ 🟣Admin │ │ 🟠Mgr  │ │ ⚫Memb │<br>
+        │ 2 users │ │ 5 users │ │ 8 users │<br>
+        │ ████░░░ │ │ ███░░░░ │ │ █░░░░░░ │<br>
+        └─────────┘ └─────────┘ └─────────┘<br>
+        ┌─────────┐<br>
+        │ + New   │<br>
+        └─────────┘
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:24px; padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+  <p style="font-size:12px; color:#64748b; margin:0;">
+    <strong>My recommendation: A</strong> — Inline expansion keeps everything in context. No modals or drawers to manage. Works well for 3–8 roles which is the typical range.
+  </p>
+</div>

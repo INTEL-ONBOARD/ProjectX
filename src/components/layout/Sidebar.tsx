@@ -28,8 +28,8 @@ interface SidebarProps {
 }
 
 const ALL_NAV_ITEMS = [
-    { id: '/', label: 'Task Board', icon: LayoutGrid },
     { id: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+    { id: '/', label: 'Task Board', icon: LayoutGrid },
     { id: '/messages', label: 'Messages', icon: MessageSquare },
     { id: '/tasks', label: 'Tasks', icon: CheckSquare },
     { id: '/teams', label: 'Projects', icon: Users },

@@ -1,0 +1,51 @@
+<h2>Organization Screen Layout</h2>
+<p class="subtitle">Which overall structure feels right for managing roles, permissions, and users?</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Three-Tab Layout (Evolved Current)</h3>
+      <p>Keep the left sidebar nav but expand it: <strong>Overview</strong> · <strong>Users</strong> · <strong>Roles &amp; Permissions</strong>. The Roles tab becomes a full role builder — create/delete roles, name them, toggle permissions. Users tab gets richer profile info and workload stats.</p>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">✓ Familiar structure</div>
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">✓ Easy to extend</div>
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">— Role builder in sidebar feels cramped</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Split-Panel: Users + Roles Side by Side</h3>
+      <p>Left panel: full user directory with search, filters, workload bars, inline role assignment. Right panel: role builder — list of all roles, click a role to expand its permission toggles. Selecting a user in the left highlights who has that role on the right.</p>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">✓ See users &amp; roles at once</div>
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">✓ Fast role assignment</div>
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">— Less room for user detail</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Four-Tab Layout with Dedicated Role Builder</h3>
+      <p>Left sidebar expands to four sections: <strong>Overview</strong> · <strong>Users</strong> · <strong>Roles</strong> · <strong>Permissions</strong>. <em>Users</em> = rich directory with profile drawer, workload &amp; tasks. <em>Roles</em> = create/rename/delete roles, see who's assigned. <em>Permissions</em> = matrix view — roles across columns, pages down rows, toggle cells.</p>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">✓ Cleanest separation</div>
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">✓ Scales to many roles</div>
+        <div style="background:#f3f4f6; border-radius:8px; padding:8px 12px; font-size:11px; color:#6b7280;">✓ Matrix is powerful</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:24px; padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+  <p style="font-size:12px; color:#64748b; margin:0;">
+    <strong>My recommendation: C</strong> — Four tabs gives each concern its own space. The permissions matrix is especially powerful once you have 4-6 custom roles — a grid beats individual cards at that scale.
+  </p>
+</div>

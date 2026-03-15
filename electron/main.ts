@@ -314,7 +314,10 @@ function registerDbHandlers() {
     ipcMain.handle('db:auth:register', async (_e, name: string, email: string, password: string, role: string) => {
         const existing = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (existing) throw new Error('An account with this email already exists.');
-        const d = await AuthUserModel.create({ appId: `auth-${Date.now()}`, name, email: email.toLowerCase(), password, role });
+        const appId = `auth-${Date.now()}`;
+        const d = await AuthUserModel.create({ appId, name, email: email.toLowerCase(), password, role });
+        // Mirror into User collection so the member shows up in the Users/Members pages
+        await UserModel.create({ appId, name, email: email.toLowerCase(), role, status: 'active' });
         return safe(toAuthUser(d.toObject()));
     });
     ipcMain.handle('db:auth:updatePassword', async (_e, userId: string, currentPassword: string, newPassword: string) => {
@@ -340,6 +343,14 @@ function registerDbHandlers() {
         if (!existing) {
             await AuthUserModel.create({ appId: 'auth-default', name: 'Admin User', email: 'admin@projectm.com', password: 'password123', role: 'admin' });
         }
+        // Ensure a User (member) record exists for every AuthUser
+        const allAuthUsers = await AuthUserModel.find().lean() as any[];
+        for (const au of allAuthUsers) {
+            const memberExists = await UserModel.findOne({ appId: au.appId }).lean();
+            if (!memberExists) {
+                await UserModel.create({ appId: au.appId, name: au.name, email: au.email, role: au.role, status: 'active' });
+            }
+        }
         const adminExists = await AuthUserModel.findOne({ email: 'admin@gmail.com' }).lean();
         if (!adminExists) {
             await AuthUserModel.create({ appId: 'auth-toursurv-admin', name: 'Admin', email: 'admin@gmail.com', password: 'Admin@123', role: 'admin' });
@@ -348,27 +359,16 @@ function registerDbHandlers() {
         if (!orgExists) {
             await OrgModel.create({ orgId: 'org-toursurv', name: 'Toursurv', workStart: '09:00', workEnd: '18:00', createdAt: new Date().toISOString() });
         }
-        const defaultPerms = [
-            { role: 'admin',   allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/organization', '/settings'] },
-            { role: 'manager', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/attendance', '/settings'] },
-            { role: 'member',  allowedRoutes: ['/settings'] },
-        ];
-        for (const p of defaultPerms) {
-            if (p.role === 'admin') {
-                await RolePermsModel.findOneAndUpdate({ role: 'admin' }, { allowedRoutes: p.allowedRoutes }, { upsert: true });
-            } else {
-                const exists = await RolePermsModel.findOne({ role: p.role }).lean();
-                if (!exists) await RolePermsModel.create(p);
-            }
-        }
-        // Seed default roles if none exist
-        const roleCount = await RoleModel.countDocuments();
-        if (roleCount === 0) {
-            await RoleModel.insertMany([
-                { appId: 'role_admin',   name: 'admin',   color: '#5030E5' },
-                { appId: 'role_manager', name: 'manager', color: '#D97706' },
-                { appId: 'role_member',  name: 'member',  color: '#9CA3AF' },
-            ]);
+        // Only admin perms are seeded — all other roles are user-created
+        await RolePermsModel.findOneAndUpdate(
+            { role: 'admin' },
+            { allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/users', '/settings'] },
+            { upsert: true }
+        );
+        // Seed only the admin role if it doesn't exist
+        const adminRole = await RoleModel.findOne({ name: 'admin' }).lean();
+        if (!adminRole) {
+            await RoleModel.create({ appId: 'role_admin', name: 'admin', color: '#5030E5' });
         }
     });
 

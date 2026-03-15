@@ -1,0 +1,59 @@
+<h2>Users Tab — Directory + Detail</h2>
+<p class="subtitle">How should user oversight look? You want role assignment, profile editing, and workload/activity info.</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Table + Slide-out Profile Drawer</h3>
+      <p>Rich table showing avatar, name, email, role (dropdown), workload bar, task count, and status. Clicking any row slides open a right drawer with full profile — editable name, designation, location, status toggle, task activity feed, and workload breakdown. Same pattern as the current Members page profile panel.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace;">
+        Name &nbsp;&nbsp;&nbsp;&nbsp; Email &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Role &nbsp;&nbsp;&nbsp;&nbsp; Workload &nbsp; Tasks<br>
+        ● Alice &nbsp;&nbsp; alice@co &nbsp;&nbsp;&nbsp;&nbsp; [Manager▼] ████░ &nbsp;&nbsp;&nbsp; 8<br>
+        ● Bob &nbsp;&nbsp;&nbsp;&nbsp; bob@co &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [Member▼] &nbsp;██░░░ &nbsp;&nbsp;&nbsp; 3<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; → drawer slides in
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Card Grid + Expanded Card Detail</h3>
+      <p>Users shown as cards (avatar, name, role badge, task count). Clicking a card expands it in-place (like accordion) to show full editable profile + workload stats. No drawer — everything stays in the grid. More visual but takes more vertical space.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace;">
+        ┌──────────┐ ┌──────────┐ ┌──────────┐<br>
+        │ 👤 Alice │ │ 👤 Bob  │ │ 👤 Carol │<br>
+        │ Manager  │ │ Member  │ │ Dev      │<br>
+        │ 8 tasks  │ │ 3 tasks │ │ 5 tasks  │<br>
+        └──────────┘ └──────────┘ └──────────┘<br>
+        ↕ click to expand inline
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Table + Inline Expandable Row</h3>
+      <p>Compact table. Clicking a row expands it into a full-width detail panel below the row — shows editable fields, workload chart, assigned tasks list. The table stays visible above, making it easy to compare users or quickly jump to another. Best of both table density and drawer richness.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace;">
+        ● Alice &nbsp; alice@co &nbsp; [Manager▼] &nbsp; ████░ &nbsp; 8 &nbsp; ▼<br>
+        ┌────────────────────────────────────────┐<br>
+        │ Designation: [Sr. Engineer___] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+        │ Location: [Nairobi_________] &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; │<br>
+        │ Tasks: Dashboard ✓, Auth ✓, API ○ &nbsp;&nbsp;&nbsp; │<br>
+        └────────────────────────────────────────┘<br>
+        ● Bob &nbsp;&nbsp; bob@co &nbsp;&nbsp; [Member▼] &nbsp;&nbsp; ██░░░ &nbsp; 3 &nbsp; ▶
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:24px; padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+  <p style="font-size:12px; color:#64748b; margin:0;">
+    <strong>My recommendation: A</strong> — The slide-out drawer gives the most room for rich profile editing and task activity without disrupting the table. It also matches the existing Members page pattern your app already uses, so it feels consistent.
+  </p>
+</div>

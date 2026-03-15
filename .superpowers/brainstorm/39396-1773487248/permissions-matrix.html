@@ -1,0 +1,58 @@
+<h2>Permissions Tab — Matrix Style</h2>
+<p class="subtitle">How should the role × page permission grid look and behave?</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Simple Toggle Grid</h3>
+      <p>Pages down the left, roles across the top as column headers. Each cell is a toggle switch. Role columns are color-coded. Locked cells (Admin full access, /settings always on) shown as faded with a lock icon. Clean and scannable.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace; overflow-x:auto;">
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Admin &nbsp;&nbsp; Manager &nbsp; Member &nbsp; Dev<br>
+        Dashboard &nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ❌ &nbsp;&nbsp;&nbsp;&nbsp; ✅<br>
+        Messages &nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ❌ &nbsp;&nbsp;&nbsp;&nbsp; ❌<br>
+        Tasks &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp; ✅<br>
+        Members &nbsp;&nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp; ❌ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ❌ &nbsp;&nbsp;&nbsp;&nbsp; ❌<br>
+        Settings &nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp; 🔒
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Toggle Grid + Per-Role Quick Actions</h3>
+      <p>Same grid as A, but each role column header has a "Grant All / Revoke All" quick action button. Useful when setting up a new role — one click to start from full access then remove, or start blank and add. Also shows a mini progress bar under each role name showing % access.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace; overflow-x:auto;">
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Admin &nbsp;&nbsp;&nbsp;&nbsp; Manager &nbsp;&nbsp;&nbsp; Member<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [lock] &nbsp;&nbsp;&nbsp; [▓▓▓▓░░] &nbsp; [▓░░░░░]<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Grant/Revoke &nbsp; Grant/Revoke<br>
+        Dashboard &nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ❌<br>
+        Messages &nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ❌<br>
+        Tasks &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✅
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Toggle Grid + Per-Page Quick Actions</h3>
+      <p>Same grid but with row-level actions — each page row has a "Grant to All / Revoke from All" button. Useful when you want to quickly open or close a page across all roles at once. Role headers show the progress bar too.</p>
+      <div style="margin-top:10px; background:#f8fafc; border-radius:8px; padding:10px; font-size:11px; color:#475569; font-family:monospace; overflow-x:auto;">
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Admin &nbsp; Manager &nbsp; Member &nbsp; [Row action]<br>
+        Dashboard &nbsp; 🔒 &nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ❌ &nbsp;&nbsp;&nbsp;&nbsp; [Grant all]<br>
+        Messages &nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ❌ &nbsp;&nbsp;&nbsp;&nbsp; [Grant all]<br>
+        Tasks &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 🔒 &nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✅ &nbsp;&nbsp;&nbsp;&nbsp; [Revoke all]
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:24px; padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+  <p style="font-size:12px; color:#64748b; margin:0;">
+    <strong>My recommendation: B</strong> — Grant/Revoke All per column is a huge time-saver when creating a new custom role. The progress bar gives instant visual feedback on how permissive each role is.
+  </p>
+</div>
