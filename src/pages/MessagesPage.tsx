@@ -54,7 +54,7 @@ const MessagesPage: React.FC = () => {
     }
   }, [location.state]);
 
-  const activeMember = members.find(m => m.id === activeId) ?? members[0] ?? null;
+  const activeMember = conversations.find(m => m.id === activeId) ?? conversations[0] ?? null;
   const activeColor = getMemberColor(activeId);
   const activeChats = chats[activeId] ?? [];
 
@@ -65,6 +65,7 @@ const MessagesPage: React.FC = () => {
 
   // Mark as read when switching conversation
   useEffect(() => {
+    if (!activeId) return;
     setChats(prev => ({
       ...prev,
       [activeId]: (prev[activeId] ?? []).map(m => ({ ...m, read: true })),
@@ -111,35 +112,36 @@ const MessagesPage: React.FC = () => {
   const sendMessage = () => {
     const text = input.trim();
     if (!text || !currentUserId) return;
+    const targetId = activeId;
     const newMsg: Msg = {
-      id: `m${Date.now()}`,
+      id: `m${crypto.randomUUID()}`,
       from: myId,
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       read: false,
     };
-    setChats(prev => ({ ...prev, [activeId]: [...(prev[activeId] ?? []), newMsg] }));
+    setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
     setInput('');
     inputRef.current?.focus();
-    dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? activeId, text, timestamp: newMsg.time })
+    dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: newMsg.time })
         .then((saved: Msg) => {
           setChats(prev => ({
             ...prev,
-            [activeId]: (prev[activeId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id } : m),
+            [targetId]: (prev[targetId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id } : m),
           }));
         })
         .catch((err: unknown) => {
           console.error('[MessagesPage] Failed to send message:', err);
-          setChats(prev => ({ ...prev, [activeId]: (prev[activeId] ?? []).filter(m => m.id !== newMsg.id) }));
+          setChats(prev => ({ ...prev, [targetId]: (prev[targetId] ?? []).filter(m => m.id !== newMsg.id) }));
           showToast('Failed to send message.', 'error');
         });
   };
 
   const addReaction = async (msgId: string, emoji: string) => {
-    const prevChats = chats[activeId] ?? [];
+    const targetId = activeId;
     setChats(prev => ({
       ...prev,
-      [activeId]: (prev[activeId] ?? []).map(m =>
+      [targetId]: (prev[targetId] ?? []).map(m =>
         m.id === msgId ? { ...m, reactions: [...(m.reactions ?? []).filter(e => e !== emoji), emoji] } : m
       ),
     }));
@@ -148,33 +150,52 @@ const MessagesPage: React.FC = () => {
       await dbApi().reactToMessage(msgId, myId, emoji);
     } catch (err: unknown) {
       console.error('[MessagesPage] Failed to save reaction:', err);
-      setChats(prev => ({ ...prev, [activeId]: prevChats }));
+      // Targeted undo: remove only the emoji we just added
+      setChats(prev => ({
+        ...prev,
+        [targetId]: (prev[targetId] ?? []).map(m =>
+          m.id === msgId ? { ...m, reactions: (m.reactions ?? []).filter(e => e !== emoji) } : m
+        ),
+      }));
       showToast('Failed to save reaction.', 'error');
     }
   };
 
   const deleteMessage = async (msgId: string) => {
-    const prevChats = chats[activeId] ?? [];
-    setChats(prev => ({ ...prev, [activeId]: (prev[activeId] ?? []).filter(m => m.id !== msgId) }));
+    const targetId = activeId;
+    const deletedMsg = (chats[targetId] ?? []).find(m => m.id === msgId);
+    setChats(prev => ({ ...prev, [targetId]: (prev[targetId] ?? []).filter(m => m.id !== msgId) }));
     setShowContextMenu(null);
     try {
       await dbApi().deleteMessage(msgId);
     } catch (err: unknown) {
       console.error('[MessagesPage] Failed to delete message:', err);
-      setChats(prev => ({ ...prev, [activeId]: prevChats }));
+      // Targeted undo: re-insert only the deleted message
+      if (deletedMsg) {
+        setChats(prev => ({
+          ...prev,
+          [targetId]: [...(prev[targetId] ?? []), deletedMsg].sort((a, b) => a.time.localeCompare(b.time)),
+        }));
+      }
       showToast('Failed to delete message.', 'error');
     }
   };
 
   const clearChat = async () => {
-    const msgs = chats[activeId] ?? [];
+    const targetId = activeId;
+    const msgs = chats[targetId] ?? [];
     if (!msgs.length) return;
-    setChats(p => ({ ...p, [activeId]: [] }));
+    setChats(p => ({ ...p, [targetId]: [] }));
     try {
-      await Promise.all(msgs.map(m => dbApi().deleteMessage(m.id)));
+      const results = await Promise.allSettled(msgs.map(m => dbApi().deleteMessage(m.id)));
+      const failed = msgs.filter((_, i) => results[i].status === 'rejected');
+      if (failed.length > 0) {
+        setChats(p => ({ ...p, [targetId]: [...(p[targetId] ?? []), ...failed] }));
+        showToast('Some messages could not be deleted.', 'error');
+      }
     } catch (err: unknown) {
       console.error('[MessagesPage] Failed to clear chat:', err);
-      setChats(p => ({ ...p, [activeId]: msgs }));
+      setChats(p => ({ ...p, [targetId]: msgs }));
       showToast('Failed to clear chat.', 'error');
     }
   };
@@ -454,19 +475,25 @@ const MessagesPage: React.FC = () => {
               </button>
               <input ref={attachRef} type="file" className="hidden" onChange={e => {
                 const file = e.target.files?.[0];
-                if (!file) return;
+                if (!file || !currentUserId) return;
+                const targetId = activeId;
+                const text = `📎 ${file.name}`;
                 const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                setChats(prev => ({
-                  ...prev,
-                  [activeId]: [...(prev[activeId] ?? []), {
-                    id: String(Date.now()),
-                    from: myId,
-                    text: `📎 ${file.name}`,
-                    time: now,
-                    read: true,
-                  }],
-                }));
+                const newMsg: Msg = { id: `m${crypto.randomUUID()}`, from: myId, text, time: now, read: true };
+                setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
                 e.target.value = '';
+                dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: now })
+                  .then((saved: Msg) => {
+                    setChats(prev => ({
+                      ...prev,
+                      [targetId]: (prev[targetId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id } : m),
+                    }));
+                  })
+                  .catch((err: unknown) => {
+                    console.error('[MessagesPage] Failed to send attachment:', err);
+                    setChats(prev => ({ ...prev, [targetId]: (prev[targetId] ?? []).filter(m => m.id !== newMsg.id) }));
+                    showToast('Failed to send attachment.', 'error');
+                  });
               }} />
               <input
                 ref={inputRef}
@@ -522,7 +549,7 @@ const MessagesPage: React.FC = () => {
           <div className="p-4 border-b border-surface-100">
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</div>
             {[
-              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); if (nextConv) setActiveId(nextConv.id); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
+              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); setActiveId(nextConv ? nextConv.id : ''); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
               { icon: Trash2, label: 'Clear Chat', action: clearChat },
             ].map(({ icon: Icon, label, action }) => (
               <button
@@ -581,7 +608,7 @@ const MessagesPage: React.FC = () => {
                 )}
                 {members.filter(m => m.id !== myId).map(m => (
                   <button key={m.id} onClick={() => {
-                    setChats(prev => ({ ...prev, [m.id]: [] }));
+                    setChats(prev => ({ ...prev, [m.id]: prev[m.id] ?? [] }));
                     setActiveId(m.id);
                     setShowNewConvo(false);
                   }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-50 transition-colors">
