@@ -69,11 +69,19 @@ export const UserProfileDrawer: React.FC<Props> = ({ user, member, getMemberColo
             if (member) {
                 await dbApi().updateMember(user.id, { designation, location, status });
             }
-            // Role
+            // Role — update member first, then sync auth; revert if auth sync fails
             if (role !== user.role && !isSelf) {
-                await authApi().updateRole(user.id, role);
                 await dbApi().updateMember(user.id, { role });
                 await updateMember(user.id, { role });
+                try {
+                    await authApi().updateRole(user.id, role);
+                } catch {
+                    // Revert if auth sync fails
+                    await dbApi().updateMember(user.id, { role: user.role }).catch(() => {});
+                    await updateMember(user.id, { role: user.role }).catch(() => {});
+                    showToast('Role update failed: auth sync error. Role reverted.', 'error');
+                    return;
+                }
             }
             onSaved(user.id, { name, designation, location, status, role });
             showToast('Profile updated.', 'success');

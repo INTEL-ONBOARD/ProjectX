@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, Save, User as UserIcon, Mail, MapPin, Briefcase, Phone,
     Building2, FileText, Shield, Activity, Calendar, Hash,
+    Clock, TrendingUp, CheckCircle2, XCircle, Coffee, Home,
 } from 'lucide-react';
 import { User } from '../../types';
 import { RoleDoc } from '../../context/RolesContext';
@@ -10,6 +11,7 @@ import { useMembersContext } from '../../context/MembersContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../ui/Toast';
 import { useProjects } from '../../context/ProjectContext';
+import { AppContext } from '../../context/AppContext';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const authApi = () => (window as any).electronAPI.auth;
@@ -20,12 +22,13 @@ interface Props {
     onClose: () => void;
 }
 
-type Section = 'profile' | 'role' | 'activity';
+type Section = 'profile' | 'role' | 'activity' | 'attendance';
 
 const SECTIONS: { id: Section; label: string }[] = [
-    { id: 'profile', label: 'Profile' },
-    { id: 'role',    label: 'Role & Status' },
-    { id: 'activity', label: 'Activity' },
+    { id: 'profile',    label: 'Profile' },
+    { id: 'role',       label: 'Role & Status' },
+    { id: 'activity',   label: 'Activity' },
+    { id: 'attendance', label: 'Attendance' },
 ];
 
 const Field: React.FC<{
@@ -50,6 +53,7 @@ export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
     const { user: authUser } = useAuth();
     const { showToast } = useToast();
     const { allTasks } = useProjects();
+    const { attendanceRecords } = useContext(AppContext);
 
     const [section, setSection] = useState<Section>('profile');
     const [saving, setSaving] = useState(false);
@@ -104,10 +108,18 @@ export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
             };
             if (!isSelf && form.role !== member.role) {
                 changes.role = form.role;
-                try { await authApi().updateRole(member.id, form.role); }
-                catch { showToast('Role updated but auth sync failed. User may need to re-login.', 'error'); }
+                await updateMember(member.id, changes);
+                try {
+                    await authApi().updateRole(member.id, form.role);
+                } catch {
+                    // Revert member role if auth sync fails
+                    await updateMember(member.id, { role: member.role }).catch(() => {});
+                    showToast('Role update failed: auth sync error. Role reverted.', 'error');
+                    return;
+                }
+            } else {
+                await updateMember(member.id, changes);
             }
-            await updateMember(member.id, changes);
             showToast(`${member.name} updated successfully.`, 'success');
             onClose();
         } catch {
@@ -123,6 +135,38 @@ export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
     const inProgressTasks = assignedTasks.filter(t => t.status === 'in-progress');
     const blockerTasks   = assignedTasks.filter(t => t.status === 'blocker');
     const completionRate = assignedTasks.length > 0 ? Math.round((completedTasks.length / assignedTasks.length) * 100) : 0;
+
+    // Attendance stats
+    const memberAttendance = attendanceRecords
+        .filter(r => r.userId === member?.id)
+        .sort((a, b) => b.date.localeCompare(a.date)); // newest first
+
+    const attPresent  = memberAttendance.filter(r => r.status === 'present').length;
+    const attAbsent   = memberAttendance.filter(r => r.status === 'absent').length;
+    const attWfh      = memberAttendance.filter(r => r.status === 'wfh').length;
+    const attOnLeave  = memberAttendance.filter(r => r.status === 'on-leave').length;
+    const attHalfDay  = memberAttendance.filter(r => r.status === 'half-day').length;
+    const attTotal    = memberAttendance.length;
+    const attRate     = attTotal > 0 ? Math.round(((attPresent + attWfh + attHalfDay * 0.5) / attTotal) * 100) : 0;
+
+    const computeWorkHours = (checkIn?: string, checkOut?: string): string => {
+        if (!checkIn || !checkOut) return '—';
+        const diff = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+        if (diff <= 0) return '—';
+        const hrs = Math.floor(diff / 3600000);
+        const mins = Math.floor((diff % 3600000) / 60000);
+        return `${hrs}h ${mins}m`;
+    };
+
+    const totalWorkMs = memberAttendance.reduce((acc, r) => {
+        if (!r.checkIn || !r.checkOut) return acc;
+        const diff = new Date(r.checkOut).getTime() - new Date(r.checkIn).getTime();
+        return diff > 0 ? acc + diff : acc;
+    }, 0);
+    const avgWorkMs = attTotal > 0 ? totalWorkMs / attTotal : 0;
+    const avgHrs = Math.floor(avgWorkMs / 3600000);
+    const avgMins = Math.floor((avgWorkMs % 3600000) / 60000);
+    const avgWorkLabel = avgWorkMs > 0 ? `${avgHrs}h ${avgMins}m` : '—';
 
     const initials = (name: string) => name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
@@ -352,10 +396,108 @@ export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
                                     )}
                                 </>
                             )}
+
+                            {/* ── Attendance tab ── */}
+                            {section === 'attendance' && (
+                                <>
+                                    {/* Summary stats */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {[
+                                            { label: 'Attendance Rate', value: `${attRate}%`, color: '#68B266', icon: <TrendingUp size={14} /> },
+                                            { label: 'Avg Work Hours', value: avgWorkLabel, color: '#5030E5', icon: <Clock size={14} /> },
+                                            { label: 'Present Days',   value: attPresent,   color: '#68B266', icon: <CheckCircle2 size={14} /> },
+                                            { label: 'Absent Days',    value: attAbsent,    color: '#D8727D', icon: <XCircle size={14} /> },
+                                            { label: 'Work From Home',  value: attWfh,       color: '#30C5E5', icon: <Home size={14} /> },
+                                            { label: 'On Leave',       value: attOnLeave,   color: '#FFA500', icon: <Coffee size={14} /> },
+                                        ].map(stat => (
+                                            <div key={stat.label} className="bg-surface-50 rounded-xl p-3 border border-surface-100 flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: stat.color + '20' }}>
+                                                    <span style={{ color: stat.color }}>{stat.icon}</span>
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg font-extrabold" style={{ color: stat.color }}>{stat.value}</div>
+                                                    <div className="text-[10px] text-gray-400 leading-tight">{stat.label}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Attendance rate bar */}
+                                    <div className="bg-surface-50 rounded-xl p-4 border border-surface-100">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-semibold text-gray-600">Attendance Rate</span>
+                                            <span className="text-xs font-bold text-gray-800">{attRate}%</span>
+                                        </div>
+                                        <div className="h-2 bg-surface-200 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className="h-full rounded-full"
+                                                style={{ background: '#68B266' }}
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${attRate}%` }}
+                                                transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+                                            />
+                                        </div>
+                                        <div className="flex justify-between mt-1.5">
+                                            <span className="text-[10px] text-gray-400">{attTotal} records total</span>
+                                            {attHalfDay > 0 && <span className="text-[10px] text-gray-400">{attHalfDay} half-day{attHalfDay !== 1 ? 's' : ''}</span>}
+                                        </div>
+                                    </div>
+
+                                    {/* Recent records */}
+                                    {memberAttendance.length > 0 ? (
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Recent Records</p>
+                                            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                                                {memberAttendance.slice(0, 30).map(r => {
+                                                    const statusMeta: Record<string, { color: string; label: string }> = {
+                                                        present:    { color: '#68B266', label: 'Present' },
+                                                        absent:     { color: '#D8727D', label: 'Absent' },
+                                                        wfh:        { color: '#30C5E5', label: 'WFH' },
+                                                        'on-leave': { color: '#FFA500', label: 'On Leave' },
+                                                        'half-day': { color: '#9C27B0', label: 'Half Day' },
+                                                        holiday:    { color: '#6366f1', label: 'Holiday' },
+                                                    };
+                                                    const meta = statusMeta[r.status] ?? { color: '#9ca3af', label: r.status };
+                                                    const workHours = computeWorkHours(r.checkIn, r.checkOut);
+                                                    const checkInTime = r.checkIn ? new Date(r.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null;
+                                                    const checkOutTime = r.checkOut ? new Date(r.checkOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : null;
+                                                    return (
+                                                        <div key={r.id} className="px-3 py-2 bg-surface-50 rounded-lg border border-surface-100 text-xs">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: meta.color }} />
+                                                                    <span className="font-semibold text-gray-700">
+                                                                        {new Date(r.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                                    </span>
+                                                                </div>
+                                                                <span className="font-semibold px-2 py-0.5 rounded-md text-[10px]" style={{ background: meta.color + '20', color: meta.color }}>
+                                                                    {meta.label}
+                                                                </span>
+                                                            </div>
+                                                            {(checkInTime || checkOutTime) && (
+                                                                <div className="mt-1.5 flex items-center gap-3 text-[10px] text-gray-400">
+                                                                    {checkInTime && <span>In: <span className="text-gray-600 font-medium">{checkInTime}</span></span>}
+                                                                    {checkOutTime && <span>Out: <span className="text-gray-600 font-medium">{checkOutTime}</span></span>}
+                                                                    {workHours !== '—' && <span className="ml-auto text-gray-500 font-medium">{workHours}</span>}
+                                                                </div>
+                                                            )}
+                                                            {r.notes && (
+                                                                <div className="mt-1 text-[10px] text-gray-400 italic">{r.notes}</div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-xs text-gray-400">No attendance records yet</div>
+                                    )}
+                                </>
+                            )}
                         </div>
 
                         {/* Footer */}
-                        {section !== 'activity' && (
+                        {section !== 'activity' && section !== 'attendance' && (
                             <div className="px-6 py-4 border-t border-surface-100 shrink-0">
                                 <button
                                     onClick={handleSave}

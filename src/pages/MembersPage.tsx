@@ -384,20 +384,24 @@ const MembersPage: React.FC = () => {
                         disabled={saving}
                         onChange={async e => {
                           const newRole = e.target.value as User['role'];
+                          const prevRole = selectedMember.role;
                           setSaving(true);
                           try {
                             await updateMember(selectedMember.id, { role: newRole });
+                            try {
+                              await authApi().updateRole(selectedMember.id, newRole);
+                            } catch {
+                              // Revert member update if auth sync fails
+                              await updateMember(selectedMember.id, { role: prevRole }).catch(() => {});
+                              showToast('Role update failed: auth sync error. Role reverted.', 'error');
+                              setSaving(false);
+                              return;
+                            }
+                            setSelectedMember(prev => prev ? { ...prev, role: newRole } : prev);
+                            showToast('Role updated.', 'success');
                           } catch {
                             showToast('Failed to update role.', 'error');
-                            setSaving(false);
-                            return;
                           }
-                          try {
-                            await authApi().updateRole(selectedMember.id, newRole);
-                          } catch {
-                            showToast('Role saved but auth sync failed. User may need to re-login.', 'info');
-                          }
-                          setSelectedMember(prev => prev ? { ...prev, role: newRole } : prev);
                           setSaving(false);
                         }}
                         className="text-xs font-semibold text-gray-700 border border-surface-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-primary-400 disabled:opacity-50"
