@@ -58,6 +58,15 @@ interface ElectronDB {
   // Role permissions
   getRolePerms(): Promise<RolePerms[]>;
   setRolePerms(data: { role: string; allowedRoutes: string[] }): Promise<RolePerms>;
+
+  // Roles
+  getRoles(): Promise<unknown[]>;
+  createRole(data: { name: string; color: string }): Promise<{ appId: string; name: string; color: string }>;
+  renameRole(data: { appId: string; newName: string }): Promise<{ ok: boolean; oldName: string }>;
+  updateRoleColor(data: { appId: string; color: string }): Promise<unknown>;
+  deleteRole(data: { appId: string }): Promise<unknown>;
+  // NOTE: handler reads data.roleName (not data.role) — pass { roleName: string }
+  deleteRolePerms(data: { roleName: string }): Promise<unknown>;
 }
 
 interface ElectronAuth {
