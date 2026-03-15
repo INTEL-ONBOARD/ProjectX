@@ -10,10 +10,10 @@ import TeamsPage from './pages/TeamsPage';
 import AttendancePage from './pages/AttendancePage';
 import SettingsPage from './pages/SettingsPage';
 import ReportsPage from './pages/ReportsPage';
-import OrganizationPage from './pages/OrganizationPage';
 import MessagesPage from './pages/MessagesPage';
 import TasksPage from './pages/TasksPage';
 import MembersPage from './pages/MembersPage';
+import UsersPage from './pages/UsersPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AppProvider, AppContext, User } from './context/AppContext';
 import { MembersProvider } from './context/MembersContext';
@@ -143,8 +143,8 @@ const MainApp: React.FC = () => (
         <Route path="/teams" element={<ProtectedRoute path="/teams"><Layout><TeamsPage /></Layout></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute path="/attendance"><Layout><AttendancePage /></Layout></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute path="/reports"><Layout><ReportsPage /></Layout></ProtectedRoute>} />
-        <Route path="/organization" element={<ProtectedRoute path="/organization"><Layout><OrganizationPage /></Layout></ProtectedRoute>} />
-        <Route path="/settings" element={<Layout><SettingsPage /></Layout>} />
+        <Route path="/users" element={<ProtectedRoute path="/users"><Layout><UsersPage /></Layout></ProtectedRoute>} />
+<Route path="/settings" element={<Layout><SettingsPage /></Layout>} />
         <Route path="*" element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
     </Routes>
 );
@@ -196,19 +196,19 @@ const App: React.FC = () => (
     <AuthProvider>
         <AppProvider>
             <AuthAppSync />
-            <RolesProvider>
-                <RolePermsProvider>
-                    <MembersProvider>
-                        <ProjectProvider>
-                            <ToastProvider>
-                                <HashRouter>
-                                    <Root />
-                                </HashRouter>
-                            </ToastProvider>
-                        </ProjectProvider>
-                    </MembersProvider>
-                </RolePermsProvider>
-            </RolesProvider>
+            <RolePermsProvider>
+                <RolesProvider>
+                <MembersProvider>
+                    <ProjectProvider>
+                        <ToastProvider>
+                            <HashRouter>
+                                <Root />
+                            </HashRouter>
+                        </ToastProvider>
+                    </ProjectProvider>
+                </MembersProvider>
+                </RolesProvider>
+            </RolePermsProvider>
         </AppProvider>
     </AuthProvider>
 );

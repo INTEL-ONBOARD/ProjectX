@@ -6,9 +6,9 @@ import {
     MessageSquare,
     CheckSquare,
     Users,
+    Users2,
     Clock3,
     BarChart3,
-    Building2,
     Settings,
     ChevronLeft,
     Plus,
@@ -36,7 +36,7 @@ const ALL_NAV_ITEMS = [
     { id: '/members', label: 'Members', icon: Users },
     { id: '/attendance', label: 'Attendance', icon: Clock3 },
     { id: '/reports', label: 'Reports', icon: BarChart3 },
-    { id: '/organization', label: 'Organization', icon: Building2 },
+    { id: '/users', label: 'Users', icon: Users2 },
     { id: '/settings', label: 'Settings', icon: Settings },
 ];
 
