@@ -183,10 +183,9 @@ const toUser = d => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', email:
 const toProject = d => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 const toRole = d => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, commentData: (d.commentData ?? []).map(c => ({ id: c.id, author: c.author, text: c.text, time: c.time })), files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });
+const toMsg = d => ({ id: d.msgId, from: d.fromId, to: d.toId, text: d.text, time: d.timestamp, read: false, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
 
 // ─── MongoDB connection ────────────────────────────────────────────────────────
-
-const toMsg = d => ({ id: d.msgId, from: d.fromId, to: d.toId, text: d.text, time: d.timestamp, read: false, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
 
 let messageStream = null;
 
@@ -202,7 +201,11 @@ function startMessageStream() {
         });
         messageStream.on('error', err => {
             console.error('[changeStream] error:', err.message);
+            try { messageStream.close(); } catch (_) {}
             messageStream = null;
+            setTimeout(() => {
+                if (mongoose.connection.readyState === 1) startMessageStream();
+            }, 5000);
         });
         console.log('[changeStream] message stream started');
     } catch (err) {
