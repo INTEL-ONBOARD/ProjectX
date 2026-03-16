@@ -122,7 +122,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         createTask:    (task: object): Promise<unknown>                        => ipcRenderer.invoke('db:tasks:create', task),
         updateTask:    (id: string, changes: object): Promise<unknown>         => ipcRenderer.invoke('db:tasks:update', id, changes),
         deleteTask:    (id: string): Promise<boolean>                          => ipcRenderer.invoke('db:tasks:delete', id),
-        moveTask:      (id: string, newStatus: string): Promise<unknown>       => ipcRenderer.invoke('db:tasks:move', id, newStatus),
+        moveTask:      (id: string, newStatus: string, actorId?: string, actorName?: string): Promise<unknown> => ipcRenderer.invoke('db:tasks:move', id, newStatus, actorId, actorName),
         scrubAssignee: (memberId: string): Promise<boolean>                    => ipcRenderer.invoke('db:tasks:scrubAssignee', memberId),
 
         // Members

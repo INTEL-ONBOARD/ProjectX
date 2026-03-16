@@ -78,7 +78,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         createTask: (task) => ipcRenderer.invoke('db:tasks:create', task),
         updateTask: (id, changes) => ipcRenderer.invoke('db:tasks:update', id, changes),
         deleteTask: (id) => ipcRenderer.invoke('db:tasks:delete', id),
-        moveTask: (id, newStatus) => ipcRenderer.invoke('db:tasks:move', id, newStatus),
+        moveTask: (id, newStatus, actorId, actorName) => ipcRenderer.invoke('db:tasks:move', id, newStatus, actorId, actorName),
         scrubAssignee: (memberId) => ipcRenderer.invoke('db:tasks:scrubAssignee', memberId),
 
         // Members

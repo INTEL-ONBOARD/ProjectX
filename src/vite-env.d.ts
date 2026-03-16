@@ -13,10 +13,10 @@ interface ElectronDB {
 
   // Tasks
   getTasks(): Promise<Task[]>;
-  createTask(task: Omit<Task, 'id'>): Promise<Task>;
-  updateTask(id: string, changes: Partial<Omit<Task, 'id'>>): Promise<Task | null>;
+  createTask(task: Omit<Task, 'id'> & { actorId?: string; actorName?: string }): Promise<Task>;
+  updateTask(id: string, changes: Partial<Omit<Task, 'id'>> & { actorId?: string; actorName?: string }): Promise<Task | null>;
   deleteTask(id: string): Promise<boolean>;
-  moveTask(id: string, newStatus: TaskStatus): Promise<Task | null>;
+  moveTask(id: string, newStatus: TaskStatus, actorId?: string, actorName?: string): Promise<Task | null>;
   scrubAssignee(memberId: string): Promise<boolean>;
 
   // Members
