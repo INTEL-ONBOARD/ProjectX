@@ -21,6 +21,7 @@ import {
 import { useProjects } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
 import { useRolePerms } from '../../context/RolePermsContext';
+import { useMembersContext } from '../../context/MembersContext';
 
 interface SidebarProps {
     collapsed: boolean;
@@ -60,9 +61,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     const { projects, createProject, updateProject, deleteProject } = useProjects();
     const { user } = useAuth();
     const { getAllowedRoutes } = useRolePerms();
+    const { members } = useMembersContext();
+    const [unreadMsgCount, setUnreadMsgCount] = useState(0);
 
     const allowedRoutes = getAllowedRoutes(user?.role ?? 'member');
     const navItems = ALL_NAV_ITEMS.filter(item => allowedRoutes.includes(item.id));
+    const onMessagesPage = location.pathname === '/messages';
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -73,6 +77,46 @@ const Sidebar: React.FC<SidebarProps> = ({
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    // Load unread count from DB; recompute whenever the user leaves the messages page
+    useEffect(() => {
+        if (!user?.id || members.length === 0) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = () => (window as any).electronAPI?.db;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI;
+        const peers = members.filter((m: { id: string }) => m.id !== user.id);
+
+        const recompute = async () => {
+            let total = 0;
+            for (const peer of peers) {
+                try {
+                    const msgs: { from: string; read: boolean }[] = await db().getMessagesBetween(user.id, peer.id);
+                    total += msgs.filter((m: { from: string; read: boolean }) => m.from !== user.id && !m.read).length;
+                } catch { /* ignore */ }
+            }
+            setUnreadMsgCount(total);
+        };
+
+        // Increment on new incoming message only when NOT on messages page
+        const unsub = api?.onNewMessage?.((_: unknown, msg: { from: string; to: string }) => {
+            if (msg.to !== user.id) return;
+            if (onMessagesPage) return; // user is already viewing messages, no badge needed
+            setUnreadMsgCount(prev => prev + 1);
+        });
+
+        // Always recompute fresh from DB on mount or when leaving messages page
+        if (!onMessagesPage) {
+            // Small delay when navigating away from messages page so markMessagesRead DB calls finish first
+            const timer = setTimeout(recompute, 300);
+            return () => { clearTimeout(timer); unsub?.(); };
+        } else {
+            setUnreadMsgCount(0); // user is on messages page — they're reading
+        }
+
+        return () => unsub?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id, members.length, onMessagesPage]);
 
     return (
         <>
@@ -141,7 +185,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                                         : 'text-gray-500 hover:bg-surface-100 hover:text-gray-700'
                                         }`}
                                 >
-                                    <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                                    <div className="relative shrink-0">
+                                        <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                                        {item.id === '/messages' && unreadMsgCount > 0 && !onMessagesPage && (
+                                            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] rounded-full bg-primary-500 text-white text-[9px] font-bold flex items-center justify-center px-1 leading-none">
+                                                {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
+                                            </span>
+                                        )}
+                                    </div>
                                     <AnimatePresence>
                                         {!collapsed && (
                                             <motion.span

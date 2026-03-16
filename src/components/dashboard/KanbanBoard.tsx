@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Tag, User, Calendar, ChevronDown, ImagePlus,
   Check, Edit3, Trash2, MessageSquare, Send,
-  ArrowRight, Flag, UserPlus, UserMinus, FileText, Plus, Pencil,
+  ArrowRight, Flag, UserPlus, UserMinus, FileText, Plus, Pencil, FolderPlus,
 } from 'lucide-react';
 import { Task, TaskStatus, TaskCommentItem, TaskActivityEntry } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
@@ -218,6 +218,58 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const proj = selectedTask ? projects.find(p => p.id === selectedTask.projectId) : null;
 
   const projectTasks = applyFilters(allTasks.filter(t => t.projectId === activeProject));
+
+  // ── No projects empty state ──────────────────────────────────────────────
+  const [newProjName, setNewProjName] = useState('');
+  const [newProjColor, setNewProjColor] = useState('#5030E5');
+  const [creating, setCreating] = useState(false);
+  const PROJECT_COLORS = ['#5030E5','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6'];
+
+  if (projects.length === 0) {
+    return (
+      <div className="flex-1 min-h-0 flex items-center justify-center -mt-16">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="flex flex-col items-center gap-6 max-w-sm w-full"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center">
+            <FolderPlus size={28} className="text-primary-500" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-gray-900">No projects yet</h2>
+            <p className="text-sm text-gray-400 mt-1">Create your first project to start organizing tasks</p>
+          </div>
+          <div className="w-full bg-white rounded-2xl p-5 shadow-card ring-1 ring-surface-100 flex flex-col gap-4">
+            <input
+              type="text"
+              placeholder="Project name"
+              value={newProjName}
+              onChange={e => setNewProjName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && newProjName.trim()) { setCreating(true); createProject(newProjName.trim(), newProjColor).finally(() => setCreating(false)); }}}
+              className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 mr-1">Color</span>
+              {PROJECT_COLORS.map(c => (
+                <button key={c} onClick={() => setNewProjColor(c)}
+                  className={`w-6 h-6 rounded-full transition-all ${newProjColor === c ? 'ring-2 ring-offset-2' : 'opacity-60 hover:opacity-100'}`}
+                  style={{ background: c, ...(newProjColor === c ? { outlineColor: c } : {}) }}
+                />
+              ))}
+            </div>
+            <button
+              disabled={!newProjName.trim() || creating}
+              onClick={() => { setCreating(true); createProject(newProjName.trim(), newProjColor).finally(() => setCreating(false)); }}
+              className="w-full py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {creating ? 'Creating…' : 'Create Project'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <>

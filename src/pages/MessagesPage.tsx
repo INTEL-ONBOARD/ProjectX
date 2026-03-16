@@ -9,6 +9,7 @@ import { useMembersContext } from '../context/MembersContext';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
 import { getPresenceStatus } from '../context/PresenceContext';
+import { useNotifications } from '../context/NotificationContext';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
@@ -21,12 +22,14 @@ const MessagesPage: React.FC = () => {
   useContext(AppContext); // keep context subscription for future use
   const { showToast } = useToast();
   const { user: authUser } = useAuth();
+  const { notifications, markRead } = useNotifications();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dbApi = () => (window as any).electronAPI.db;
   // Single source of truth: authUser.id is always available after login
   const myId = authUser?.id ?? '';
   const currentUserId = myId;
   const [activeId, setActiveId] = useState('');
+  const activeIdRef = useRef('');
   const [chats, setChats] = useState<Record<string, Msg[]>>({});
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
@@ -54,7 +57,15 @@ const MessagesPage: React.FC = () => {
     }
   }, [location.state]);
 
-  const activeMember = conversations.find(m => m.id === activeId) ?? conversations[0] ?? null;
+  // Auto-select first conversation if none is selected
+  useEffect(() => {
+    if (!activeId && conversations.length > 0) {
+      setActiveId(conversations[0].id);
+    }
+  }, [conversations.length]);
+
+  activeIdRef.current = activeId;
+  const activeMember = conversations.find(m => m.id === activeId) ?? null;
   const activeColor = getMemberColor(activeId);
   const activeChats = chats[activeId] ?? [];
 
@@ -69,9 +80,14 @@ const MessagesPage: React.FC = () => {
     conversations.forEach(peer => {
       // Skip the active conversation — the active-conversation effect handles it and marks as read
       if (peer.id === activeMember?.id) return;
-      dbApi().getMessagesBetween(currentUserId, peer.id)
-        .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [peer.id]: msgs as Msg[] })))
-        .catch((err: unknown) => console.error('[MessagesPage] Failed to preload messages for', peer.id, err));
+      // Skip conversations already loaded — don't overwrite read state set by the active-conv effect
+      setChats(prev => {
+        if (prev[peer.id] !== undefined) return prev; // already loaded, don't overwrite
+        dbApi().getMessagesBetween(currentUserId, peer.id)
+          .then((msgs: Msg[]) => setChats(p => ({ ...p, [peer.id]: msgs as Msg[] })))
+          .catch((err: unknown) => console.error('[MessagesPage] Failed to preload messages for', peer.id, err));
+        return prev;
+      });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId, conversations.length]);
@@ -90,6 +106,15 @@ const MessagesPage: React.FC = () => {
         })
         .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
   }, [activeMember?.id, currentUserId]);
+
+  // Mark new_message notifications as read when viewing a conversation
+  useEffect(() => {
+    if (!activeMember) return;
+    notifications
+      .filter(n => !n.read && n.type === 'new_message' && n.refId?.startsWith('msg-'))
+      .forEach(n => markRead(n.id));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMember?.id, notifications.length]);
 
   // Real-time: listen for new messages pushed from main via change stream
   useEffect(() => {
@@ -116,7 +141,7 @@ const MessagesPage: React.FC = () => {
       });
     });
     return () => unsub?.();
-  }, [currentUserId]);
+  }, [currentUserId, activeId]);
 
   // Load conv meta (pin/star/archive) on mount
   useEffect(() => {
@@ -156,7 +181,7 @@ const MessagesPage: React.FC = () => {
     setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
     setInput('');
     inputRef.current?.focus();
-    dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: newMsg.time, read: true })
+    dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: newMsg.time, read: false })
         .then((saved: Msg) => {
           setChats(prev => ({
             ...prev,
@@ -301,12 +326,6 @@ const MessagesPage: React.FC = () => {
           <p className="text-sm font-medium">No team members yet.</p>
           <p className="text-xs">Invite members from the Members page to start messaging.</p>
         </div>
-      ) : !activeMember ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 text-gray-400">
-          <MessageSquare size={40} className="opacity-30" />
-          <p className="text-sm font-medium">No conversations yet.</p>
-          <p className="text-xs">Click <strong>New Message</strong> to start a conversation.</p>
-        </div>
       ) : (
       <div className="flex flex-1 min-h-0 bg-white border border-surface-200 rounded-2xl overflow-hidden">
 
@@ -361,7 +380,18 @@ const MessagesPage: React.FC = () => {
                   className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${isActive ? 'bg-primary-50 border-r-2 border-primary-500' : 'hover:bg-surface-50'}`}
                   initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: i * 0.05 }}
-                  onClick={() => { setActiveId(member.id); setOpenedIds(p => new Set([...p, member.id])); }}
+                  onClick={() => {
+                    setActiveId(member.id);
+                    setOpenedIds(p => new Set([...p, member.id]));
+                    // Immediately mark this conversation's messages as read in local state
+                    // so totalUnread and the unread badge drop instantly (before DB fetch completes)
+                    setChats(prev => {
+                      const msgs = prev[member.id];
+                      if (!msgs) return prev;
+                      const allRead = msgs.map(m => m.from !== myId ? { ...m, read: true } : m);
+                      return { ...prev, [member.id]: allRead };
+                    });
+                  }}
                 >
                   <div className="relative shrink-0">
                     <Avatar name={member.name} color={color} size="md" />
@@ -391,6 +421,17 @@ const MessagesPage: React.FC = () => {
 
         {/* Chat area */}
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          {!activeMember ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-400">
+              <div className="w-14 h-14 rounded-2xl bg-primary-50 flex items-center justify-center">
+                <MessageSquare size={26} className="text-primary-300" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-gray-600">No conversation selected</p>
+                <p className="text-xs mt-1">Choose a conversation or start a new one</p>
+              </div>
+            </div>
+          ) : <>
           {/* Chat header */}
           <div className="flex items-center gap-3 px-5 py-3.5 border-b border-surface-100 shrink-0">
             <div className="relative">
@@ -534,7 +575,7 @@ const MessagesPage: React.FC = () => {
                 const newMsg: Msg = { id: `m${crypto.randomUUID()}`, from: myId, text, time: now, read: true };
                 setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
                 e.target.value = '';
-                dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: now, read: true })
+                dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: now, read: false })
                   .then((saved: Msg) => {
                     setChats(prev => ({
                       ...prev,
@@ -582,6 +623,7 @@ const MessagesPage: React.FC = () => {
               </motion.button>
             </div>
           </div>
+          </>}
         </div>
 
         {/* Right info panel */}

@@ -7,6 +7,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { AppContext } from '../context/AppContext';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
+import { getPresenceStatus } from '../context/PresenceContext';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 
@@ -249,7 +250,7 @@ const DashboardPage: React.FC = () => {
                     <div className="text-xs font-semibold text-gray-900 truncate">{member.name}</div>
                     <div className="text-[10px] text-gray-400 truncate">{member.designation ?? ''}</div>
                   </div>
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[member.status === 'active' ? 'online' : 'offline'] }} />
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[getPresenceStatus(member.lastSeen)] }} />
                 </div>
               );
             })}

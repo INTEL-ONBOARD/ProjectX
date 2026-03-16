@@ -2,15 +2,15 @@ import React, { useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useMembersContext } from './MembersContext';
 
-const HEARTBEAT_MS = 30_000;
-const POLL_MS = 5_000;
+const HEARTBEAT_MS = 520;
+const POLL_MS = 520;
 const dbApi = () => (window as any).electronAPI.db;
 
 export function getPresenceStatus(lastSeen?: string | null): 'online' | 'away' | 'offline' {
     if (!lastSeen) return 'offline';
     const diffMs = Date.now() - new Date(lastSeen).getTime();
-    if (diffMs < 60_000) return 'online';
-    if (diffMs < 300_000) return 'away';
+    if (diffMs < 3_000) return 'online';
+    if (diffMs < 10_000) return 'away';
     return 'offline';
 }
 
