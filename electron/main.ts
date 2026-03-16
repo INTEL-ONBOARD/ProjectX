@@ -749,6 +749,16 @@ function createWindow() {
     });
 
     mainWindow.on('closed', () => { mainWindow = null; });
+
+    // Block end-user refresh shortcuts in production (Ctrl+R, Cmd+R, F5)
+    if (!process.env.VITE_DEV_SERVER_URL) {
+        mainWindow.webContents.on('before-input-event', (event, input) => {
+            const isReload =
+                (input.key === 'r' && (input.control || input.meta)) ||
+                (input.key === 'F5');
+            if (isReload) event.preventDefault();
+        });
+    }
 }
 
 // ─── App lifecycle ─────────────────────────────────────────────────────────────
