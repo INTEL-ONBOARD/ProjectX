@@ -104,6 +104,7 @@ interface ElectronAPI {
   openExternal(url: string): Promise<void>;
   checkForUpdate(): Promise<void>;
   installUpdate(): Promise<void>;
+  forceReconnect(): Promise<void>;
   onDbConnected(cb: () => void): () => void;
   onDbConnectionFailed(cb: (_: unknown, message: string) => void): () => void;
   onDbDisconnected(cb: () => void): () => void;

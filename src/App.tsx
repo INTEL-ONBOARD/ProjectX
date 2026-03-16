@@ -390,7 +390,9 @@ const MainApp: React.FC = () => (
 );
 
 // ── Reconnecting overlay ──────────────────────────────────────────────────────
-const ReconnectingOverlay: React.FC = () => (
+const ReconnectingOverlay: React.FC<{ status?: 'reconnecting' | 'failed' | 'slow' }> = ({ status = 'reconnecting' }) => {
+    const label = status === 'failed' ? 'Connection failed — retrying…' : status === 'slow' ? 'Still reconnecting…' : 'Reconnecting…';
+    return (
     <motion.div
         key="reconnecting"
         className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
@@ -439,10 +441,11 @@ const ReconnectingOverlay: React.FC = () => (
                     transition={{ duration: 1.4, ease: 'easeInOut', repeat: Infinity }}
                 />
             </div>
-            <span className="text-[11px] text-gray-300 tracking-widest uppercase font-medium">Reconnecting…</span>
+            <span className="text-[11px] text-gray-300 tracking-widest uppercase font-medium">{label}</span>
         </motion.div>
     </motion.div>
-);
+    );
+};
 
 // ── Root: manages splash → walkthrough → auth → app ──────────────────────────
 const Root: React.FC = () => {
@@ -450,6 +453,8 @@ const Root: React.FC = () => {
     const [splashDone, setSplashDone] = useState(false);
     const returningUser = !!localStorage.getItem('pm_auth_session');
     const [dbDisconnected, setDbDisconnected] = useState(false);
+    const [reconnectStatus, setReconnectStatus] = useState<'reconnecting' | 'failed' | 'slow'>('reconnecting');
+    const reconnectTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
     const navigate = useNavigate();
 
     // When auth transitions to authenticated (e.g. after register), navigate to root
@@ -461,31 +466,48 @@ const Root: React.FC = () => {
 
     // Listen for DB disconnect/reconnect events from main process
     React.useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI;
+
+        const showOverlay = () => {
+            setDbDisconnected(true);
+            setReconnectStatus('reconnecting');
+            // Safety timeout: if DB hasn't reconnected in 15s, trigger force-reconnect and update label
+            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+            reconnectTimerRef.current = setTimeout(() => {
+                setReconnectStatus('slow');
+                api?.forceReconnect?.().catch(() => {});
+            }, 15000);
+        };
+
+        const hideOverlay = () => {
+            if (reconnectTimerRef.current) { clearTimeout(reconnectTimerRef.current); reconnectTimerRef.current = null; }
+            setDbDisconnected(false);
+            setReconnectStatus('reconnecting');
+        };
+
         // Layer 1: instant show on network loss; hide only after DB confirms reconnection
-        const handleOffline = () => setDbDisconnected(true);
-        // Network restored — don't clear overlay yet; wait for DB to confirm reconnection.
-        // The main process retry loop (connectDB) will keep calling mongoose.connect() until
-        // it succeeds, then fires db:reconnected which clears the overlay.
+        const handleOffline = () => showOverlay();
+        // Network restored — don't clear overlay yet; wait for DB to confirm reconnection
         const handleOnline = () => console.log('[App] Network restored — waiting for DB reconnect...');
         window.addEventListener('offline', handleOffline);
         window.addEventListener('online', handleOnline);
 
         // Layer 2: mongoose events via Electron IPC
-        // - disconnected: also triggers overlay as fallback (e.g. Atlas outage without internet drop)
-        // - reconnected:  the ONLY thing that hides the overlay (DB is actually ready)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api = (window as any).electronAPI;
         if (!api) return () => {
             window.removeEventListener('offline', handleOffline);
             window.removeEventListener('online', handleOnline);
         };
-        const unsubDisconnect = api.onDbDisconnected?.(() => setDbDisconnected(true));
-        const unsubReconnect  = api.onDbReconnected?.(() => setDbDisconnected(false));
+        const unsubDisconnect    = api.onDbDisconnected?.(() => showOverlay());
+        const unsubReconnect     = api.onDbReconnected?.(() => hideOverlay());
+        const unsubConnFailed    = api.onDbConnectionFailed?.(() => setReconnectStatus('failed'));
         return () => {
             window.removeEventListener('offline', handleOffline);
             window.removeEventListener('online', handleOnline);
+            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
             unsubDisconnect?.();
             unsubReconnect?.();
+            unsubConnFailed?.();
         };
     }, []);
 
@@ -519,7 +541,7 @@ const Root: React.FC = () => {
             <BugReportModal />
             <UpdateBanner />
             <AnimatePresence>
-                {dbDisconnected && <ReconnectingOverlay />}
+                {dbDisconnected && <ReconnectingOverlay status={reconnectStatus} />}
             </AnimatePresence>
         </>
     );

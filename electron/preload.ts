@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Update controls
     checkForUpdate: (): Promise<void> => ipcRenderer.invoke('update:check'),
     installUpdate: (): Promise<void> => ipcRenderer.invoke('update:install'),
+    forceReconnect: (): Promise<void> => ipcRenderer.invoke('db:force-reconnect'),
 
     // DB connection event listeners
     onDbConnected: (cb: () => void) => {

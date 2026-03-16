@@ -16,6 +16,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     // Update controls
     checkForUpdate: () => electron_1.ipcRenderer.invoke('update:check'),
     installUpdate: () => electron_1.ipcRenderer.invoke('update:install'),
+    forceReconnect: () => electron_1.ipcRenderer.invoke('db:force-reconnect'),
     // DB connection event listeners
     onDbConnected: (cb) => {
         electron_1.ipcRenderer.on('db:connected', cb);

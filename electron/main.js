@@ -929,23 +929,16 @@ async function ensureDefaultData() {
     await AuthUserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
     await UserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
 }
-async function connectDB() {
-    const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
-    if (!uri) {
-        console.error('MONGODB_URI not set');
-        return;
-    }
-    const opts = { serverSelectionTimeoutMS: 30000, connectTimeoutMS: 30000, socketTimeoutMS: 45000 };
-    // Listen for mongoose disconnect/reconnect events once
-    mongoose_1.default.connection.once('connected', () => { });
+// Set up mongoose event listeners ONCE at startup — never inside connectDB() to avoid duplicate listeners
+function setupDbListeners() {
     mongoose_1.default.connection.on('disconnected', () => {
         console.log('MongoDB disconnected');
-        if (mainWindow)
+        if (mainWindow && !mainWindow.isDestroyed())
             mainWindow.webContents.send('db:disconnected');
     });
     mongoose_1.default.connection.on('reconnected', () => {
         console.log('MongoDB reconnected');
-        if (mainWindow)
+        if (mainWindow && !mainWindow.isDestroyed())
             mainWindow.webContents.send('db:reconnected');
         // Restart all change streams — they die on disconnect and need to be re-opened
         startMessageStream();
@@ -954,11 +947,21 @@ async function connectDB() {
     mongoose_1.default.connection.on('error', (err) => {
         console.error('[MongoDB] Connection error:', err.message);
     });
+}
+async function connectDB() {
+    const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
+    if (!uri) {
+        console.error('MONGODB_URI not set');
+        return;
+    }
+    // Reduced serverSelectionTimeoutMS from 30s → 8s so failed attempts surface faster
+    // and the retry loop can kick in sooner after internet is restored
+    const opts = { serverSelectionTimeoutMS: 8000, connectTimeoutMS: 10000, socketTimeoutMS: 45000 };
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
             await mongoose_1.default.connect(uri, opts);
             console.log('MongoDB connected');
-            if (mainWindow)
+            if (mainWindow && !mainWindow.isDestroyed())
                 mainWindow.webContents.send('db:connected');
             await ensureDefaultData();
             return;
@@ -967,13 +970,13 @@ async function connectDB() {
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`MongoDB connection attempt ${attempt} failed:`, msg);
             if (attempt < 5) {
-                const delay = attempt * 3000;
+                const delay = attempt * 2000;
                 console.log(`Retrying in ${delay / 1000}s...`);
                 await new Promise(r => setTimeout(r, delay));
             }
             else {
                 console.error('MongoDB connection failed after 5 attempts. Will retry in 10s...');
-                if (mainWindow)
+                if (mainWindow && !mainWindow.isDestroyed())
                     mainWindow.webContents.send('db:connection-failed', msg);
                 // Retry loop: keep trying every 10s until connected (handles offline-at-startup)
                 setTimeout(() => connectDB(), 10000);
@@ -1576,7 +1579,17 @@ electron_1.app.whenReady().then(async () => {
         await NotifPrefModel.findOneAndUpdate({ userId }, { systemNotifs: value }, { upsert: true });
         return true;
     });
+    electron_1.ipcMain.handle('db:force-reconnect', async () => {
+        if (mongoose_1.default.connection.readyState !== 1) {
+            try {
+                await mongoose_1.default.disconnect();
+            }
+            catch (_) { }
+            connectDB();
+        }
+    });
     setupAutoUpdater();
+    setupDbListeners();
     await connectDB();
     createWindow();
 });
