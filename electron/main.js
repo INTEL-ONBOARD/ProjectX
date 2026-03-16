@@ -134,6 +134,7 @@ const UserPrefSchema = new mongoose_1.Schema({
     hasSeenWalkthrough: { type: Boolean, default: false },
     projectsView: { type: String, enum: ['grid', 'list'], default: 'grid' },
     taskBreakdownSnapshot: { type: mongoose_1.Schema.Types.Mixed, default: {} },
+    navOrder: { type: [String], default: [] },
 });
 const NotifPrefSchema = new mongoose_1.Schema({
     userId: { type: String, required: true, unique: true },
@@ -233,7 +234,7 @@ const toConvMeta = (d) => ({ convId: d.convId, userId: d.userId, peerId: d.peerI
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toOrg = (d) => ({ id: d.orgId, name: d.name, logo: d.logo ?? '', address: d.address ?? '', workStart: d.workStart ?? '09:00', workEnd: d.workEnd ?? '18:00', createdAt: d.createdAt ?? '' });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toUserPref = (d) => ({ userId: d.userId, theme: d.theme, sidebarCollapsed: d.sidebarCollapsed ?? false, selectedWeekStart: d.selectedWeekStart ?? null, hasSeenWalkthrough: d.hasSeenWalkthrough ?? false, projectsView: d.projectsView ?? 'grid', taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {} });
+const toUserPref = (d) => ({ userId: d.userId, theme: d.theme, sidebarCollapsed: d.sidebarCollapsed ?? false, selectedWeekStart: d.selectedWeekStart ?? null, hasSeenWalkthrough: d.hasSeenWalkthrough ?? false, projectsView: d.projectsView ?? 'grid', taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {}, navOrder: d.navOrder ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toNotifPref = (d) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours, systemNotifs: d.systemNotifs ?? true });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
