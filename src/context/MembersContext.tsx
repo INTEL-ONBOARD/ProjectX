@@ -26,40 +26,45 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [members, setMembers] = useState<User[]>([]);
 
   useEffect(() => {
-    let cancelled = false;
-    api().getMembers()
-      .then((docs: User[]) => { if (!cancelled) setMembers(docs as User[]); })
-      .catch((err: unknown) => console.error('[MembersContext] Failed to load members:', err));
-    return () => { cancelled = true; };
-  }, []);
-
-  // Real-time sync: listen for member changes from other clients via MongoDB change streams
-  useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const electronAPI = (window as any).electronAPI;
-    if (!electronAPI) return;
+    let cancelled = false;
+    const subs: { unsub?: () => void; unsubReconnect?: () => void } = {};
 
-    const unsub = electronAPI.onMemberChanged?.((_: unknown, payload: { op: string; doc?: User; id?: string }) => {
-      const { op, doc } = payload;
-      if (op === 'insert') {
-        setMembers(prev => prev.some(m => m.id === doc!.id) ? prev : [...prev, doc!]);
-      } else if (op === 'update' || op === 'replace') {
-        setMembers(prev => {
-          const exists = prev.some(m => m.id === doc!.id);
-          return exists ? prev.map(m => m.id === doc!.id ? doc! : m) : [...prev, doc!];
+    // Step 1: fetch initial data first, THEN subscribe to change stream.
+    // This eliminates the race condition where the initial fetch overwrites change stream inserts.
+    api().getMembers()
+      .then((docs: User[]) => {
+        if (cancelled) return;
+        setMembers(docs as User[]);
+
+        // Step 2: wire up change stream only AFTER initial data is in state
+        if (!electronAPI) return;
+        subs.unsub = electronAPI.onMemberChanged?.((_: unknown, payload: { op: string; doc?: User; id?: string }) => {
+          const { op, doc } = payload;
+          if (op === 'insert') {
+            setMembers(prev => prev.some(m => m.id === doc!.id) ? prev : [...prev, doc!]);
+          } else if (op === 'update' || op === 'replace') {
+            setMembers(prev => {
+              const exists = prev.some(m => m.id === doc!.id);
+              return exists ? prev.map(m => m.id === doc!.id ? doc! : m) : [...prev, doc!];
+            });
+          } else if (op === 'delete') {
+            api().getMembers().then((fresh: User[]) => setMembers(fresh)).catch(() => {});
+          }
         });
-      } else if (op === 'delete') {
-        // For deletes the stream gives _id not appId — refetch to stay in sync
-        api().getMembers().then((docs: User[]) => setMembers(docs)).catch(() => {});
-      }
-    });
+      })
+      .catch((err: unknown) => console.error('[MembersContext] Failed to load members:', err));
 
-    // Fix 7: refetch after DB reconnect
-    const unsubReconnect = electronAPI.onDbReconnected?.(() => {
+    subs.unsubReconnect = electronAPI?.onDbReconnected?.(() => {
       api().getMembers().then((docs: User[]) => setMembers(docs)).catch(() => {});
     });
 
-    return () => { unsub?.(); unsubReconnect?.(); };
+    return () => {
+      cancelled = true;
+      subs.unsub?.();
+      subs.unsubReconnect?.();
+    };
   }, []);
 
   const getMemberColor = (id: string): string => {
