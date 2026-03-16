@@ -307,7 +307,7 @@ const TasksPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-surface-100">
                   {['Task', 'Project', 'Priority', 'Assignees', 'Due', 'Status'].map(h => (
-                    <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-surface-50">{h}</th>
+                    <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-surface-50${h === 'Task' ? ' w-[35%]' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>

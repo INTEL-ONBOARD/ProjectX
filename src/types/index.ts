@@ -1,4 +1,4 @@
-export type Priority = 'low' | 'high' | 'completed';
+export type Priority = 'low' | 'medium' | 'high' | 'completed';
 export type TaskStatus = 'todo' | 'in-progress' | 'ready-for-qa' | 'deployment-pending' | 'blocker' | 'done';
 
 export interface User {

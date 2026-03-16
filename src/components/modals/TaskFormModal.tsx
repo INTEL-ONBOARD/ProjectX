@@ -14,8 +14,9 @@ interface Props {
 }
 
 const priorityConfig = {
-  low:  { label: 'Low',  color: '#D58D49', bg: '#DFA87415', ring: '#D58D49' },
-  high: { label: 'High', color: '#D8727D', bg: '#D8727D15', ring: '#D8727D' },
+  low:    { label: 'Low',    color: '#D58D49', bg: '#DFA87415', ring: '#D58D49' },
+  medium: { label: 'Medium', color: '#A78BFA', bg: '#A78BFA15', ring: '#A78BFA' },
+  high:   { label: 'High',   color: '#D8727D', bg: '#D8727D15', ring: '#D8727D' },
 };
 
 const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultStatus }) => {
@@ -24,7 +25,9 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
 
   const [title, setTitle]           = useState(initial?.title ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
-  const [priority, setPriority]     = useState<'low' | 'high'>(initial?.priority === 'high' ? 'high' : 'low');
+  const [priority, setPriority]     = useState<'low' | 'medium' | 'high'>(
+    initial?.priority === 'high' ? 'high' : initial?.priority === 'medium' ? 'medium' : 'low'
+  );
   const [assignees, setAssignees]   = useState<string[]>(initial?.assignees ?? []);
   const [projectId, setProjectId]   = useState(initial?.projectId ?? '');
   const [startDate, setStartDate]   = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10));
@@ -132,7 +135,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                 <Flag size={10} /> Priority
               </label>
               <div className="flex gap-2">
-                {(['low', 'high'] as const).map(p => {
+                {(['low', 'medium', 'high'] as const).map(p => {
                   const cfg = priorityConfig[p];
                   const active = priority === p;
                   return (

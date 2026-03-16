@@ -5,7 +5,7 @@ import { PROJECT_COLORS } from '../../data/mockData';
 
 export type ProjectRichFields = {
   description: string;
-  status: 'active' | 'on-hold' | 'completed' | 'live' | 'support' | 'planning';
+  status: 'active' | 'on-hold' | 'completed' | 'live-and-support' | 'planning';
   priority: 'low' | 'medium' | 'high';
   startDate: string;
   dueDate: string;
@@ -22,9 +22,8 @@ const STATUS_OPTIONS: { value: ProjectRichFields['status']; label: string; color
   { value: 'active',    label: 'Active',    color: 'text-[#68B266] bg-[#83C29D22]' },
   { value: 'on-hold',  label: 'On Hold',   color: 'text-[#FFA500] bg-[#FFA50020]' },
   { value: 'completed',label: 'Completed', color: 'text-primary-500 bg-primary-50' },
-  { value: 'live',     label: 'Live',      color: 'text-[#00BFFF] bg-[#00BFFF20]' },
-  { value: 'support',  label: 'Support',   color: 'text-[#C084FC] bg-[#C084FC20]' },
-  { value: 'planning', label: 'Planning',  color: 'text-[#94A3B8] bg-[#94A3B820]' },
+  { value: 'live-and-support', label: 'Live and Support', color: 'text-[#00BFFF] bg-[#00BFFF20]' },
+  { value: 'planning',         label: 'Planning',         color: 'text-[#94A3B8] bg-[#94A3B820]' },
 ];
 
 const PRIORITY_OPTIONS: { value: ProjectRichFields['priority']; label: string; color: string }[] = [
