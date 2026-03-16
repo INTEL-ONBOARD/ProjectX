@@ -27,6 +27,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [priority, setPriority]     = useState<'low' | 'high'>(initial?.priority === 'high' ? 'high' : 'low');
   const [assignees, setAssignees]   = useState<string[]>(initial?.assignees ?? []);
   const [projectId, setProjectId]   = useState(initial?.projectId ?? '');
+  const [startDate, setStartDate]   = useState(initial?.startDate ?? '');
   const [dueDate, setDueDate]       = useState(initial?.dueDate ?? '');
   const [loading, setLoading]       = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState('');
@@ -59,6 +60,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
         status,
         assignees,
         projectId: projectId || undefined,
+        startDate: startDate || undefined,
         dueDate: dueDate || undefined,
         comments: initial?.comments ?? 0,
         files: initial?.files ?? 0,
@@ -156,25 +158,38 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
               </div>
             </div>
 
-            {/* Project + Due Date row */}
+            {/* Project */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">
+                <Layers size={10} /> Project
+              </label>
+              <div className="relative">
+                <select
+                  value={projectId}
+                  onChange={e => setProjectId(e.target.value)}
+                  className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 bg-white text-gray-700 pr-7 font-medium"
+                >
+                  <option value="">No project</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Start Date + Due Date */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">
-                  <Layers size={10} /> Project
+                  <Calendar size={10} /> Start Date
                 </label>
-                <div className="relative">
-                  <select
-                    value={projectId}
-                    onChange={e => setProjectId(e.target.value)}
-                    className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 bg-white text-gray-700 pr-7 font-medium"
-                  >
-                    <option value="">No project</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all bg-white text-gray-700 font-medium"
+                />
               </div>
               <div>
                 <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">

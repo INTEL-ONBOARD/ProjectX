@@ -7,6 +7,7 @@ export type ProjectRichFields = {
   description: string;
   status: 'active' | 'on-hold' | 'completed';
   priority: 'low' | 'medium' | 'high';
+  startDate: string;
   dueDate: string;
   category: string;
 };
@@ -37,6 +38,7 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
   const [description, setDescription] = useState(initial?.description ?? '');
   const [status, setStatus]           = useState<ProjectRichFields['status']>(initial?.status ?? 'active');
   const [priority, setPriority]       = useState<ProjectRichFields['priority']>(initial?.priority ?? 'medium');
+  const [startDate, setStartDate]     = useState(initial?.startDate ?? '');
   const [dueDate, setDueDate]         = useState(initial?.dueDate ?? '');
   const [category, setCategory]       = useState(initial?.category ?? '');
   const [loading, setLoading]         = useState(false);
@@ -50,6 +52,7 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
         description,
         status,
         priority,
+        startDate,
         dueDate,
         category: category.trim() || 'General',
       });
@@ -150,8 +153,16 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
             </div>
           </div>
 
-          {/* Due Date + Category */}
+          {/* Start Date + Due Date */}
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Start Date</label>
+              <input
+                type="date"
+                value={startDate} onChange={e => setStartDate(e.target.value)}
+                className={inputCls}
+              />
+            </div>
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Due Date</label>
               <input
@@ -160,14 +171,16 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
                 className={inputCls}
               />
             </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Category</label>
-              <input
-                value={category} onChange={e => setCategory(e.target.value)}
-                placeholder="e.g. Engineering"
-                className={inputCls}
-              />
-            </div>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Category</label>
+            <input
+              value={category} onChange={e => setCategory(e.target.value)}
+              placeholder="e.g. Engineering"
+              className={inputCls}
+            />
           </div>
 
           {/* Color */}

@@ -331,21 +331,46 @@ const SettingsPage: React.FC = () => {
   const strength = calcStrength(passwords.next);
 
   // System behavior
-  const [runOnStartup,    setRunOnStartup]    = useState(false);
-  const [runInBackground, setRunInBackground] = useState(false);
+  const [runOnStartup,    setRunOnStartup]    = useState(true);
+  const [runInBackground, setRunInBackground] = useState(true);
   const [systemNotifs,    setSystemNotifs]    = useState(true);
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const api = (window as any).electronAPI;
     if (!api) return;
-    api.getLoginItemSettings?.().then((s: { openAtLogin: boolean }) => setRunOnStartup(s.openAtLogin)).catch(() => {});
-    api.getBackgroundMode?.().then((v: boolean) => setRunInBackground(v)).catch(() => {});
+    api.getLoginItemSettings?.()
+      .then((s: { openAtLogin: boolean }) => {
+        // If never set before (null/undefined treated as false by Electron), default to true and enable it
+        if (!s || typeof s.openAtLogin !== 'boolean') {
+          setRunOnStartup(true);
+          api.setOpenAtLogin?.(true).catch(() => {});
+        } else {
+          setRunOnStartup(s.openAtLogin);
+        }
+      }).catch(() => {});
+    api.getBackgroundMode?.()
+      .then((v: boolean | null | undefined) => {
+        if (v === null || v === undefined) {
+          setRunInBackground(true);
+          api.setBackgroundMode?.(true).catch(() => {});
+        } else {
+          setRunInBackground(v);
+        }
+      }).catch(() => {});
   }, []);
   useEffect(() => {
     if (!currentUser?.id) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const api = (window as any).electronAPI;
-    api?.getSystemNotifsEnabled?.(currentUser.id).then((v: boolean) => setSystemNotifs(v)).catch(() => {});
+    api?.getSystemNotifsEnabled?.(currentUser.id)
+      .then((v: boolean | null | undefined) => {
+        if (v === null || v === undefined) {
+          setSystemNotifs(true);
+          api?.setSystemNotifsEnabled?.(currentUser.id, true).catch(() => {});
+        } else {
+          setSystemNotifs(v);
+        }
+      }).catch(() => {});
   }, [currentUser?.id]);
 
   const toggleRunOnStartup = () => {

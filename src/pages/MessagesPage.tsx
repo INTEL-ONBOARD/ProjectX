@@ -14,7 +14,7 @@ import { useNotifications } from '../context/NotificationContext';
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
 
-type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: Record<string, string[]> };
+type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: Record<string, string[]>; deleted?: boolean };
 
 const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
@@ -85,7 +85,7 @@ const MessagesPage: React.FC = () => {
     dbApi().getMessagesBetween(currentUserId, peerId)
         .then((msgs: Msg[]) => {
           // Force all messages read:true in local state — user is viewing this conversation
-          const allRead = msgs.map((m: Msg) => ({ ...m, read: true }));
+          const allRead = msgs.filter((m: Msg) => !m.deleted).map((m: Msg) => ({ ...m, read: true }));
           setChats(prev => ({ ...prev, [peerId]: allRead }));
           // markMessagesRead is handled by the separate effect above
         })
@@ -107,7 +107,7 @@ const MessagesPage: React.FC = () => {
             // Double-check: only write if the slot is still empty (active-conv effect may have
             // loaded it between the time we started the fetch and now)
             if (p[peer.id] !== undefined) return p;
-            return { ...p, [peer.id]: msgs as Msg[] };
+            return { ...p, [peer.id]: (msgs as Msg[]).filter(m => !m.deleted) };
           }))
           .catch((err: unknown) => console.error('[MessagesPage] preload failed for', peer.id, err));
         return prev;
@@ -167,6 +167,10 @@ const MessagesPage: React.FC = () => {
       setChats(prev => {
         const existing = prev[peerId];
         if (!existing) return prev;
+        // If deleted, remove from local state entirely
+        if (msg.deleted) {
+          return { ...prev, [peerId]: existing.filter((m: Msg) => m.id !== msg.id) };
+        }
         const updated = existing.map((m: Msg) =>
           m.id === msg.id ? { ...m, text: msg.text, reactions: msg.reactions, read: msg.read } : m
         );

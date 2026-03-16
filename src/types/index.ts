@@ -62,6 +62,7 @@ export interface Task {
     commentData?: TaskCommentItem[];
     files: number;
     images?: string[];
+    startDate?: string;
     dueDate?: string;
     projectId?: string;
     activity?: TaskActivityEntry[];

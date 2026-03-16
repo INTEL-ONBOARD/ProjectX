@@ -31,6 +31,7 @@ const TaskSchema = new Schema({
     comments:    { type: Number, default: 0 },
     files:       { type: Number, default: 0 },
     images:      [String],
+    startDate:   String,
     dueDate:     String,
     projectId:   String,
     activity:    { type: Array, default: [] },
@@ -85,6 +86,7 @@ const ProjectRichSchema = new Schema({
     status:      { type: String, enum: ['active', 'on-hold', 'completed'], default: 'active' },
     priority:    { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
     memberIds:   [String],
+    startDate:   { type: String, default: '' },
     dueDate:     { type: String, default: '' },
     starred:     { type: Boolean, default: false },
     category:    { type: String, default: 'General' },
@@ -189,13 +191,13 @@ const toUser = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '',
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser    = (d: any) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toDept        = (d: any) => ({ id: d.deptId, name: d.name, color: d.color, memberIds: (d.memberIds ?? []).map(String) });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toProjectRich = (d: any) => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General' });
+const toProjectRich = (d: any) => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), startDate: d.startDate ?? '', dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General' });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toMsg         = (d: any) => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
 // Produces renderer-compatible shape (from/to/time) for IPC push events
