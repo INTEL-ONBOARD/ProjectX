@@ -1,16 +1,72 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2 } from 'lucide-react';
+import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AvatarGroup } from '../components/ui/Avatar';
-import { Task, TaskStatus } from '../types';
+import { Task, TaskStatus, TaskActivityEntry } from '../types';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
+import { useAuth } from '../context/AuthContext';
 import TaskFormModal from '../components/modals/TaskFormModal';
 import { downloadCsv } from '../utils/exportCsv';
 
+
+// ── Activity Log helpers ────────────────────────────────────────────────────
+const activityIconMap: Record<string, { icon: React.ComponentType<any>; color: string }> = {
+  created:             { icon: Plus,      color: '#68B266' },
+  status_changed:      { icon: ArrowRight, color: '#6366f1' },
+  priority_changed:    { icon: Flag,      color: '#FFA500' },
+  assignee_added:      { icon: UserPlus,  color: '#68B266' },
+  assignee_removed:    { icon: UserMinus, color: '#D8727D' },
+  due_date_changed:    { icon: Calendar,  color: '#a855f7' },
+  title_changed:       { icon: Pencil,    color: '#6b7280' },
+  description_changed: { icon: FileText,  color: '#6b7280' },
+};
+const activityLabelMap: Record<string, string> = {
+  created:             'created this task',
+  status_changed:      'changed status',
+  priority_changed:    'changed priority',
+  assignee_added:      'added assignee',
+  assignee_removed:    'removed assignee',
+  due_date_changed:    'changed due date',
+  title_changed:       'changed title',
+  description_changed: 'updated description',
+};
+function formatActivityTime(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+const ActivityEntryRow: React.FC<{ entry: TaskActivityEntry; currentUserId: string }> = ({ entry, currentUserId }) => {
+  const { icon: Icon, color } = activityIconMap[entry.type] ?? { icon: ArrowRight, color: '#6b7280' };
+  const label = activityLabelMap[entry.type] ?? entry.type;
+  const actor = entry.actorId === currentUserId ? 'You' : entry.actorName;
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: color + '20' }}>
+        <Icon size={11} style={{ color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-gray-700 leading-snug">
+          <span className="font-semibold">{actor}</span> {label}
+          {(entry.from || entry.to) && (
+            <span className="inline-flex items-center gap-1 ml-1">
+              {entry.from && <span className="bg-surface-100 text-gray-500 rounded px-1 py-0.5 text-[10px]">{entry.from}</span>}
+              {entry.from && entry.to && <ArrowRight size={9} className="text-gray-400" />}
+              {entry.to && <span className="bg-surface-100 text-gray-500 rounded px-1 py-0.5 text-[10px]">{entry.to}</span>}
+            </span>
+          )}
+        </p>
+        <p className="text-[10px] text-gray-400 mt-0.5">{formatActivityTime(entry.timestamp)}</p>
+      </div>
+    </div>
+  );
+};
+// ── End Activity Log helpers ────────────────────────────────────────────────
 
 const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
   low: { bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]', label: 'Low' },
@@ -33,7 +89,9 @@ const TasksPage: React.FC = () => {
   const location = useLocation();
   const { projects: contextProjects, allTasks, createTask, updateTask, deleteTask } = useProjects();
   const { members, getMemberColor } = useMembersContext();
+  const { user: authUser } = useAuth() ?? { user: null };
   const [activeTab, setActiveTab] = useState(0);
+  const [detailTab, setDetailTab] = useState<'details' | 'activity'>('details');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Pre-populate search from header search navigation
@@ -41,8 +99,14 @@ const TasksPage: React.FC = () => {
     const s = (location.state as any)?.search;
     if (s) setSearchQuery(s);
   }, [location.state]);
+
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // Reset detail tab when selected task changes
+  useEffect(() => {
+    setDetailTab('details');
+  }, [selectedTask?.id]);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const detailFileRef = useRef<HTMLInputElement>(null);
   const [detailImage, setDetailImage] = useState<string | null>(null);
@@ -304,6 +368,24 @@ const TasksPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Tab bar */}
+              <div className="flex border-b border-surface-100 shrink-0">
+                {(['details', 'activity'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setDetailTab(tab)}
+                    className={`flex-1 py-2.5 text-xs font-semibold capitalize transition-colors ${
+                      detailTab === tab
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {detailTab === 'details' && (
               <div className="flex-1 px-5 py-4 flex flex-col gap-4">
                 {/* Title + priority */}
                 <div>
@@ -563,6 +645,21 @@ const TasksPage: React.FC = () => {
                   </div>
                 )}
               </div>
+              )}
+
+              {detailTab === 'activity' && (
+                <div className="flex-1 overflow-y-auto p-4">
+                  {(selectedTask.activity ?? []).length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center mt-8">No activity yet.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {[...(selectedTask.activity ?? [])].reverse().map(entry => (
+                        <ActivityEntryRow key={entry.id} entry={entry} currentUserId={authUser?.id ?? ''} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
