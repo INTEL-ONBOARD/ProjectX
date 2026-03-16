@@ -107,7 +107,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         // Not on messages page: recompute from DB (520ms delay on first call so any
         // markMessagesRead calls from the messages page have time to finish in MongoDB)
-        const timer = setTimeout(recompute, 520);
+        const timer = setTimeout(recompute, 1500);
 
         // Increment badge in real-time when a new message arrives while away from messages page
         const unsub = api?.onNewMessage?.((_: unknown, msg: { from: string; to: string }) => {

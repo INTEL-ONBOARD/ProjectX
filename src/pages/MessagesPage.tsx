@@ -76,7 +76,16 @@ const MessagesPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChats.length, activeId]);
 
-  // Load messages for the active conversation and mark them as read in DB
+  // Mark conversation read in DB immediately when user switches to it.
+  // Called independently of the message fetch so the DB write starts right away —
+  // not delayed by the getMessagesBetween round-trip (~200-400ms on Atlas).
+  useEffect(() => {
+    if (!activeMember || !currentUserId) return;
+    dbApi().markMessagesRead(currentUserId, activeMember.id)
+      .catch((err: unknown) => console.error('[MessagesPage] markRead failed:', err));
+  }, [activeMember?.id, currentUserId]);
+
+  // Load messages for the active conversation and update local state
   useEffect(() => {
     if (!activeMember || !currentUserId) return;
     const peerId = activeMember.id;
@@ -85,9 +94,7 @@ const MessagesPage: React.FC = () => {
           // Force all messages read:true in local state — user is viewing this conversation
           const allRead = msgs.map((m: Msg) => ({ ...m, read: true }));
           setChats(prev => ({ ...prev, [peerId]: allRead }));
-          // Persist to DB so other sessions + sidebar recompute reflect reality
-          dbApi().markMessagesRead(currentUserId, peerId)
-            .catch((err: unknown) => console.error('[MessagesPage] markRead failed:', err));
+          // markMessagesRead is handled by the separate effect above
         })
         .catch((err: unknown) => console.error('[MessagesPage] Failed to load active conv:', err));
   }, [activeMember?.id, currentUserId]);

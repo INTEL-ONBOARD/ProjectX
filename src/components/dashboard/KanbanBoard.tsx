@@ -101,7 +101,7 @@ interface KanbanBoardProps {
 }
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode = 'grid' }) => {
-  const { allTasks, moveTask, updateTask, deleteTask, createTask, projects, activeProject } = useProjects();
+  const { allTasks, moveTask, updateTask, deleteTask, createTask, createProject, projects, activeProject } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const { user: authUser } = useAuth() ?? { user: null };
 
@@ -123,6 +123,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [editPriority, setEditPriority] = useState<'low' | 'high'>('low');
   const [editAssignees, setEditAssignees] = useState<string[]>([]);
   const [editDueDate, setEditDueDate] = useState('');
+
+  // New project form state (used in empty state)
+  const [newProjName, setNewProjName] = useState('');
+  const [newProjColor, setNewProjColor] = useState('#5030E5');
+  const [creating, setCreating] = useState(false);
 
   const openTask = (task: Task) => {
     setSelectedTask(task);
@@ -220,9 +225,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const projectTasks = applyFilters(allTasks.filter(t => t.projectId === activeProject));
 
   // ── No projects empty state ──────────────────────────────────────────────
-  const [newProjName, setNewProjName] = useState('');
-  const [newProjColor, setNewProjColor] = useState('#5030E5');
-  const [creating, setCreating] = useState(false);
   const PROJECT_COLORS = ['#5030E5','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6'];
 
   if (projects.length === 0) {
