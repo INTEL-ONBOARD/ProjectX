@@ -55,31 +55,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try { restoredUser = JSON.parse(savedSession) as AuthUser; } catch { /* ignore */ }
 
       if (restoredUser) {
-        authApi().validate(restoredUser.id)
-          .then(valid => {
-            if (valid) {
-              const fresh = { ...restoredUser!, name: valid.name, role: valid.role };
-              localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
-              setUser(fresh);
-              appApi().setActiveUser(fresh.id).catch(() => {});
-              prefsApi().get(fresh.id)
-                .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
-                .catch(() => {});
-            } else {
-              // User no longer exists in DB — clear stale session
-              localStorage.removeItem(SESSION_KEY);
-              setUser(null);
-            }
-          })
-          .catch(() => {
-            // DB unreachable — clear session and force re-login
-            localStorage.removeItem(SESSION_KEY);
-            setUser(null);
-          })
-          .finally(() => {
-            authApi().seedDefault().catch(() => {});
-            setIsLoading(false);
-          });
+        const tryValidate = (retriesLeft: number) => {
+          authApi().validate(restoredUser!.id)
+            .then(valid => {
+              if (valid) {
+                const fresh = { ...restoredUser!, name: valid.name, role: valid.role };
+                localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+                setUser(fresh);
+                appApi().setActiveUser(fresh.id).catch(() => {});
+                prefsApi().get(fresh.id)
+                  .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
+                  .catch(() => {});
+              } else {
+                // User no longer exists in DB — clear stale session
+                localStorage.removeItem(SESSION_KEY);
+                setUser(null);
+              }
+              authApi().seedDefault().catch(() => {});
+              setIsLoading(false);
+            })
+            .catch(() => {
+              if (retriesLeft > 0) {
+                // DB not ready yet — retry after 1.5s, user stays on splash screen
+                setTimeout(() => tryValidate(retriesLeft - 1), 1500);
+              } else {
+                // All retries exhausted — clear session and force re-login
+                localStorage.removeItem(SESSION_KEY);
+                setUser(null);
+                authApi().seedDefault().catch(() => {});
+                setIsLoading(false);
+              }
+            });
+        };
+        tryValidate(4); // up to 4 retries = ~6s total wait
         return;
       }
     }
