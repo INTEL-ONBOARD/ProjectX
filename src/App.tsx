@@ -194,27 +194,75 @@ const KanbanRoute: React.FC = () => {
 // ── Auth screens (with navigate) ──────────────────────────────────────────────
 const AuthScreens: React.FC = () => {
     const navigate = useNavigate();
+    const { markWalkthroughSeen } = useAuth();
+    const [showRegisteredModal, setShowRegisteredModal] = React.useState(false);
+
+    const handleRegistered = React.useCallback(() => {
+        markWalkthroughSeen(); // skip walkthrough — user just registered, no need to show it
+        setShowRegisteredModal(true);
+        navigate('/login');
+        setTimeout(() => setShowRegisteredModal(false), 3000);
+    }, [navigate, markWalkthroughSeen]);
+
     return (
-        <Routes>
-            <Route path="/login" element={
-                <LoginPage
-                    onNavigateRegister={() => navigate('/register')}
-                    onNavigateForgot={() => navigate('/forgot-password')}
-                />
-            } />
-            <Route path="/register" element={
-                <RegisterPage onNavigateLogin={() => navigate('/login')} />
-            } />
-            <Route path="/forgot-password" element={
-                <ForgotPasswordPage onNavigateLogin={() => navigate('/login')} />
-            } />
-            <Route path="*" element={
-                <LoginPage
-                    onNavigateRegister={() => navigate('/register')}
-                    onNavigateForgot={() => navigate('/forgot-password')}
-                />
-            } />
-        </Routes>
+        <>
+            <Routes>
+                <Route path="/login" element={
+                    <LoginPage
+                        onNavigateRegister={() => navigate('/register')}
+                        onNavigateForgot={() => navigate('/forgot-password')}
+                    />
+                } />
+                <Route path="/register" element={
+                    <RegisterPage onNavigateLogin={() => navigate('/login')} onRegistered={handleRegistered} />
+                } />
+                <Route path="/forgot-password" element={
+                    <ForgotPasswordPage onNavigateLogin={() => navigate('/login')} />
+                } />
+                <Route path="*" element={
+                    <LoginPage
+                        onNavigateRegister={() => navigate('/register')}
+                        onNavigateForgot={() => navigate('/forgot-password')}
+                    />
+                } />
+            </Routes>
+
+            {/* Registration success modal — lives outside Routes so it survives navigation */}
+            <AnimatePresence>
+                {showRegisteredModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center"
+                        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.85, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            className="rounded-2xl p-8 flex flex-col items-center text-center gap-4 shadow-2xl mx-4"
+                            style={{ background: 'var(--bg-card)', maxWidth: 380, width: '100%' }}>
+                            <motion.div
+                                initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.15, type: 'spring', stiffness: 300 }}
+                                className="w-16 h-16 rounded-full flex items-center justify-center"
+                                style={{ background: 'linear-gradient(135deg, #5030E5, #6B44F8)' }}>
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                            </motion.div>
+                            <div>
+                                <h2 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>Account Created!</h2>
+                                <p className="text-sm mt-1.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                                    Your account is pending admin approval. Contact your admin to get access.
+                                </p>
+                            </div>
+                            <div className="w-full rounded-full h-1 overflow-hidden" style={{ background: 'var(--bg-input)' }}>
+                                <motion.div
+                                    initial={{ width: '0%' }} animate={{ width: '100%' }} transition={{ duration: 3, ease: 'linear' }}
+                                    className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #5030E5, #6B44F8)' }} />
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </>
     );
 };
 

@@ -70,8 +70,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           })
           .catch(() => {
-            // DB unreachable — trust local cache optimistically
-            setUser(restoredUser);
+            // DB unreachable — clear session and force re-login
+            localStorage.removeItem(SESSION_KEY);
+            setUser(null);
           })
           .finally(() => {
             authApi().seedDefault().catch(() => {});
@@ -108,9 +109,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role: string,
     orgId?: string
   ) => {
-    const authUser = await authApi().register(name, email, password, role, orgId);
+    await authApi().register(name, email, password, role, orgId);
     setHasSeenWalkthrough(false);
-    setUser(authUser);
+    // Do NOT setUser — new accounts are guest and require admin approval before accessing the app
   }, []);
 
   const logout = useCallback(() => {

@@ -6,6 +6,7 @@ import { BrandPanel, FormPanel, LogoMark } from './AuthBackground';
 
 interface RegisterPageProps {
   onNavigateLogin: () => void;
+  onRegistered?: () => void;
 }
 
 const fi = (i: number) => ({
@@ -30,7 +31,7 @@ const cleanIpcError = (err: unknown, fallback: string): string => {
   return plain || fallback;
 };
 
-const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
+const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin, onRegistered }) => {
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -81,6 +82,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
     setLoading(true);
     try {
       await register(name.trim(), email.trim(), password, 'member', orgId);
+      onRegistered?.();
     } catch (err: unknown) {
       setGlobalError(cleanIpcError(err, 'Registration failed.'));
     } finally {
@@ -187,6 +189,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
           <button onClick={onNavigateLogin} className="font-semibold text-primary-500 hover:text-primary-600 transition-colors">Sign in</button>
         </motion.p>
       </FormPanel>
+
     </div>
   );
 };
