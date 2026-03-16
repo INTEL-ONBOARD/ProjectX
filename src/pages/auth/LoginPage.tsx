@@ -54,7 +54,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
   const sf = (f: string, v: boolean) => setFocus(p => ({ ...p, [f]: v }));
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-white">
+    <motion.div className="fixed inset-0 flex overflow-hidden bg-white"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}>
       <BrandPanel />
       <FormPanel>
         {/* Header */}
@@ -199,7 +201,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
         </motion.p>
 
       </FormPanel>
-    </div>
+    </motion.div>
   );
 };
 

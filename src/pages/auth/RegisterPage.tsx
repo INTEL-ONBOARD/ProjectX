@@ -78,7 +78,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   };
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-white">
+    <motion.div className="fixed inset-0 flex overflow-hidden bg-white"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}>
       <BrandPanel />
       <FormPanel>
         <motion.div {...fi(0)} className="mb-2">
@@ -176,7 +178,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
           <button onClick={onNavigateLogin} className="font-semibold text-primary-500 hover:text-primary-600 transition-colors">Sign in</button>
         </motion.p>
       </FormPanel>
-    </div>
+    </motion.div>
   );
 };
 

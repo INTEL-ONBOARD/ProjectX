@@ -32,7 +32,9 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
   };
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-white">
+    <motion.div className="fixed inset-0 flex overflow-hidden bg-white"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}>
       <BrandPanel />
       <FormPanel>
         <AnimatePresence mode="wait">
@@ -181,7 +183,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
           )}
         </AnimatePresence>
       </FormPanel>
-    </div>
+    </motion.div>
   );
 };
 
