@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // App info
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
+    openExternal: (url: string): Promise<void> => ipcRenderer.invoke('app:openExternal', url),
 
     // Update controls
     checkForUpdate: (): Promise<void> => ipcRenderer.invoke('update:check'),

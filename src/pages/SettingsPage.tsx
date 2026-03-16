@@ -1072,12 +1072,7 @@ const SettingsPage: React.FC = () => {
                       <div>
                         <div className="text-xl font-extrabold text-gray-900 tracking-tight">Project X</div>
                         <div className="text-sm text-gray-500 mt-0.5">Version {updateState.appVersion ?? '—'}</div>
-                        <div className="text-xs text-gray-400 mt-0.5 mb-3">Built with Electron + React</div>
-                        <div className="flex items-center gap-2">
-                          {['Electron', 'React', 'TypeScript', 'Tailwind'].map(tech => (
-                            <span key={tech} className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-surface-100 text-gray-600">{tech}</span>
-                          ))}
-                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">Developed and published by Toursurv Ltd.</div>
                       </div>
                     </div>
                   </div>
@@ -1135,17 +1130,25 @@ const SettingsPage: React.FC = () => {
                       )}
 
                       {/* Actions */}
-                      <div className="flex gap-3">
-                        {(updateState.status === 'idle' || updateState.status === 'error' || updateState.status === 'not-available') && (
-                          <button onClick={checkForUpdate}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-surface-200 text-gray-600 hover:bg-surface-50 transition-colors">
-                            <RefreshCw size={14} /> Check for Updates
-                          </button>
+                      <div className="flex gap-3 flex-wrap">
+                        {/* Check / Checking button */}
+                        {(updateState.status === 'idle' || updateState.status === 'error' || updateState.status === 'not-available' || updateState.status === 'checking') && (
+                          <motion.button onClick={updateState.status === 'checking' ? undefined : checkForUpdate}
+                            disabled={updateState.status === 'checking'}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-surface-200 text-gray-600 hover:bg-surface-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            whileHover={updateState.status !== 'checking' ? { scale: 1.02 } : {}}
+                            whileTap={updateState.status !== 'checking' ? { scale: 0.97 } : {}}
+                          >
+                            <RefreshCw size={14} className={updateState.status === 'checking' ? 'animate-spin' : ''} />
+                            {updateState.status === 'checking' ? 'Checking…' : 'Check for Updates'}
+                          </motion.button>
                         )}
+{/* Install button once download is complete */}
                         {updateState.status === 'downloaded' && (
                           <motion.button onClick={installUpdate}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#5030E5] to-[#7C3AED] text-white hover:opacity-90 transition-opacity"
-                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#5030E5] to-[#7C3AED] text-white shadow-md"
+                            whileHover={{ scale: 1.03, boxShadow: '0 8px 24px rgba(80,48,229,0.35)' }}
+                            whileTap={{ scale: 0.97 }}
                           >
                             <Download size={14} /> Install & Restart
                           </motion.button>

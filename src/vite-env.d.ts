@@ -101,6 +101,7 @@ interface ElectronAppearancePrefs {
 interface ElectronAPI {
   platform: string;
   getVersion(): Promise<string>;
+  openExternal(url: string): Promise<void>;
   checkForUpdate(): Promise<void>;
   installUpdate(): Promise<void>;
   onDbConnected(cb: () => void): () => void;

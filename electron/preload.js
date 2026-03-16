@@ -5,6 +5,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     platform: process.platform,
     // App info
     getVersion: () => electron_1.ipcRenderer.invoke('app:version'),
+    openExternal: (url) => electron_1.ipcRenderer.invoke('app:openExternal', url),
     // Update controls
     checkForUpdate: () => electron_1.ipcRenderer.invoke('update:check'),
     installUpdate: () => electron_1.ipcRenderer.invoke('update:install'),

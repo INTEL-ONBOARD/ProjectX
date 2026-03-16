@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import path from 'path';
 import dotenv from 'dotenv';
 import mongoose, { Schema } from 'mongoose';
@@ -700,15 +700,20 @@ if (!process.env.VITE_DEV_SERVER_URL) {
     }
 }
 
-function checkForUpdates() {
+function checkForUpdates(userTriggered = false) {
     if (!mainWindow) return;
     if (!autoUpdater) {
-        mainWindow.webContents.send('update:error', 'Auto-updater is not available in development mode.');
+        // Only report the error to the UI when the user explicitly pressed "Check for Updates"
+        if (userTriggered) {
+            mainWindow.webContents.send('update:error', 'Automatic updates are not configured for this build. Please download the latest version manually.');
+        }
         return;
     }
     autoUpdater.checkForUpdates().catch((err: Error) => {
         console.error('Update check failed:', err);
-        mainWindow?.webContents.send('update:error', err.message);
+        if (userTriggered) {
+            mainWindow?.webContents.send('update:error', err.message);
+        }
     });
 }
 
@@ -772,9 +777,10 @@ function createWindow() {
 
 app.whenReady().then(async () => {
     registerDbHandlers();
-    ipcMain.handle('update:check', () => checkForUpdates());
+    ipcMain.handle('update:check', () => checkForUpdates(true));
     ipcMain.handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
     ipcMain.handle('app:version', () => app.getVersion());
+    ipcMain.handle('app:openExternal', (_e, url: string) => shell.openExternal(url));
     setupAutoUpdater();
     await connectDB();
     createWindow();

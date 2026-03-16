@@ -71,6 +71,8 @@ export function useAppUpdater() {
 
     const checkForUpdate = useCallback(() => {
         if (!isElectron()) return;
+        // Set checking immediately so the UI responds before the IPC event arrives
+        setState(s => ({ ...s, status: 'checking', errorMessage: null }));
         getApi().checkForUpdate();
     }, []);
 
@@ -79,9 +81,16 @@ export function useAppUpdater() {
         getApi().installUpdate();
     }, []);
 
+    const openReleasesPage = useCallback(() => {
+        const api = getApi();
+        if (api?.openExternal) {
+            api.openExternal('https://github.com/INTEL-ONBOARD/ProjectX/releases/latest');
+        }
+    }, []);
+
     const dismiss = useCallback(() => {
         setState(s => ({ ...s, status: 'idle', errorMessage: null }));
     }, []);
 
-    return { state, checkForUpdate, installUpdate, dismiss, isElectron: isElectron() };
+    return { state, checkForUpdate, installUpdate, openReleasesPage, dismiss, isElectron: isElectron() };
 }

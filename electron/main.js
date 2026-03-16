@@ -716,16 +716,20 @@ if (!process.env.VITE_DEV_SERVER_URL) {
         // electron-updater not available in dev
     }
 }
-function checkForUpdates() {
+function checkForUpdates(userTriggered = false) {
     if (!mainWindow)
         return;
     if (!autoUpdater) {
-        mainWindow.webContents.send('update:error', 'Auto-updater is not available in development mode.');
+        if (userTriggered) {
+            mainWindow.webContents.send('update:error', 'Automatic updates are not configured for this build. Please download the latest version manually.');
+        }
         return;
     }
     autoUpdater.checkForUpdates().catch((err) => {
         console.error('Update check failed:', err);
-        mainWindow?.webContents.send('update:error', err.message);
+        if (userTriggered) {
+            mainWindow?.webContents.send('update:error', err.message);
+        }
     });
 }
 function setupAutoUpdater() {
@@ -783,10 +787,11 @@ function createWindow() {
 // ─── App lifecycle ─────────────────────────────────────────────────────────────
 electron_1.app.whenReady().then(async () => {
     registerDbHandlers();
-    electron_1.ipcMain.handle('update:check', () => checkForUpdates());
+    electron_1.ipcMain.handle('update:check', () => checkForUpdates(true));
     electron_1.ipcMain.handle('update:install', () => { if (autoUpdater)
         autoUpdater.quitAndInstall(false, true); });
     electron_1.ipcMain.handle('app:version', () => electron_1.app.getVersion());
+    electron_1.ipcMain.handle('app:openExternal', (_e, url) => electron_1.shell.openExternal(url));
     setupAutoUpdater();
     await connectDB();
     createWindow();
