@@ -343,6 +343,7 @@ function startProjectStream() {
     try {
         projectStream = ProjectModel.watch([], { fullDocument: 'updateLookup' });
         projectStream.on('change', (change) => {
+            console.log('[changeStream:project] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
             const op = change.operationType;
@@ -385,6 +386,7 @@ function startTaskStream() {
     try {
         taskStream = TaskModel.watch([], { fullDocument: 'updateLookup' });
         taskStream.on('change', (change) => {
+            console.log('[changeStream:task] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
             const op = change.operationType;
@@ -949,6 +951,9 @@ async function connectDB() {
         startMessageStream();
         startDataStreams();
     });
+    mongoose_1.default.connection.on('error', (err) => {
+        console.error('[MongoDB] Connection error:', err.message);
+    });
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
             await mongoose_1.default.connect(uri, opts);
@@ -967,9 +972,11 @@ async function connectDB() {
                 await new Promise(r => setTimeout(r, delay));
             }
             else {
-                console.error('MongoDB connection failed after 5 attempts.');
+                console.error('MongoDB connection failed after 5 attempts. Will retry in 10s...');
                 if (mainWindow)
                     mainWindow.webContents.send('db:connection-failed', msg);
+                // Retry loop: keep trying every 10s until connected (handles offline-at-startup)
+                setTimeout(() => connectDB(), 10000);
             }
         }
     }
@@ -1490,14 +1497,10 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
         },
-        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
         trafficLightPosition: { x: 15, y: 15 },
-        // Windows: overlay the native title bar buttons with theme-matching colors
-        titleBarOverlay: process.platform === 'win32' ? {
-            color: '#1A1F35',
-            symbolColor: '#CBD5E1',
-            height: 40,
-        } : false,
+        // Windows uses default native title bar — no overlay needed
+        titleBarOverlay: false,
         backgroundColor: '#1A1F35',
         autoHideMenuBar: true,
         show: false,
@@ -1530,13 +1533,11 @@ function createWindow() {
     }
 }
 // ─── App lifecycle ─────────────────────────────────────────────────────────────
-
 // Must be set before app is ready so Windows notifications show "Project M" not "electron.app.*"
 electron_1.app.setName('Project M');
 if (process.platform === 'win32') {
     electron_1.app.setAppUserModelId('com.intel-onboard.projectm');
 }
-
 electron_1.app.whenReady().then(async () => {
     registerDbHandlers();
     electron_1.ipcMain.handle('update:check', () => checkForUpdates(true));

@@ -362,7 +362,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const db = (window as any).electronAPI?.db;
                         if (proj?.id && db?.setProjectRich) {
-                            await db.setProjectRich(proj.id, rich).catch(() => {});
+                            await db.setProjectRich({ projectId: proj.id, ...rich, memberIds: [], starred: false }).catch(() => {});
                         }
                     }}
                 />
@@ -380,7 +380,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const db = (window as any).electronAPI?.db;
                         if (db?.setProjectRich) {
-                            await db.setProjectRich(editingProject.id, rich).catch(() => {});
+                            await db.setProjectRich({ projectId: editingProject.id, ...rich }).catch(() => {});
                         }
                     }}
                 />

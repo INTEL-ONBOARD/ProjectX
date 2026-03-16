@@ -310,6 +310,7 @@ function startProjectStream(): void {
     try {
         projectStream = (ProjectModel as any).watch([], { fullDocument: 'updateLookup' });
         projectStream.on('change', (change: any) => {
+            console.log('[changeStream:project] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
@@ -338,6 +339,7 @@ function startTaskStream(): void {
     try {
         taskStream = (TaskModel as any).watch([], { fullDocument: 'updateLookup' });
         taskStream.on('change', (change: any) => {
+            console.log('[changeStream:task] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {

@@ -69,6 +69,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!electronAPI) return;
 
     const unsubProject = electronAPI.onProjectChanged?.((_: unknown, payload: { op: string; doc?: Project; id?: string }) => {
+      console.log('[ProjectContext] onProjectChanged received:', payload.op, payload.doc?.id ?? payload.id);
       const { op, doc } = payload;
       if (op === 'insert') {
         setProjects(prev => prev.some(p => p.id === doc!.id) ? prev : [...prev, doc!]);
@@ -87,6 +88,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
 
     const unsubTask = electronAPI.onTaskChanged?.((_: unknown, payload: { op: string; doc?: Task; id?: string }) => {
+      console.log('[ProjectContext] onTaskChanged received:', payload.op, payload.doc?.id ?? payload.id);
       const { op, doc } = payload;
       if (op === 'insert') {
         setAllTasks(prev => prev.some(t => t.id === doc!.id) ? prev : [...prev, doc!]);
