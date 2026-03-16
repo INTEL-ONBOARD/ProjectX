@@ -194,6 +194,18 @@ const toDept        = (d: any) => ({ id: d.deptId, name: d.name, color: d.color,
 const toProjectRich = (d: any) => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General' });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toMsg         = (d: any) => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
+// Produces renderer-compatible shape (from/to/time) for IPC push events
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toMsgFrontend = (d: any) => ({
+    id: d.msgId,
+    from: d.fromId,
+    to: d.toId,
+    text: d.text,
+    time: d.timestamp,
+    read: false,
+    reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions as Record<string, unknown>)) : {},
+    deleted: d.deleted ?? false,
+});
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toConvMeta    = (d: any) => ({ convId: d.convId, userId: d.userId, peerId: d.peerId, pinned: d.pinned ?? false, starred: d.starred ?? false, archived: d.archived ?? false });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -212,6 +224,32 @@ const toRole = (d: any) => ({ appId: d.appId, name: d.name, color: d.color ?? '#
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
 let mainWindow: BrowserWindow | null = null;
+
+let messageStream: any = null;
+
+function startMessageStream(): void {
+    if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
+    try {
+        messageStream = (MessageModel as any).watch([{ $match: { operationType: 'insert' } }]);
+        messageStream.on('change', (change: any) => {
+            if (!mainWindow || (mainWindow as any).isDestroyed()) return;
+            const d = change.fullDocument;
+            if (!d) return;
+            (mainWindow as any).webContents.send('msg:new', toMsgFrontend(d));
+        });
+        messageStream.on('error', (err: any) => {
+            console.error('[changeStream] error:', err.message);
+            try { messageStream.close(); } catch (_) {}
+            messageStream = null;
+            setTimeout(() => {
+                if (mongoose.connection.readyState === 1) startMessageStream();
+            }, 5000);
+        });
+        console.log('[changeStream] message stream started');
+    } catch (err: any) {
+        console.error('[changeStream] failed to start:', err.message);
+    }
+}
 
 async function connectDB() {
     const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectx?retryWrites=true&w=majority';
@@ -634,6 +672,7 @@ function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
         if (autoUpdater) setTimeout(() => checkForUpdates(), 3000);
+        startMessageStream();
     });
 
     mainWindow.on('closed', () => { mainWindow = null; });
@@ -649,6 +688,10 @@ app.whenReady().then(async () => {
     setupAutoUpdater();
     await connectDB();
     createWindow();
+});
+
+app.on('before-quit', () => {
+    if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
