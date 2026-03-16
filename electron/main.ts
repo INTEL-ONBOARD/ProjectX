@@ -734,7 +734,7 @@ function setupDbListeners() {
 }
 
 async function connectDB() {
-    const uri = process.env.MONGODB_URI;
+    const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
     if (!uri) { console.error('MONGODB_URI not set'); return; }
     // Reduced serverSelectionTimeoutMS from 30s → 8s so failed attempts surface faster
     // and the retry loop can kick in sooner after internet is restored
