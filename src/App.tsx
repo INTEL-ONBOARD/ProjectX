@@ -233,12 +233,18 @@ const PermissionDeniedModal: React.FC<{ path: string; onClose: () => void }> = (
         setSending(true);
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const api = (window as any).electronAPI;
+            const electronAPI = (window as any).electronAPI;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const admins = members.filter((m: any) => m.role === 'admin');
+            let allMembers: any[] = members;
+            // Fallback: fetch directly if context hasn't loaded yet
+            if (allMembers.length === 0) {
+                allMembers = await electronAPI.db.getMembers();
+            }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const admins = allMembers.filter((m: any) => m.role === 'admin');
             const refId = `permreq-${user.id}-${path}-${Date.now()}`;
             for (const admin of admins) {
-                await api.notifs.create({
+                await electronAPI.notifs.create({
                     userId: admin.id,
                     type: 'permission_request',
                     title: `${user.name} requested access`,
@@ -247,7 +253,11 @@ const PermissionDeniedModal: React.FC<{ path: string; onClose: () => void }> = (
                 });
             }
             setRequested(true);
-        } catch { /* ignore */ }
+            // Auto-close after showing success for 2s
+            setTimeout(() => onClose(), 2000);
+        } catch (err) {
+            console.error('[PermissionDeniedModal] Failed to send permission request:', err);
+        }
         setSending(false);
     };
 
@@ -261,43 +271,66 @@ const PermissionDeniedModal: React.FC<{ path: string; onClose: () => void }> = (
                 className="rounded-2xl p-8 w-full max-w-sm mx-4 flex flex-col items-center text-center"
                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}
             >
-                {/* Icon */}
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ background: 'rgba(220,38,38,0.12)' }}>
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                </div>
-
-                {/* Text */}
-                <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Access Restricted</h2>
-                <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
-                    You don't have permission to access <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{pageName}</span>.
-                </p>
-                <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Contact your admin or request access below.</p>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-2.5 w-full">
+                <AnimatePresence mode="wait">
                     {!requested ? (
-                        <button
-                            onClick={handleRequest}
-                            disabled={sending}
-                            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-primary-500 hover:bg-primary-600 transition-colors disabled:opacity-60"
+                        <motion.div key="locked" className="flex flex-col items-center w-full"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ duration: 0.18 }}
                         >
-                            {sending ? 'Sending…' : 'Request Permission'}
-                        </button>
+                            {/* Lock icon */}
+                            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ background: 'rgba(220,38,38,0.12)' }}>
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                            </div>
+                            <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Access Restricted</h2>
+                            <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
+                                You don't have permission to access <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{pageName}</span>.
+                            </p>
+                            <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Contact your admin or request access below.</p>
+                            <div className="flex flex-col gap-2.5 w-full">
+                                <button
+                                    onClick={handleRequest}
+                                    disabled={sending}
+                                    className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-60 bg-primary-500 hover:bg-primary-600"
+                                >
+                                    {sending ? 'Sending…' : 'Request Permission'}
+                                </button>
+                                <button
+                                    onClick={onClose}
+                                    className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                                    style={{ color: 'var(--text-muted)' }}
+                                >
+                                    Go Back
+                                </button>
+                            </div>
+                        </motion.div>
                     ) : (
-                        <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center" style={{ background: 'rgba(34,197,94,0.12)', color: '#4ADE80' }}>
-                            ✓ Request sent to admin
-                        </div>
+                        <motion.div key="success" className="flex flex-col items-center w-full py-4"
+                            initial={{ opacity: 0, scale: 0.85, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                            {/* Success checkmark */}
+                            <motion.div
+                                className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
+                                style={{ background: 'rgba(34,197,94,0.15)' }}
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 20 }}
+                            >
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                            </motion.div>
+                            <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Request Sent!</h2>
+                            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                                Your request has been sent to the admin. You'll be notified once access is granted.
+                            </p>
+                        </motion.div>
                     )}
-                    <button
-                        onClick={onClose}
-                        className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors" style={{ color: 'var(--text-muted)' }}
-                    >
-                        Go Back
-                    </button>
-                </div>
+                </AnimatePresence>
             </motion.div>
         </div>
     );

@@ -1175,10 +1175,10 @@ const SettingsPage: React.FC = () => {
                   <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="p-6 flex items-center gap-5">
                       <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold bg-gradient-to-br from-primary-500 to-primary-700 shrink-0 shadow-lg">
-                        PX
+                        PM
                       </div>
                       <div>
-                        <div className="text-xl font-extrabold text-gray-900 tracking-tight">Project X</div>
+                        <div className="text-xl font-extrabold text-gray-900 tracking-tight">Project M</div>
                         <div className="text-sm text-gray-500 mt-0.5">Version {updateState.appVersion ?? '—'}</div>
                         <div className="text-xs text-gray-400 mt-0.5">Developed and published by GitBase</div>
                       </div>

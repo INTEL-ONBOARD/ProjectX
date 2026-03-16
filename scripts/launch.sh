@@ -1,7 +1,7 @@
 #!/bin/bash
-# Launch ProjectX app
-APP_PATH="$HOME/Applications/ProjectX.app"
-SOURCE_APP="$(dirname "$0")/../release/mac-arm64/ProjectX.app"
+# Launch Project M app
+APP_PATH="$HOME/Applications/ProjectM.app"
+SOURCE_APP="$(dirname "$0")/../release/mac-arm64/ProjectM.app"
 
 # Copy/update the app
 if [ -d "$SOURCE_APP" ]; then
@@ -11,6 +11,6 @@ if [ -d "$SOURCE_APP" ]; then
   xattr -rd com.apple.quarantine "$APP_PATH" 2>/dev/null || true
 fi
 
-echo "Launching ProjectX..."
+echo "Launching ProjectM..."
 osascript -e "set theApp to POSIX file \"$APP_PATH\"
 tell application \"Finder\" to open theApp"

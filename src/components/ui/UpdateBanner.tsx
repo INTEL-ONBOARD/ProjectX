@@ -47,7 +47,7 @@ const UpdateBanner: React.FC = () => {
                                     <div className="text-[11px] text-gray-400 mt-0.5">
                                         {status === 'downloaded' ? 'Restart the app to apply the update.' :
                                          status === 'downloading' ? `${progress ?? 0}% complete` :
-                                         'A new version of ProjectX is available.'}
+                                         'A new version of Project M is available.'}
                                     </div>
 
                                     {/* Progress bar */}

@@ -1,6 +1,6 @@
-appId: com.projectx.app
-productName: ProjectX
-copyright: Copyright © 2024 ProjectX
+appId: com.projectm.app
+productName: ProjectM
+copyright: Copyright © 2024 ProjectM
 
 directories:
   buildResources: build
@@ -47,5 +47,5 @@ nsis:
 publish:
   provider: github
   owner: INTEL-ONBOARD
-  repo: ProjectX
+  repo: ProjectM
   releaseType: release

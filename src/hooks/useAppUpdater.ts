@@ -84,7 +84,7 @@ export function useAppUpdater() {
     const openReleasesPage = useCallback(() => {
         const api = getApi();
         if (api?.openExternal) {
-            api.openExternal('https://github.com/INTEL-ONBOARD/ProjectX/releases/latest');
+            api.openExternal('https://github.com/INTEL-ONBOARD/ProjectM/releases/latest');
         }
     }, []);
 

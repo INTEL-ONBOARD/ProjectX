@@ -1,6 +1,6 @@
 {
-  "name": "projectx",
-  "version": "1.6.8",
+  "name": "projectm",
+  "version": "1.6.9",
   "description": "Project Planning Desktop App",
   "main": "electron/main.js",
   "author": "",
@@ -28,8 +28,8 @@
     "recharts": "^3.8.0"
   },
   "build": {
-    "appId": "com.intel-onboard.projectx",
-    "productName": "Project X",
+    "appId": "com.intel-onboard.projectm",
+    "productName": "Project M",
     "publish": {
       "provider": "github",
       "owner": "INTEL-ONBOARD",

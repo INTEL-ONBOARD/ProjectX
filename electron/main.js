@@ -928,7 +928,7 @@ async function ensureDefaultData() {
     await UserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
 }
 async function connectDB() {
-    const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectx?retryWrites=true&w=majority';
+    const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
     if (!uri) {
         console.error('MONGODB_URI not set');
         return;
@@ -1412,7 +1412,7 @@ function buildTrayMenu() {
         },
         { type: 'separator' },
         {
-            label: 'Quit Project X',
+            label: 'Quit Project M',
             click: () => {
                 backgroundModeEnabled = false;
                 electron_1.app.quit();
@@ -1424,12 +1424,19 @@ function createTray() {
     if (tray)
         return; // already exists
     const iconPath = path_1.default.join(__dirname, '../build/tray-icon.png');
-    const icon = electron_1.nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    const icon = electron_1.nativeImage.createFromPath(iconPath);
+    // macOS: mark as template so the OS renders it correctly in light/dark menu bar
+    if (process.platform === 'darwin')
+        icon.setTemplateImage(true);
     tray = new electron_1.Tray(icon);
-    tray.setToolTip('Project X');
+    tray.setToolTip('Project M');
     tray.setContextMenu(buildTrayMenu());
-    // Single click restores window on Windows/Linux; on macOS it opens the menu
+    // Single click restores window on Windows/Linux; on macOS it opens the context menu
     tray.on('click', () => {
+        if (process.platform === 'darwin') {
+            tray?.popUpContextMenu();
+            return;
+        }
         if (!mainWindow)
             return;
         if (mainWindow.isVisible()) {
@@ -1476,7 +1483,8 @@ function applyBackgroundMode(enabled) {
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
         width: 1400, height: 900, minWidth: 1100, minHeight: 700,
-        icon: path_1.default.join(__dirname, '../build/icon.icns'),
+        // macOS gets its icon from the app bundle automatically — setting it here causes white-edge artifacts
+        icon: process.platform !== 'darwin' ? path_1.default.join(__dirname, '../build/icon.png') : undefined,
         webPreferences: {
             preload: path_1.default.join(__dirname, 'preload.js'),
             contextIsolation: true,
