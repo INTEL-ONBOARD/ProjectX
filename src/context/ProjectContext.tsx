@@ -7,8 +7,9 @@ const api = () => (window as any).electronAPI.db;
 
 export interface ProjectRichData {
   description: string;
-  status: 'active' | 'on-hold' | 'completed';
+  status: 'active' | 'on-hold' | 'completed' | 'live-and-support' | 'planning';
   priority: 'low' | 'medium' | 'high';
+  startDate: string;
   memberIds: string[];
   dueDate: string;
   starred: boolean;

@@ -38,9 +38,11 @@ interface ProjectData {
 
 // ─── Static configs ────────────────────────────────────────────────────────────
 const statusConfig = {
-  active:    { label: 'Active',    bg: 'bg-[#7AC55520]', text: 'text-[#7AC555]', dot: '#7AC555' },
-  'on-hold': { label: 'On Hold',   bg: 'bg-[#FFA50020]', text: 'text-[#FFA500]', dot: '#FFA500' },
-  completed: { label: 'Completed', bg: 'bg-[#5030E520]', text: 'text-[#5030E5]', dot: '#5030E5' },
+  active:             { label: 'Active',           bg: 'bg-[#7AC55520]', text: 'text-[#7AC555]', dot: '#7AC555' },
+  'on-hold':          { label: 'On Hold',          bg: 'bg-[#EAB30820]', text: 'text-[#EAB308]', dot: '#EAB308' },
+  completed:          { label: 'Completed',        bg: 'bg-[#5030E520]', text: 'text-[#5030E5]', dot: '#5030E5' },
+  'live-and-support': { label: 'Live and Support', bg: 'bg-[#00BFFF20]', text: 'text-[#00BFFF]', dot: '#00BFFF' },
+  planning:           { label: 'Planning',         bg: 'bg-[#A78BFA20]', text: 'text-[#A78BFA]', dot: '#A78BFA' },
 };
 
 const priorityConfig = {
