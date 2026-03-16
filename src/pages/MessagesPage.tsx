@@ -13,7 +13,7 @@ import { getPresenceStatus } from '../context/PresenceContext';
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
 
-type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: string[] };
+type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: Record<string, string[]> };
 
 const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
@@ -63,21 +63,29 @@ const MessagesPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChats.length, activeId]);
 
-  // Mark as read when switching conversation
+  // Pre-load messages for all conversations on mount so sidebar shows last message + unread count
   useEffect(() => {
-    if (!activeId) return;
-    setChats(prev => ({
-      ...prev,
-      [activeId]: (prev[activeId] ?? []).map(m => ({ ...m, read: true })),
-    }));
-  }, [activeId]);
+    if (!currentUserId || conversations.length === 0) return;
+    conversations.forEach(peer => {
+      dbApi().getMessagesBetween(currentUserId, peer.id)
+        .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [peer.id]: msgs as Msg[] })))
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to preload messages for', peer.id, err));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, conversations.length]);
 
-  // Load messages from DB when active peer changes (one-time fetch)
+  // Load messages for the active conversation and mark them as read
   useEffect(() => {
-    if (!activeMember) return;
+    if (!activeMember || !currentUserId) return;
     const peerId = activeMember.id;
     dbApi().getMessagesBetween(currentUserId, peerId)
-        .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [peerId]: msgs })))
+        .then((msgs: Msg[]) => {
+          // Mark all incoming messages as read since the user is viewing this conversation
+          const read = msgs.map((m: Msg) => ({ ...m, read: true }));
+          setChats(prev => ({ ...prev, [peerId]: read }));
+          dbApi().markMessagesRead(currentUserId, peerId)
+            .catch((err: unknown) => console.error('[MessagesPage] Failed to mark messages as read:', err));
+        })
         .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
   }, [activeMember?.id, currentUserId]);
 
@@ -136,12 +144,12 @@ const MessagesPage: React.FC = () => {
       from: myId,
       text,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      read: false,
+      read: true,
     };
     setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
     setInput('');
     inputRef.current?.focus();
-    dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: newMsg.time })
+    dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: newMsg.time, read: true })
         .then((saved: Msg) => {
           setChats(prev => ({
             ...prev,
@@ -157,23 +165,42 @@ const MessagesPage: React.FC = () => {
 
   const addReaction = async (msgId: string, emoji: string) => {
     const targetId = activeId;
+    // Optimistic: add myId to the emoji's user list (or remove if already there — toggle)
     setChats(prev => ({
       ...prev,
-      [targetId]: (prev[targetId] ?? []).map(m =>
-        m.id === msgId ? { ...m, reactions: [...(m.reactions ?? []).filter(e => e !== emoji), emoji] } : m
-      ),
+      [targetId]: (prev[targetId] ?? []).map(m => {
+        if (m.id !== msgId) return m;
+        const reactions = { ...(m.reactions ?? {}) };
+        const users = reactions[emoji] ?? [];
+        if (users.includes(myId)) {
+          const next = users.filter(u => u !== myId);
+          if (next.length === 0) { delete reactions[emoji]; } else { reactions[emoji] = next; }
+        } else {
+          reactions[emoji] = [...users, myId];
+        }
+        return { ...m, reactions };
+      }),
     }));
     setShowEmojiPicker(null);
     try {
       await dbApi().reactToMessage(msgId, myId, emoji);
     } catch (err: unknown) {
       console.error('[MessagesPage] Failed to save reaction:', err);
-      // Targeted undo: remove only the emoji we just added
+      // Undo: reverse the toggle
       setChats(prev => ({
         ...prev,
-        [targetId]: (prev[targetId] ?? []).map(m =>
-          m.id === msgId ? { ...m, reactions: (m.reactions ?? []).filter(e => e !== emoji) } : m
-        ),
+        [targetId]: (prev[targetId] ?? []).map(m => {
+          if (m.id !== msgId) return m;
+          const reactions = { ...(m.reactions ?? {}) };
+          const users = reactions[emoji] ?? [];
+          if (users.includes(myId)) {
+            const next = users.filter(u => u !== myId);
+            if (next.length === 0) { delete reactions[emoji]; } else { reactions[emoji] = next; }
+          } else {
+            reactions[emoji] = [...users, myId];
+          }
+          return { ...m, reactions };
+        }),
       }));
       showToast('Failed to save reaction.', 'error');
     }
@@ -222,7 +249,7 @@ const MessagesPage: React.FC = () => {
     if (archivedIds.has(m.id)) return false;
     if (!m.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (msgFilter === 'pinned') return pinnedIds.includes(m.id);
-    if (msgFilter === 'unread') return !openedIds.has(m.id);
+    if (msgFilter === 'unread') return getUnread(m.id) > 0;
     return true;
   });
 
@@ -463,10 +490,10 @@ const MessagesPage: React.FC = () => {
                       </AnimatePresence>
                     </div>
                     {/* Reactions display */}
-                    {(msg.reactions ?? []).length > 0 && (
+                    {Object.keys(msg.reactions ?? {}).length > 0 && (
                       <div className="flex gap-1 mt-1 flex-wrap">
-                        {msg.reactions!.map((r, ri) => (
-                          <span key={ri} className="text-xs bg-white border border-surface-200 rounded-full px-1.5 py-0.5 shadow-sm">{r}</span>
+                        {Object.entries(msg.reactions!).map(([emoji, users]) => (
+                          <span key={emoji} className="text-xs bg-white border border-surface-200 rounded-full px-1.5 py-0.5 shadow-sm">{emoji} {users.length > 1 ? users.length : ''}</span>
                         ))}
                       </div>
                     )}
@@ -500,7 +527,7 @@ const MessagesPage: React.FC = () => {
                 const newMsg: Msg = { id: `m${crypto.randomUUID()}`, from: myId, text, time: now, read: true };
                 setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
                 e.target.value = '';
-                dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: now })
+                dbApi().sendMessage({ fromId: currentUserId, toId: activeMember?.id ?? targetId, text, timestamp: now, read: true })
                   .then((saved: Msg) => {
                     setChats(prev => ({
                       ...prev,

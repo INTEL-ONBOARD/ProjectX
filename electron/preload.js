@@ -116,6 +116,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         sendMessage: (msg) => electron_1.ipcRenderer.invoke('db:messages:send', msg),
         reactToMessage: (msgId, userId, emoji) => electron_1.ipcRenderer.invoke('db:messages:react', msgId, userId, emoji),
         deleteMessage: (msgId) => electron_1.ipcRenderer.invoke('db:messages:delete', msgId),
+        markMessagesRead: (userId, peerId) => electron_1.ipcRenderer.invoke('db:messages:markRead', userId, peerId),
         // Conv meta
         getConvMeta: (userId) => electron_1.ipcRenderer.invoke('db:convmeta:getAll', userId),
         setConvMeta: (meta) => electron_1.ipcRenderer.invoke('db:convmeta:set', meta),

@@ -142,6 +142,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         sendMessage:        (msg: object): Promise<unknown>                       => ipcRenderer.invoke('db:messages:send', msg),
         reactToMessage:     (msgId: string, userId: string, emoji: string): Promise<unknown> => ipcRenderer.invoke('db:messages:react', msgId, userId, emoji),
         deleteMessage:      (msgId: string): Promise<boolean>                     => ipcRenderer.invoke('db:messages:delete', msgId),
+        markMessagesRead:   (userId: string, peerId: string): Promise<boolean>    => ipcRenderer.invoke('db:messages:markRead', userId, peerId),
 
         // Conv meta
         getConvMeta: (userId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:convmeta:getAll', userId),

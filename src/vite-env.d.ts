@@ -36,6 +36,7 @@ interface ElectronDB {
   sendMessage(msg: object): Promise<unknown>;
   reactToMessage(msgId: string, userId: string, emoji: string): Promise<unknown>;
   deleteMessage(msgId: string): Promise<boolean>;
+  markMessagesRead(userId: string, peerId: string): Promise<boolean>;
 
   // Conv meta
   getConvMeta(userId: string): Promise<unknown[]>;

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu } from 'electron';
 import path from 'path';
 import dotenv from 'dotenv';
 import mongoose, { Schema } from 'mongoose';
@@ -59,6 +59,7 @@ const MessageSchema = new Schema({
     timestamp: { type: String, required: true },
     reactions: { type: Map, of: [String], default: {} },
     deleted:   { type: Boolean, default: false },
+    read:      { type: Boolean, default: false },
 });
 
 const ConvMetaSchema = new Schema({
@@ -427,6 +428,10 @@ function registerDbHandlers() {
         await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
         return true;
     });
+    ipcMain.handle('db:messages:markRead', async (_e, userId: string, peerId: string) => {
+        await MessageModel.updateMany({ fromId: peerId, toId: userId, read: false }, { read: true });
+        return true;
+    });
 
     // Conv meta (pin/star/archive)
     ipcMain.handle('db:convmeta:getAll', async (_e, userId: string) => {
@@ -733,8 +738,10 @@ function createWindow() {
         titleBarStyle: 'hiddenInset',
         trafficLightPosition: { x: 15, y: 15 },
         backgroundColor: '#F5F5F5',
+        autoHideMenuBar: true,
         show: false,
     });
+    Menu.setApplicationMenu(null);
 
     if (process.env.VITE_DEV_SERVER_URL) {
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);

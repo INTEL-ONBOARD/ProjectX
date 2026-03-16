@@ -90,6 +90,7 @@ const MessageSchema = new mongoose_1.Schema({
     timestamp: { type: String, required: true },
     reactions: { type: Map, of: [String], default: {} },
     deleted: { type: Boolean, default: false },
+    read: { type: Boolean, default: false },
 });
 const ConvMetaSchema = new mongoose_1.Schema({
     convId: { type: String, required: true, unique: true },
@@ -456,6 +457,10 @@ function registerDbHandlers() {
         await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
         return true;
     });
+    electron_1.ipcMain.handle('db:messages:markRead', async (_e, userId, peerId) => {
+        await MessageModel.updateMany({ fromId: peerId, toId: userId, read: false }, { read: true });
+        return true;
+    });
     // Conv meta (pin/star/archive)
     electron_1.ipcMain.handle('db:convmeta:getAll', async (_e, userId) => {
         const docs = await ConvMetaModel.find({ userId }).lean();
@@ -748,8 +753,10 @@ function createWindow() {
         titleBarStyle: 'hiddenInset',
         trafficLightPosition: { x: 15, y: 15 },
         backgroundColor: '#F5F5F5',
+        autoHideMenuBar: true,
         show: false,
     });
+    electron_1.Menu.setApplicationMenu(null);
     if (process.env.VITE_DEV_SERVER_URL) {
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     }
