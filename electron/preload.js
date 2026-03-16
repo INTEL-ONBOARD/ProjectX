@@ -6,6 +6,12 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     // App info
     getVersion: () => electron_1.ipcRenderer.invoke('app:version'),
     openExternal: (url) => electron_1.ipcRenderer.invoke('app:openExternal', url),
+    getLoginItemSettings: () => electron_1.ipcRenderer.invoke('app:getLoginItemSettings'),
+    setOpenAtLogin: (value) => electron_1.ipcRenderer.invoke('app:setOpenAtLogin', value),
+    getBackgroundMode: () => electron_1.ipcRenderer.invoke('app:getBackgroundMode'),
+    setBackgroundMode: (value) => electron_1.ipcRenderer.invoke('app:setBackgroundMode', value),
+    getSystemNotifsEnabled: (userId) => electron_1.ipcRenderer.invoke('app:getSystemNotifsEnabled', userId),
+    setSystemNotifsEnabled: (userId, value) => electron_1.ipcRenderer.invoke('app:setSystemNotifsEnabled', userId, value),
     // Update controls
     checkForUpdate: () => electron_1.ipcRenderer.invoke('update:check'),
     installUpdate: () => electron_1.ipcRenderer.invoke('update:install'),

@@ -74,7 +74,7 @@ const WalkthroughScreen: React.FC<WalkthroughScreenProps> = ({ onComplete }) => 
   const current = steps[step];
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-white">
+    <div className="fixed inset-0 flex overflow-hidden" style={{ background: 'var(--bg-app)' }}>
       <BrandPanel />
 
       <FormPanel>

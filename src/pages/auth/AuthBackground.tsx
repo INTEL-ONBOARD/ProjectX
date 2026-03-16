@@ -186,7 +186,7 @@ export const BrandPanel: React.FC = () => (
 
 // ── Right panel (form side) wrapper ──────────────────────────────────────────
 export const FormPanel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto bg-white px-6 py-10 min-h-screen">
+  <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto px-6 py-10 min-h-screen" style={{ background: 'var(--bg-app)' }}>
     <div className="w-full max-w-[380px]">
       {children}
     </div>
@@ -195,7 +195,7 @@ export const FormPanel: React.FC<{ children: React.ReactNode }> = ({ children })
 
 // ── Root layout ───────────────────────────────────────────────────────────────
 const AuthBackground: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="fixed inset-0 flex overflow-hidden bg-white">
+  <div className="fixed inset-0 flex overflow-hidden" style={{ background: 'var(--bg-app)' }}>
     <BrandPanel />
     {children}
   </div>

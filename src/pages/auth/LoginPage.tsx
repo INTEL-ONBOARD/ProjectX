@@ -58,12 +58,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
   const inputStyle = (f: string) => ({
     borderColor: focus[f] ? '#5030E5' : 'transparent',
     boxShadow: focus[f] ? '0 0 0 3px rgba(80,48,229,0.1)' : 'none',
-    background: focus[f] ? '#fff' : '#F5F5F5',
+    background: focus[f] ? 'var(--bg-card)' : 'var(--bg-input)',
   });
   const sf = (f: string, v: boolean) => setFocus(p => ({ ...p, [f]: v }));
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-white">
+    <div className="fixed inset-0 flex overflow-hidden" style={{ background: 'var(--bg-app)' }}>
       <BrandPanel />
       <FormPanel>
         {/* Header */}
@@ -137,8 +137,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
                 onClick={() => setRemember(!remember)}
                 className="w-4.5 h-4.5 w-[18px] h-[18px] rounded-[5px] flex items-center justify-center transition-all cursor-pointer border-2 shrink-0"
                 style={{
-                  background: remember ? '#5030E5' : '#fff',
-                  borderColor: remember ? '#5030E5' : '#D9D9D9',
+                  background: remember ? '#5030E5' : 'var(--bg-input)',
+                  borderColor: remember ? '#5030E5' : 'var(--border-strong)',
                 }}
               >
                 {remember && (

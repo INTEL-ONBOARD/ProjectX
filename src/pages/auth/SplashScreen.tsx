@@ -13,7 +13,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, duration = 2800
   }, [onComplete, duration]);
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-white overflow-hidden">
+    <div className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden" style={{ background: 'var(--bg-app)' }}>
       {/* Background accent */}
       <div className="absolute inset-0 pointer-events-none"
         style={{ background: 'radial-gradient(ellipse 60% 40% at 50% 30%, rgba(80,48,229,0.06) 0%, transparent 70%)' }} />

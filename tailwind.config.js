@@ -17,10 +17,10 @@ module.exports = {
                     900: 'var(--color-primary-900, #100861)',
                 },
                 surface: {
-                    50: '#FFFFFF',
-                    100: '#F5F5F5',
-                    200: '#EBEBEB',
-                    300: '#D9D9D9',
+                    50:  'var(--color-surface-50,  #FFFFFF)',
+                    100: 'var(--color-surface-100, #F5F5F5)',
+                    200: 'var(--color-surface-200, #EBEBEB)',
+                    300: 'var(--color-surface-300, #D9D9D9)',
                 },
                 priority: {
                     low: '#D58D49',

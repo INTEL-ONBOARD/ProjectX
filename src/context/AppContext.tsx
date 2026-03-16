@@ -99,7 +99,7 @@ export const AppContext = createContext<AppContextType>({
     setOrg: () => { },
     currentUser: null,
     setCurrentUser: () => { },
-    theme: 'light',
+    theme: 'dark',
     setTheme: () => { },
     sidebarCollapsed: false,
     setSidebarCollapsed: () => { },
@@ -113,7 +113,7 @@ export const AppContext = createContext<AppContextType>({
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [org, setOrg] = useState<Organization | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [theme, setThemeState] = useState<'light' | 'dark'>('light');
+    const [theme, setThemeState] = useState<'light' | 'dark'>('dark');
     const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
     const [selectedWeekStart, setSelectedWeekStartState] = useState<string>(currentWeekMonday());

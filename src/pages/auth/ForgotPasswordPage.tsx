@@ -28,11 +28,11 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
   const inputStyle = {
     borderColor: error ? '#EF4444' : focused ? '#5030E5' : 'transparent',
     boxShadow: error ? '0 0 0 3px rgba(239,68,68,0.08)' : focused ? '0 0 0 3px rgba(80,48,229,0.1)' : 'none',
-    background: focused ? '#fff' : '#F5F5F5',
+    background: focused ? 'var(--bg-card)' : 'var(--bg-input)',
   };
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-white">
+    <div className="fixed inset-0 flex overflow-hidden" style={{ background: 'var(--bg-app)' }}>
       <BrandPanel />
       <FormPanel>
         <AnimatePresence mode="wait">

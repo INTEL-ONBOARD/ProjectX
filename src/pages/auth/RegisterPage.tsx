@@ -56,7 +56,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   const inputStyle = (f: string) => ({
     borderColor: errors[f] ? '#EF4444' : focus[f] ? '#5030E5' : 'transparent',
     boxShadow: errors[f] ? '0 0 0 3px rgba(239,68,68,0.08)' : focus[f] ? '0 0 0 3px rgba(80,48,229,0.1)' : 'none',
-    background: focus[f] ? '#fff' : '#F5F5F5',
+    background: focus[f] ? 'var(--bg-card)' : 'var(--bg-input)',
   });
 
   const validate = () => {
@@ -89,7 +89,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   };
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-white">
+    <div className="fixed inset-0 flex overflow-hidden" style={{ background: 'var(--bg-app)' }}>
       <BrandPanel />
       <FormPanel>
         <motion.div {...fi(0)} className="mb-2">

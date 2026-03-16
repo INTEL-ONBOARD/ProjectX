@@ -144,6 +144,7 @@ const NotifPrefSchema = new mongoose_1.Schema({
     projectUpdates: { type: Boolean, default: true },
     securityAlerts: { type: Boolean, default: true },
     quietHours: { type: Boolean, default: true },
+    systemNotifs: { type: Boolean, default: true },
 });
 const NotificationSchema = new mongoose_1.Schema({
     notifId: { type: String, required: true, unique: true },
@@ -232,7 +233,7 @@ const toOrg = (d) => ({ id: d.orgId, name: d.name, logo: d.logo ?? '', address: 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toUserPref = (d) => ({ userId: d.userId, theme: d.theme, sidebarCollapsed: d.sidebarCollapsed ?? false, selectedWeekStart: d.selectedWeekStart ?? null, hasSeenWalkthrough: d.hasSeenWalkthrough ?? false, projectsView: d.projectsView ?? 'grid', taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {} });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toNotifPref = (d) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours });
+const toNotifPref = (d) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours, systemNotifs: d.systemNotifs ?? true });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAppearancePref = (d) => ({ userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor, fontSize: d.fontSize, compactMode: d.compactMode ?? false });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,6 +242,8 @@ const toNotif = (d) => ({ id: d.notifId, userId: d.userId, type: d.type, title: 
 const toRole = (d) => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 let mainWindow = null;
+let tray = null;
+let backgroundModeEnabled = false;
 // Fix 1: flag set once ready-to-show fires — prevents streams from starting before window exists
 let windowReady = false;
 let messageStream = null;
@@ -258,6 +261,16 @@ let convMetaStream = null;
 let deptStream = null;
 let authUserStream = null;
 let notificationStream = null;
+// Per-user system notification setting (userId → enabled). Loaded lazily from DB.
+const systemNotifsEnabled = new Map();
+function fireSystemNotif(title, body) {
+    if (!electron_1.Notification.isSupported())
+        return;
+    try {
+        new electron_1.Notification({ title, body, silent: false }).show();
+    }
+    catch (_) { }
+}
 function startMessageStream() {
     if (!windowReady)
         return; // Fix 1: don't start until window is ready
@@ -280,6 +293,16 @@ function startMessageStream() {
                 return;
             if (op === 'insert') {
                 mainWindow.webContents.send('msg:new', toMsgFrontend(d));
+                // System notification for the recipient
+                const recipientId = d.toId;
+                if (systemNotifsEnabled.get(recipientId) !== false) {
+                    // Look up sender name async (best-effort)
+                    UserModel.findOne({ appId: d.fromId }).lean().then((sender) => {
+                        const name = sender?.name ?? 'New message';
+                        const text = String(d.text ?? '').slice(0, 80);
+                        fireSystemNotif(name, text || '📎 Attachment');
+                    }).catch(() => { });
+                }
             }
             else if (op === 'update' || op === 'replace') {
                 mainWindow.webContents.send('msg:updated', toMsgFrontend(d));
@@ -1303,6 +1326,10 @@ function registerDbHandlers() {
     electron_1.ipcMain.handle('db:notifs:create', async (_e, notif) => {
         const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
+        // Fire OS notification if enabled for this user (skip new_message — handled by message stream)
+        if (notif.type !== 'new_message' && systemNotifsEnabled.get(notif.userId) !== false) {
+            fireSystemNotif(notif.title, notif.body ?? '');
+        }
         return safe(toNotif(d.toObject()));
     });
     electron_1.ipcMain.handle('db:notifs:markRead', async (_e, notifId) => {
@@ -1362,6 +1389,87 @@ function setupAutoUpdater() {
     autoUpdater.on('update-downloaded', (info) => mainWindow?.webContents.send('update:downloaded', { version: info.version }));
     autoUpdater.on('error', (err) => mainWindow?.webContents.send('update:error', err.message));
 }
+// ─── Tray ──────────────────────────────────────────────────────────────────────
+function buildTrayMenu() {
+    return electron_1.Menu.buildFromTemplate([
+        {
+            label: mainWindow?.isVisible() ? 'Hide Window' : 'Show Window',
+            click: () => {
+                if (!mainWindow)
+                    return;
+                if (mainWindow.isVisible()) {
+                    mainWindow.hide();
+                }
+                else {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+                // Rebuild menu so label reflects new state
+                tray?.setContextMenu(buildTrayMenu());
+            },
+        },
+        { type: 'separator' },
+        {
+            label: 'Quit Project X',
+            click: () => {
+                backgroundModeEnabled = false;
+                electron_1.app.quit();
+            },
+        },
+    ]);
+}
+function createTray() {
+    if (tray)
+        return; // already exists
+    const iconPath = path_1.default.join(__dirname, '../build/tray-icon.png');
+    const icon = electron_1.nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    tray = new electron_1.Tray(icon);
+    tray.setToolTip('Project X');
+    tray.setContextMenu(buildTrayMenu());
+    // Single click restores window on Windows/Linux; on macOS it opens the menu
+    tray.on('click', () => {
+        if (!mainWindow)
+            return;
+        if (mainWindow.isVisible()) {
+            mainWindow.focus();
+        }
+        else {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+        tray?.setContextMenu(buildTrayMenu());
+    });
+}
+function destroyTray() {
+    if (!tray)
+        return;
+    tray.destroy();
+    tray = null;
+}
+function applyBackgroundMode(enabled) {
+    backgroundModeEnabled = enabled;
+    if (!mainWindow)
+        return;
+    // Remove all existing close/closed listeners we own
+    mainWindow.removeAllListeners('close');
+    mainWindow.removeAllListeners('closed');
+    if (enabled) {
+        createTray();
+        // Intercept close — hide to tray instead of quitting
+        mainWindow.on('close', (e) => {
+            if (!backgroundModeEnabled)
+                return;
+            e.preventDefault();
+            mainWindow?.hide();
+            tray?.setContextMenu(buildTrayMenu());
+        });
+    }
+    else {
+        destroyTray();
+        // Normal close — destroy window
+        mainWindow.on('closed', () => { mainWindow = null; });
+    }
+}
 // ─── Window ────────────────────────────────────────────────────────────────────
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -1413,11 +1521,38 @@ electron_1.app.whenReady().then(async () => {
         autoUpdater.quitAndInstall(false, true); });
     electron_1.ipcMain.handle('app:version', () => electron_1.app.getVersion());
     electron_1.ipcMain.handle('app:openExternal', (_e, url) => electron_1.shell.openExternal(url));
+    electron_1.ipcMain.handle('app:getLoginItemSettings', () => electron_1.app.getLoginItemSettings());
+    electron_1.ipcMain.handle('app:setOpenAtLogin', (_e, value) => { electron_1.app.setLoginItemSettings({ openAtLogin: value }); return true; });
+    electron_1.ipcMain.handle('app:getBackgroundMode', () => backgroundModeEnabled);
+    electron_1.ipcMain.handle('app:setBackgroundMode', (_e, value) => {
+        applyBackgroundMode(value);
+        return true;
+    });
+    electron_1.ipcMain.handle('app:getSystemNotifsEnabled', async (_e, userId) => {
+        // Load from DB if not yet cached
+        if (!systemNotifsEnabled.has(userId)) {
+            try {
+                const pref = await NotifPrefModel.findOne({ userId }).lean();
+                systemNotifsEnabled.set(userId, pref?.systemNotifs ?? true);
+            }
+            catch (_) {
+                systemNotifsEnabled.set(userId, true);
+            }
+        }
+        return systemNotifsEnabled.get(userId) ?? true;
+    });
+    electron_1.ipcMain.handle('app:setSystemNotifsEnabled', async (_e, userId, value) => {
+        systemNotifsEnabled.set(userId, value);
+        await NotifPrefModel.findOneAndUpdate({ userId }, { systemNotifs: value }, { upsert: true });
+        return true;
+    });
     setupAutoUpdater();
     await connectDB();
     createWindow();
 });
 electron_1.app.on('before-quit', () => {
+    backgroundModeEnabled = false;
+    destroyTray();
     if (messageStream) {
         try {
             messageStream.close();
@@ -1524,7 +1659,18 @@ electron_1.app.on('before-quit', () => {
         notificationStream = null;
     }
 });
-electron_1.app.on('window-all-closed', () => { if (process.platform !== 'darwin')
-    electron_1.app.quit(); });
-electron_1.app.on('activate', () => { if (electron_1.BrowserWindow.getAllWindows().length === 0)
-    createWindow(); });
+electron_1.app.on('window-all-closed', () => {
+    // If background mode is on, keep the app alive even if all windows are closed/hidden
+    if (!backgroundModeEnabled && process.platform !== 'darwin')
+        electron_1.app.quit();
+});
+electron_1.app.on('activate', () => {
+    // macOS dock click — restore hidden window or create new one
+    if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+    }
+    else {
+        createWindow();
+    }
+});

@@ -454,7 +454,7 @@ const TasksPage: React.FC = () => {
                                     ? p === 'high' ? 'bg-[#D8727D15] text-[#D8727D] border-[#D8727D40]' : 'bg-[#DFA87415] text-[#D58D49] border-[#D58D4940]'
                                     : 'bg-gray-50 text-gray-400 border-gray-200'
                                 }`}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? (p === 'high' ? '#D8727D' : '#D58D49') : '#D1D5DB' }} />
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? (p === 'high' ? '#D8727D' : '#D58D49') : 'var(--border-strong)' }} />
                                 {p.charAt(0).toUpperCase() + p.slice(1)}
                               </button>
                             );

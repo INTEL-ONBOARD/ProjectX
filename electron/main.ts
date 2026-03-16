@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell, Notification, Tray, nativeImage } from 'electron';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import dotenv from 'dotenv';
@@ -119,6 +119,7 @@ const NotifPrefSchema = new Schema({
     projectUpdates: { type: Boolean, default: true },
     securityAlerts: { type: Boolean, default: true },
     quietHours:     { type: Boolean, default: true },
+    systemNotifs:   { type: Boolean, default: true },
 });
 
 const NotificationSchema = new Schema({
@@ -216,7 +217,7 @@ const toOrg         = (d: any) => ({ id: d.orgId, name: d.name, logo: d.logo ?? 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toUserPref    = (d: any) => ({ userId: d.userId, theme: d.theme, sidebarCollapsed: d.sidebarCollapsed ?? false, selectedWeekStart: d.selectedWeekStart ?? null, hasSeenWalkthrough: d.hasSeenWalkthrough ?? false, projectsView: d.projectsView ?? 'grid', taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {} });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toNotifPref   = (d: any) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours });
+const toNotifPref   = (d: any) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours, systemNotifs: d.systemNotifs ?? true });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAppearancePref = (d: any) => ({ userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor, fontSize: d.fontSize, compactMode: d.compactMode ?? false });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -227,6 +228,8 @@ const toRole = (d: any) => ({ appId: d.appId, name: d.name, color: d.color ?? '#
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let backgroundModeEnabled = false;
 // Fix 1: flag set once ready-to-show fires — prevents streams from starting before window exists
 let windowReady = false;
 
@@ -246,6 +249,16 @@ let deptStream: any = null;
 let authUserStream: any = null;
 let notificationStream: any = null;
 
+// Per-user system notification setting (userId → enabled). Loaded lazily from DB.
+const systemNotifsEnabled = new Map<string, boolean>();
+
+function fireSystemNotif(title: string, body: string): void {
+    if (!Notification.isSupported()) return;
+    try {
+        new Notification({ title, body, silent: false }).show();
+    } catch (_) {}
+}
+
 function startMessageStream(): void {
     if (!windowReady) return; // Fix 1: don't start until window is ready
     if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
@@ -259,6 +272,16 @@ function startMessageStream(): void {
             if (!d) return;
             if (op === 'insert') {
                 mainWindow.webContents.send('msg:new', toMsgFrontend(d));
+                // System notification for the recipient
+                const recipientId: string = d.toId;
+                if (systemNotifsEnabled.get(recipientId) !== false) {
+                    // Look up sender name async (best-effort)
+                    UserModel.findOne({ appId: d.fromId }).lean().then((sender: any) => {
+                        const name = sender?.name ?? 'New message';
+                        const text = String(d.text ?? '').slice(0, 80);
+                        fireSystemNotif(name, text || '📎 Attachment');
+                    }).catch(() => {});
+                }
             } else if (op === 'update' || op === 'replace') {
                 mainWindow.webContents.send('msg:updated', toMsgFrontend(d));
             }
@@ -1091,6 +1114,10 @@ function registerDbHandlers() {
     ipcMain.handle('db:notifs:create', async (_e, notif: { userId: string; type: string; title: string; body?: string; refId?: string }) => {
         const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
+        // Fire OS notification if enabled for this user (skip new_message — handled by message stream)
+        if (notif.type !== 'new_message' && systemNotifsEnabled.get(notif.userId) !== false) {
+            fireSystemNotif(notif.title, notif.body ?? '');
+        }
         return safe(toNotif(d.toObject()));
     });
     ipcMain.handle('db:notifs:markRead', async (_e, notifId: string) => {
@@ -1152,6 +1179,83 @@ function setupAutoUpdater() {
     autoUpdater.on('error', (err) => mainWindow?.webContents.send('update:error', err.message));
 }
 
+// ─── Tray ──────────────────────────────────────────────────────────────────────
+
+function buildTrayMenu() {
+    return Menu.buildFromTemplate([
+        {
+            label: mainWindow?.isVisible() ? 'Hide Window' : 'Show Window',
+            click: () => {
+                if (!mainWindow) return;
+                if (mainWindow.isVisible()) {
+                    mainWindow.hide();
+                } else {
+                    mainWindow.show();
+                    mainWindow.focus();
+                }
+                // Rebuild menu so label reflects new state
+                tray?.setContextMenu(buildTrayMenu());
+            },
+        },
+        { type: 'separator' },
+        {
+            label: 'Quit Project X',
+            click: () => {
+                backgroundModeEnabled = false;
+                app.quit();
+            },
+        },
+    ]);
+}
+
+function createTray() {
+    if (tray) return; // already exists
+    const iconPath = path.join(__dirname, '../build/tray-icon.png');
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+    tray = new Tray(icon);
+    tray.setToolTip('Project X');
+    tray.setContextMenu(buildTrayMenu());
+    // Single click restores window on Windows/Linux; on macOS it opens the menu
+    tray.on('click', () => {
+        if (!mainWindow) return;
+        if (mainWindow.isVisible()) {
+            mainWindow.focus();
+        } else {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+        tray?.setContextMenu(buildTrayMenu());
+    });
+}
+
+function destroyTray() {
+    if (!tray) return;
+    tray.destroy();
+    tray = null;
+}
+
+function applyBackgroundMode(enabled: boolean) {
+    backgroundModeEnabled = enabled;
+    if (!mainWindow) return;
+    // Remove all existing close/closed listeners we own
+    mainWindow.removeAllListeners('close');
+    mainWindow.removeAllListeners('closed');
+    if (enabled) {
+        createTray();
+        // Intercept close — hide to tray instead of quitting
+        mainWindow.on('close', (e) => {
+            if (!backgroundModeEnabled) return;
+            e.preventDefault();
+            mainWindow?.hide();
+            tray?.setContextMenu(buildTrayMenu());
+        });
+    } else {
+        destroyTray();
+        // Normal close — destroy window
+        mainWindow.on('closed', () => { mainWindow = null; });
+    }
+}
+
 // ─── Window ────────────────────────────────────────────────────────────────────
 
 function createWindow() {
@@ -1207,12 +1311,36 @@ app.whenReady().then(async () => {
     ipcMain.handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
     ipcMain.handle('app:version', () => app.getVersion());
     ipcMain.handle('app:openExternal', (_e, url: string) => shell.openExternal(url));
+    ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings());
+    ipcMain.handle('app:setOpenAtLogin', (_e, value: boolean) => { app.setLoginItemSettings({ openAtLogin: value }); return true; });
+    ipcMain.handle('app:getBackgroundMode', () => backgroundModeEnabled);
+    ipcMain.handle('app:setBackgroundMode', (_e, value: boolean) => {
+        applyBackgroundMode(value);
+        return true;
+    });
+    ipcMain.handle('app:getSystemNotifsEnabled', async (_e, userId: string) => {
+        // Load from DB if not yet cached
+        if (!systemNotifsEnabled.has(userId)) {
+            try {
+                const pref = await NotifPrefModel.findOne({ userId }).lean() as any;
+                systemNotifsEnabled.set(userId, pref?.systemNotifs ?? true);
+            } catch (_) { systemNotifsEnabled.set(userId, true); }
+        }
+        return systemNotifsEnabled.get(userId) ?? true;
+    });
+    ipcMain.handle('app:setSystemNotifsEnabled', async (_e, userId: string, value: boolean) => {
+        systemNotifsEnabled.set(userId, value);
+        await NotifPrefModel.findOneAndUpdate({ userId }, { systemNotifs: value }, { upsert: true });
+        return true;
+    });
     setupAutoUpdater();
     await connectDB();
     createWindow();
 });
 
 app.on('before-quit', () => {
+    backgroundModeEnabled = false;
+    destroyTray();
     if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
     if (projectStream) { try { projectStream.close(); } catch (_) {} projectStream = null; }
     if (taskStream) { try { taskStream.close(); } catch (_) {} taskStream = null; }
@@ -1230,5 +1358,16 @@ app.on('before-quit', () => {
     if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
 });
 
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+app.on('window-all-closed', () => {
+    // If background mode is on, keep the app alive even if all windows are closed/hidden
+    if (!backgroundModeEnabled && process.platform !== 'darwin') app.quit();
+});
+app.on('activate', () => {
+    // macOS dock click — restore hidden window or create new one
+    if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+    } else {
+        createWindow();
+    }
+});

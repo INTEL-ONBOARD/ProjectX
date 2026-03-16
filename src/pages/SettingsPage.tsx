@@ -7,7 +7,7 @@ import {
   Download, Trash2,
   Link,
   Lock, Info, RefreshCw, CheckCircle2,
-  LogOut, AtSign, Layers, BarChart2, MessageSquare, Key,
+  LogOut, AtSign, Layers, BarChart2, MessageSquare,
   Users, HardDrive, Zap,
 } from 'lucide-react';
 import { useAppUpdater } from '../hooks/useAppUpdater';
@@ -330,6 +330,49 @@ const SettingsPage: React.FC = () => {
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
   const strength = calcStrength(passwords.next);
 
+  // System behavior
+  const [runOnStartup,    setRunOnStartup]    = useState(false);
+  const [runInBackground, setRunInBackground] = useState(false);
+  const [systemNotifs,    setSystemNotifs]    = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).electronAPI;
+    if (!api) return;
+    api.getLoginItemSettings?.().then((s: { openAtLogin: boolean }) => setRunOnStartup(s.openAtLogin)).catch(() => {});
+    api.getBackgroundMode?.().then((v: boolean) => setRunInBackground(v)).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).electronAPI;
+    api?.getSystemNotifsEnabled?.(currentUser.id).then((v: boolean) => setSystemNotifs(v)).catch(() => {});
+  }, [currentUser?.id]);
+
+  const toggleRunOnStartup = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).electronAPI;
+    const next = !runOnStartup;
+    setRunOnStartup(next);
+    api?.setOpenAtLogin?.(next).catch(() => {});
+  };
+
+  const toggleRunInBackground = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).electronAPI;
+    const next = !runInBackground;
+    setRunInBackground(next);
+    api?.setBackgroundMode?.(next).catch(() => {});
+  };
+
+  const toggleSystemNotifs = () => {
+    if (!currentUser?.id) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).electronAPI;
+    const next = !systemNotifs;
+    setSystemNotifs(next);
+    api?.setSystemNotifsEnabled?.(currentUser.id, next).catch(() => {});
+  };
+
 
   // Save feedback
   const [saved, setSaved] = useState(false);
@@ -560,9 +603,9 @@ const SettingsPage: React.FC = () => {
                     </div>
                     <div className="flex flex-col divide-y divide-surface-100">
                       {[
-                        { label: 'Projects', value: stats[0].value, icon: Layers,       bg: '#EDE9FE', color: '#7C3AED' },
-                        { label: 'Tasks',    value: stats[1].value, icon: CheckCircle2, bg: '#DCFCE7', color: '#16A34A' },
-                        { label: 'Team',     value: stats[2].value, icon: Users,        bg: '#DBEAFE', color: '#2563EB' },
+                        { label: 'Projects', value: stats[0].value, icon: Layers,       bg: 'rgba(124,58,237,0.12)', color: '#A78BFA' },
+                        { label: 'Tasks',    value: stats[1].value, icon: CheckCircle2, bg: 'rgba(34,197,94,0.12)',  color: '#4ADE80' },
+                        { label: 'Team',     value: stats[2].value, icon: Users,        bg: 'rgba(59,130,246,0.12)', color: '#60A5FA' },
                       ].map((s) => (
                         <div key={s.label} className="flex items-center gap-4 px-6 py-4">
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: s.bg }}>
@@ -591,7 +634,7 @@ const SettingsPage: React.FC = () => {
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
                   <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     {/* Blur overlay */}
-                    <div className="absolute inset-0 z-10 backdrop-blur-[3px] bg-white/60 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
+                    <div className="absolute inset-0 z-10 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none" style={{ backdropFilter: 'blur(3px)', background: 'color-mix(in srgb, var(--bg-card) 75%, transparent)' }}>
                       <div className="w-8 h-8 rounded-xl bg-primary-500/10 flex items-center justify-center">
                         <Bell size={16} className="text-primary-500" />
                       </div>
@@ -612,10 +655,10 @@ const SettingsPage: React.FC = () => {
                     </div>
                     <div className="px-6 py-2">
                       {([
-                        { icon: Mail,          label: 'Email Notifications', description: authUser?.email ?? 'Your email address', key: 'emailNotifs' as const, bg: '#DBEAFE', color: '#2563EB' },
-                        { icon: Smartphone,    label: 'Push Notifications',  description: 'Desktop & mobile alerts',               key: 'pushNotifs'  as const, bg: '#DCFCE7', color: '#16A34A' },
-                        { icon: MessageSquare, label: 'SMS Notifications',   description: 'Text message alerts',                    key: 'smsNotifs'   as const, bg: '#FEF3C7', color: '#D97706' },
-                        { icon: Clock,         label: 'Quiet Hours',         description: 'Mute notifications 10 PM – 8 AM',        key: 'quietHours'  as const, bg: '#F3E8FF', color: '#7C3AED' },
+                        { icon: Mail,          label: 'Email Notifications', description: authUser?.email ?? 'Your email address', key: 'emailNotifs' as const, bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA' },
+                        { icon: Smartphone,    label: 'Push Notifications',  description: 'Desktop & mobile alerts',               key: 'pushNotifs'  as const, bg: 'rgba(34,197,94,0.12)',   color: '#4ADE80' },
+                        { icon: MessageSquare, label: 'SMS Notifications',   description: 'Text message alerts',                    key: 'smsNotifs'   as const, bg: 'rgba(245,158,11,0.12)',  color: '#FBBF24' },
+                        { icon: Clock,         label: 'Quiet Hours',         description: 'Mute notifications 10 PM – 8 AM',        key: 'quietHours'  as const, bg: 'rgba(124,58,237,0.12)', color: '#A78BFA' },
                       ] as { icon: React.ElementType; label: string; description: string; key: keyof NotifPrefs; bg: string; color: string }[]).map(row => (
                         <div key={row.key} className="flex items-center justify-between py-3.5 border-b border-surface-100 last:border-0 hover:bg-surface-50 -mx-6 px-6 transition-colors rounded-xl">
                           <div className="flex items-center gap-3">
@@ -646,11 +689,11 @@ const SettingsPage: React.FC = () => {
                     </div>
                     <div className="px-6 py-2">
                       {([
-                        { icon: CheckCircle2, label: 'Task Updates',    description: 'When tasks are assigned or updated', key: 'taskUpdates'    as const, bg: '#DCFCE7', color: '#16A34A' },
-                        { icon: AtSign,       label: 'Team Mentions',   description: 'When someone @mentions you',         key: 'teamMentions'   as const, bg: '#DBEAFE', color: '#2563EB' },
-                        { icon: Layers,       label: 'Project Updates', description: 'New projects and milestones',        key: 'projectUpdates' as const, bg: '#EDE9FE', color: '#7C3AED' },
-                        { icon: Shield,       label: 'Security Alerts', description: 'Login attempts and changes',         key: 'securityAlerts' as const, bg: '#FEE2E2', color: '#D8727D' },
-                        { icon: BarChart2,    label: 'Weekly Digest',   description: 'Summary email every Monday',         key: 'weeklyDigest'   as const, bg: '#FEF3C7', color: '#D97706' },
+                        { icon: CheckCircle2, label: 'Task Updates',    description: 'When tasks are assigned or updated', key: 'taskUpdates'    as const, bg: 'rgba(34,197,94,0.12)',   color: '#4ADE80' },
+                        { icon: AtSign,       label: 'Team Mentions',   description: 'When someone @mentions you',         key: 'teamMentions'   as const, bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA' },
+                        { icon: Layers,       label: 'Project Updates', description: 'New projects and milestones',        key: 'projectUpdates' as const, bg: 'rgba(124,58,237,0.12)', color: '#A78BFA' },
+                        { icon: Shield,       label: 'Security Alerts', description: 'Login attempts and changes',         key: 'securityAlerts' as const, bg: 'rgba(220,38,38,0.12)',  color: '#F87171' },
+                        { icon: BarChart2,    label: 'Weekly Digest',   description: 'Summary email every Monday',         key: 'weeklyDigest'   as const, bg: 'rgba(245,158,11,0.12)', color: '#FBBF24' },
                       ] as { icon: React.ElementType; label: string; description: string; key: keyof NotifPrefs; bg: string; color: string }[]).map(row => (
                         <div key={row.key} className="flex items-center justify-between py-3.5 border-b border-surface-100 last:border-0 hover:bg-surface-50 -mx-6 px-6 transition-colors rounded-xl">
                           <div className="flex items-center gap-3">
@@ -843,7 +886,7 @@ const SettingsPage: React.FC = () => {
                             <div className="flex gap-1 mb-1">
                               {[1, 2, 3, 4].map(i => (
                                 <div key={i} className="h-1.5 flex-1 rounded-full transition-all"
-                                  style={{ background: i <= strength.score ? strength.color : '#E5E7EB' }} />
+                                  style={{ background: i <= strength.score ? strength.color : 'var(--border-default)' }} />
                               ))}
                             </div>
                             <span className="text-xs font-medium" style={{ color: strength.color }}>{strength.label}</span>
@@ -870,32 +913,51 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </motion.div>
 
-                {/* Right column: 2FA + Sessions */}
+                {/* Right column: System Behavior + Sessions */}
                 <div className="flex flex-col gap-4">
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
                     <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                       <div className="px-6 py-4 border-b border-surface-100">
-                        <h3 className="font-semibold text-gray-900 text-sm">Two-Factor Authentication</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">Add an extra layer of security to your account</p>
+                        <h3 className="font-semibold text-gray-900 text-sm">System Behavior</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">Control how the app runs on your system</p>
                       </div>
                       <div className="px-6 py-2">
-                        {[
-                          { icon: Shield, label: 'Authenticator App', description: 'Use an app like Google Authenticator', bg: '#DCFCE7', color: '#16A34A' },
-                          { icon: Key,    label: 'Backup Codes',       description: 'Store one-time recovery codes',       bg: '#FEF3C7', color: '#D97706' },
-                        ].map(row => (
-                          <div key={row.label} className="flex items-center justify-between py-3.5 border-b border-surface-100 last:border-0">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: row.bg }}>
-                                <row.icon size={14} style={{ color: row.color }} />
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{row.label}</div>
-                                <div className="text-xs text-gray-400">{row.description}</div>
-                              </div>
+                        <div className="flex items-center justify-between py-3.5 border-b border-surface-100">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#EDE9FE]">
+                              <Zap size={14} className="text-[#7C3AED]" />
                             </div>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200">Coming Soon</span>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Run on Startup</div>
+                              <div className="text-xs text-gray-400">Launch automatically when you log in</div>
+                            </div>
                           </div>
-                        ))}
+                          <Toggle on={runOnStartup} onChange={toggleRunOnStartup} />
+                        </div>
+                        <div className="flex items-center justify-between py-3.5 border-b border-surface-100">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#DBEAFE]">
+                              <HardDrive size={14} className="text-[#2563EB]" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Run in Background</div>
+                              <div className="text-xs text-gray-400">Keep running in the tray when window is closed</div>
+                            </div>
+                          </div>
+                          <Toggle on={runInBackground} onChange={toggleRunInBackground} />
+                        </div>
+                        <div className="flex items-center justify-between py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#DCFCE7]">
+                              <Bell size={14} className="text-[#16A34A]" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">System Notifications</div>
+                              <div className="text-xs text-gray-400">Show OS alerts for messages and task updates</div>
+                            </div>
+                          </div>
+                          <Toggle on={systemNotifs} onChange={toggleSystemNotifs} />
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -1000,9 +1062,9 @@ const SettingsPage: React.FC = () => {
                       <p className="text-xs text-gray-500 mb-4">Your current resource consumption</p>
                       <div className="flex flex-col gap-4">
                         {([
-                          { label: 'Storage',   used: 2.1,            total: 5,    unit: 'GB',    pct: 42,  icon: HardDrive, bg: '#DBEAFE', color: '#2563EB' },
-                          { label: 'API Calls', used: 1240,           total: 5000, unit: '/mo',   pct: 25,  icon: Zap,       bg: '#FEF3C7', color: '#D97706' },
-                          { label: 'Members',   used: members.length, total: 5,    unit: 'seats', pct: Math.min(100, Math.round((members.length / 5) * 100)), icon: Users, bg: '#EDE9FE', color: '#7C3AED' },
+                          { label: 'Storage',   used: 2.1,            total: 5,    unit: 'GB',    pct: 42,  icon: HardDrive, bg: 'rgba(59,130,246,0.12)',  color: '#60A5FA' },
+                          { label: 'API Calls', used: 1240,           total: 5000, unit: '/mo',   pct: 25,  icon: Zap,       bg: 'rgba(245,158,11,0.12)', color: '#FBBF24' },
+                          { label: 'Members',   used: members.length, total: 5,    unit: 'seats', pct: Math.min(100, Math.round((members.length / 5) * 100)), icon: Users, bg: 'rgba(124,58,237,0.12)', color: '#A78BFA' },
                         ] as { label: string; used: number; total: number; unit: string; pct: number; icon: React.ElementType; bg: string; color: string }[]).map(m => (
                           <div key={m.label} className="flex items-center gap-4">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: m.bg }}>

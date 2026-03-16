@@ -143,12 +143,12 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                         color: cfg.color,
                         borderColor: cfg.ring,
                       } : {
-                        background: '#F9FAFB',
-                        color: '#9CA3AF',
-                        borderColor: '#E5E7EB',
+                        background: 'var(--bg-muted)',
+                        color: 'var(--text-subtle)',
+                        borderColor: 'var(--border-default)',
                       }}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? cfg.color : '#D1D5DB' }} />
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? cfg.color : 'var(--border-strong)' }} />
                       {cfg.label}
                     </button>
                   );

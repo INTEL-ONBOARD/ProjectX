@@ -15,7 +15,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
             return (
                 <div style={{ padding: 40, fontFamily: 'monospace' }}>
                     <h2 style={{ color: '#D8727D' }}>Something went wrong</h2>
-                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, color: '#374151', background: '#F5F5F5', padding: 16, borderRadius: 8 }}>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, color: 'var(--text-secondary)', background: 'var(--bg-muted)', padding: 16, borderRadius: 8 }}>
                         {this.state.error.message}{'\n\n'}{this.state.error.stack}
                     </pre>
                     <button onClick={() => this.setState({ error: null })} style={{ marginTop: 16, padding: '8px 16px', background: '#5030E5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
@@ -157,7 +157,7 @@ const Layout: React.FC<{
     const { activeProject, setActiveProject } = useProjects();
 
     return (
-        <div className="flex h-screen w-screen overflow-hidden bg-white">
+        <div className="flex h-screen w-screen overflow-hidden" style={{ background: 'var(--bg-app)' }}>
             <Sidebar
                 collapsed={sidebarCollapsed}
                 onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -165,7 +165,8 @@ const Layout: React.FC<{
                 onProjectSelect={setActiveProject}
             />
             <motion.div
-                className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white"
+                className="flex-1 flex flex-col min-w-0 overflow-hidden"
+                style={{ background: 'var(--bg-app)' }}
                 layout
                 transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             >
@@ -260,7 +261,8 @@ const MainApp: React.FC = () => (
 const ReconnectingOverlay: React.FC = () => (
     <motion.div
         key="reconnecting"
-        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white overflow-hidden"
+        className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
+        style={{ background: 'var(--bg-app)' }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
     >

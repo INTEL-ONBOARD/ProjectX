@@ -120,7 +120,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
         <>
         <motion.aside
-            className="h-screen bg-white flex flex-col border-r border-surface-200 shadow-sidebar relative z-20"
+            className="h-screen flex flex-col border-r border-surface-200 shadow-sidebar relative z-20"
+            style={{ background: 'var(--bg-sidebar)' }}
             animate={{ width: collapsed ? 72 : 252 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
         >
@@ -287,7 +288,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
                                                     transition={{ duration: 0.12 }}
-                                                    className="absolute right-0 top-full mt-1 z-50 bg-white border border-surface-200 rounded-xl shadow-lg py-1 w-36"
+                                                    className="absolute right-0 top-full mt-1 z-50 border border-surface-200 rounded-xl shadow-lg py-1 w-36"
+                                    style={{ background: 'var(--bg-dropdown)' }}
                                                 >
                                                     <button
                                                         onClick={async () => {

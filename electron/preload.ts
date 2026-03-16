@@ -19,6 +19,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // App info
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('app:openExternal', url),
+    getLoginItemSettings: (): Promise<{ openAtLogin: boolean }> => ipcRenderer.invoke('app:getLoginItemSettings'),
+    setOpenAtLogin: (value: boolean): Promise<boolean> => ipcRenderer.invoke('app:setOpenAtLogin', value),
+    getBackgroundMode: (): Promise<boolean> => ipcRenderer.invoke('app:getBackgroundMode'),
+    setBackgroundMode: (value: boolean): Promise<boolean> => ipcRenderer.invoke('app:setBackgroundMode', value),
+    getSystemNotifsEnabled: (userId: string): Promise<boolean> => ipcRenderer.invoke('app:getSystemNotifsEnabled', userId),
+    setSystemNotifsEnabled: (userId: string, value: boolean): Promise<boolean> => ipcRenderer.invoke('app:setSystemNotifsEnabled', userId, value),
 
     // Update controls
     checkForUpdate: (): Promise<void> => ipcRenderer.invoke('update:check'),

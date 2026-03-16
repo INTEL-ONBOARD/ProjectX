@@ -92,7 +92,8 @@ const Header: React.FC = () => {
 
     return (
         <motion.header
-            className="h-16 bg-white border-b border-surface-200 flex items-center justify-between px-6 shrink-0"
+            className="h-16 border-b border-surface-200 flex items-center justify-between px-6 shrink-0"
+            style={{ background: 'var(--bg-header)' }}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
@@ -114,7 +115,8 @@ const Header: React.FC = () => {
                 <AnimatePresence>
                     {showResults && hasResults && (
                         <motion.div
-                            className="absolute left-0 top-full mt-2 w-full bg-white rounded-2xl border border-surface-200 shadow-lg z-50 overflow-hidden"
+                            className="absolute left-0 top-full mt-2 w-full rounded-2xl border border-surface-200 shadow-lg z-50 overflow-hidden"
+                            style={{ background: 'var(--bg-dropdown)' }}
                             initial={{ opacity: 0, y: -6, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -6, scale: 0.98 }}
@@ -165,7 +167,8 @@ const Header: React.FC = () => {
                     )}
                     {showResults && !hasResults && q.length >= 2 && (
                         <motion.div
-                            className="absolute left-0 top-full mt-2 w-full bg-white rounded-2xl border border-surface-200 shadow-lg z-50 px-4 py-4 text-center"
+                            className="absolute left-0 top-full mt-2 w-full rounded-2xl border border-surface-200 shadow-lg z-50 px-4 py-4 text-center"
+                            style={{ background: 'var(--bg-dropdown)' }}
                             initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                             transition={{ duration: 0.15 }}
                         >
@@ -206,7 +209,8 @@ const Header: React.FC = () => {
                     <AnimatePresence>
                         {isHelpOpen && (
                             <motion.div
-                                className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                className="absolute right-0 top-full mt-2 w-56 rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                style={{ background: 'var(--bg-dropdown)' }}
                                 initial={{ opacity: 0, y: -8, scale: 0.97 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -249,7 +253,8 @@ const Header: React.FC = () => {
                     <AnimatePresence>
                         {isNotifOpen && (
                             <motion.div
-                                className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                className="absolute right-0 top-full mt-2 w-80 rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                style={{ background: 'var(--bg-dropdown)' }}
                                 initial={{ opacity: 0, y: -8, scale: 0.97 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -329,7 +334,8 @@ const Header: React.FC = () => {
                     <AnimatePresence>
                         {isUserOpen && (
                             <motion.div
-                                className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                className="absolute right-0 top-full mt-2 w-52 rounded-2xl shadow-card border border-surface-200 z-50 overflow-hidden"
+                                style={{ background: 'var(--bg-dropdown)' }}
                                 initial={{ opacity: 0, y: -8, scale: 0.97 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -8, scale: 0.97 }}
