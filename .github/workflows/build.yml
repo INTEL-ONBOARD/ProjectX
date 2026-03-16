@@ -104,7 +104,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Inject .env for packaged app
+        run: echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > .env
+
       - name: Build Vite (web assets)
+        env:
+          ELECTRON: '1'
         run: npx vite build
 
       - name: Build & publish Electron app

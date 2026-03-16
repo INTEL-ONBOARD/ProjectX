@@ -1,6 +1,6 @@
-appId: com.projectm.app
-productName: ProjectM
-copyright: Copyright © 2024 ProjectM
+appId: com.intel-onboard.projectm
+productName: Project M
+copyright: Copyright © 2024 Project M
 
 directories:
   buildResources: build
@@ -12,10 +12,15 @@ files:
   - node_modules/**/*
   - package.json
 
+extraResources:
+  - from: .env
+    to: .env
+
 asar: true
 
 mac:
   category: public.app-category.productivity
+  icon: build/icon.icns
   target:
     - target: dmg
       arch: [x64, arm64]
@@ -24,6 +29,7 @@ mac:
   identity: null
 
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]
@@ -31,6 +37,7 @@ win:
       arch: [x64]
 
 linux:
+  icon: build/icon.png
   target:
     - target: AppImage
       arch: [x64]
@@ -43,9 +50,10 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  deleteAppDataOnUninstall: true
 
 publish:
   provider: github
   owner: INTEL-ONBOARD
-  repo: ProjectM
+  repo: ProjectX
   releaseType: release
