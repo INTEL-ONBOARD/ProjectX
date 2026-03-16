@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Bell, Palette, Shield,
-  Check, Clock, Moon, Sun, Monitor,
+  Check, Clock, Moon, Sun, Monitor, Coffee,
   Smartphone, Mail, Eye, EyeOff, AlertTriangle,
   Download, Trash2,
   Link,
@@ -42,7 +42,7 @@ type NotifPrefs = {
 };
 
 type AppearPrefs = {
-  themeMode: 'light' | 'dark' | 'system';
+  themeMode: 'light' | 'dark' | 'coffee' | 'system';
   accentColor: string;
   fontSize: 'sm' | 'md' | 'lg';
   compactMode: boolean;
@@ -288,7 +288,7 @@ const SettingsPage: React.FC = () => {
   };
 
   // Appearance — persisted to MongoDB (in-memory fallback in mock mode)
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(theme === 'dark' ? 'dark' : 'light');
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'coffee' | 'system'>(theme === 'coffee' ? 'coffee' : theme === 'dark' ? 'dark' : 'light');
   const [accentColor, setAccentColor] = useState('#5030E5');
   const [timezoneValue] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const appearLoaded = useRef(false);
@@ -731,7 +731,7 @@ const SettingsPage: React.FC = () => {
                       </div>
                       <SavedBadge id="appear" />
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-3">
                       {([
                         { id: 'light' as const,  label: 'Light',  Icon: Sun,     preview: (
                           <div className="w-full h-16 rounded-xl bg-white border border-surface-200 flex flex-col p-2 gap-1.5">
@@ -750,6 +750,16 @@ const SettingsPage: React.FC = () => {
                             <div className="mt-auto flex gap-1.5">
                               <div className="h-2 w-5 bg-primary-500 rounded opacity-60" />
                               <div className="h-2 flex-1 bg-gray-700 rounded" />
+                            </div>
+                          </div>
+                        )},
+                        { id: 'coffee' as const, label: 'Dark Coffee', Icon: Coffee, preview: (
+                          <div className="w-full h-16 rounded-xl flex flex-col p-2 gap-1.5" style={{ background: '#160D08' }}>
+                            <div className="h-1.5 rounded w-3/4" style={{ background: '#5C3A26' }} />
+                            <div className="h-1.5 rounded w-1/2" style={{ background: '#4A2E1E' }} />
+                            <div className="mt-auto flex gap-1.5">
+                              <div className="h-2 w-5 bg-primary-500 rounded opacity-70" />
+                              <div className="h-2 flex-1 rounded" style={{ background: '#3A2318' }} />
                             </div>
                           </div>
                         )},
@@ -773,7 +783,7 @@ const SettingsPage: React.FC = () => {
                               const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                               setAppTheme(prefersDark ? 'dark' : 'light');
                             } else {
-                              setAppTheme(t.id as 'light' | 'dark');
+                              setAppTheme(t.id as 'light' | 'dark' | 'coffee');
                             }
                             saveAppearance({ themeMode: t.id });
                             flashSaved('appear');
@@ -1145,7 +1155,7 @@ const SettingsPage: React.FC = () => {
                       <div>
                         <div className="text-xl font-extrabold text-gray-900 tracking-tight">Project X</div>
                         <div className="text-sm text-gray-500 mt-0.5">Version {updateState.appVersion ?? '—'}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">Developed and published by Toursurv Ltd.</div>
+                        <div className="text-xs text-gray-400 mt-0.5">Developed and published by GitBase</div>
                       </div>
                     </div>
                   </div>

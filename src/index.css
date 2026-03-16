@@ -122,6 +122,255 @@ body[data-theme='dark'] {
     color: var(--text-primary);
 }
 
+/* ── Dark Coffee theme tokens ───────────────────────────────────────────────── */
+body[data-theme='coffee'] {
+    /* Surface colours */
+    --color-surface-50:  #2E1C13;
+    --color-surface-100: #3A2318;
+    --color-surface-200: #4A2E1E;
+    --color-surface-300: #5C3A26;
+
+    /* Semantic backgrounds */
+    --bg-app:        #160D08;
+    --bg-sidebar:    #1E120B;
+    --bg-header:     #1E120B;
+    --bg-card:       #271710;
+    --bg-input:      #2E1C13;
+    --bg-dropdown:   #271710;
+    --bg-hover:      #3A2318;
+    --bg-active:     #4A2E1E;
+    --bg-muted:      #241610;
+
+    /* Semantic text */
+    --text-primary:   #F0E6DC;
+    --text-secondary: #C4A98A;
+    --text-muted:     #9A7560;
+    --text-subtle:    #6B4F3A;
+    --text-disabled:  #4A3020;
+    --text-inverse:   #160D08;
+
+    /* Semantic borders */
+    --border-default: #4A2E1E;
+    --border-strong:  #7A4F38;
+    --border-subtle:  #311D13;
+    --border-white:   #3A2318;
+
+    /* Scrollbar */
+    --scrollbar-thumb:       #5C3A26;
+    --scrollbar-thumb-hover: #7A4F38;
+
+    background: var(--bg-app);
+    color: var(--text-primary);
+}
+
+/* ── Coffee theme global overrides (mirrors dark theme overrides) ─────────── */
+body[data-theme='coffee'] .bg-white {
+    background-color: var(--bg-card) !important;
+}
+body[data-theme='coffee'] .bg-gray-50 {
+    background-color: var(--bg-muted) !important;
+}
+body[data-theme='coffee'] .bg-gray-100 {
+    background-color: var(--color-surface-100) !important;
+}
+body[data-theme='coffee'] .bg-gray-200 {
+    background-color: var(--color-surface-200) !important;
+}
+body[data-theme='coffee'] .bg-surface-50 {
+    background-color: var(--color-surface-50) !important;
+}
+body[data-theme='coffee'] .bg-surface-100 {
+    background-color: var(--color-surface-100) !important;
+}
+body[data-theme='coffee'] .bg-surface-200 {
+    background-color: var(--color-surface-200) !important;
+}
+body[data-theme='coffee'] .bg-surface-300 {
+    background-color: var(--color-surface-300) !important;
+}
+body[data-theme='coffee'] .border-surface-100 {
+    border-color: var(--border-subtle) !important;
+}
+body[data-theme='coffee'] .border-surface-200 {
+    border-color: var(--border-default) !important;
+}
+body[data-theme='coffee'] .border-surface-300 {
+    border-color: var(--border-strong) !important;
+}
+body[data-theme='coffee'] .border-gray-100 {
+    border-color: var(--border-subtle) !important;
+}
+body[data-theme='coffee'] .border-gray-200 {
+    border-color: var(--border-default) !important;
+}
+body[data-theme='coffee'] .border-gray-300 {
+    border-color: var(--border-strong) !important;
+}
+body[data-theme='coffee'] .border-white {
+    border-color: var(--border-white) !important;
+}
+body[data-theme='coffee'] .text-gray-900 {
+    color: var(--text-primary) !important;
+}
+body[data-theme='coffee'] .text-gray-800 {
+    color: var(--text-primary) !important;
+}
+body[data-theme='coffee'] .text-gray-700 {
+    color: var(--text-secondary) !important;
+}
+body[data-theme='coffee'] .text-gray-600 {
+    color: var(--text-secondary) !important;
+}
+body[data-theme='coffee'] .text-gray-500 {
+    color: var(--text-muted) !important;
+}
+body[data-theme='coffee'] .text-gray-400 {
+    color: var(--text-subtle) !important;
+}
+body[data-theme='coffee'] .text-gray-300 {
+    color: var(--text-disabled) !important;
+}
+body[data-theme='coffee'] .bg-primary-50 {
+    background-color: rgba(80, 48, 229, 0.15) !important;
+}
+body[data-theme='coffee'] .bg-primary-100 {
+    background-color: rgba(80, 48, 229, 0.22) !important;
+}
+body[data-theme='coffee'] .text-primary-700 {
+    color: var(--color-primary-300) !important;
+}
+body[data-theme='coffee'] .text-primary-600 {
+    color: var(--color-primary-300) !important;
+}
+body[data-theme='coffee'] .hover\:bg-primary-50:hover {
+    background-color: rgba(80, 48, 229, 0.15) !important;
+}
+body[data-theme='coffee'] .hover\:bg-primary-100:hover {
+    background-color: rgba(80, 48, 229, 0.22) !important;
+}
+body[data-theme='coffee'] .ring-primary-100,
+body[data-theme='coffee'] .focus\:ring-primary-100:focus,
+body[data-theme='coffee'] .focus\:ring-primary-200:focus {
+    --tw-ring-color: rgba(80, 48, 229, 0.35) !important;
+}
+body[data-theme='coffee'] .bg-red-50 {
+    background-color: rgba(220, 38, 38, 0.12) !important;
+}
+body[data-theme='coffee'] .hover\:bg-red-50:hover {
+    background-color: rgba(220, 38, 38, 0.18) !important;
+}
+body[data-theme='coffee'] .hover\:bg-red-100:hover {
+    background-color: rgba(220, 38, 38, 0.25) !important;
+}
+body[data-theme='coffee'] .bg-red-100 {
+    background-color: rgba(220, 38, 38, 0.18) !important;
+}
+body[data-theme='coffee'] .bg-amber-50 {
+    background-color: rgba(245, 158, 11, 0.12) !important;
+}
+body[data-theme='coffee'] .bg-green-50 {
+    background-color: rgba(34, 197, 94, 0.10) !important;
+}
+body[data-theme='coffee'] .bg-green-100 {
+    background-color: rgba(34, 197, 94, 0.15) !important;
+}
+body[data-theme='coffee'] .bg-blue-50 {
+    background-color: rgba(59, 130, 246, 0.10) !important;
+}
+body[data-theme='coffee'] .border-amber-200 {
+    border-color: rgba(245, 158, 11, 0.3) !important;
+}
+body[data-theme='coffee'] .text-amber-600 {
+    color: #FCD34D !important;
+}
+body[data-theme='coffee'] .text-red-700 {
+    color: #FCA5A5 !important;
+}
+body[data-theme='coffee'] .text-amber-700 {
+    color: #FCD34D !important;
+}
+body[data-theme='coffee'] .text-green-700 {
+    color: #86EFAC !important;
+}
+body[data-theme='coffee'] .bg-\[\#FEE2E2\] {
+    background-color: rgba(220, 38, 38, 0.15) !important;
+}
+body[data-theme='coffee'] .hover\:bg-\[\#fdd\]:hover {
+    background-color: rgba(220, 38, 38, 0.22) !important;
+}
+body[data-theme='coffee'] .bg-\[\#DBEAFE\] {
+    background-color: rgba(59, 130, 246, 0.12) !important;
+}
+body[data-theme='coffee'] .bg-\[\#EDE9FE\] {
+    background-color: rgba(124, 58, 237, 0.12) !important;
+}
+body[data-theme='coffee'] .bg-\[\#DCFCE7\] {
+    background-color: rgba(34, 197, 94, 0.12) !important;
+}
+body[data-theme='coffee'] .bg-\[\#FEF3C7\] {
+    background-color: rgba(245, 158, 11, 0.12) !important;
+}
+body[data-theme='coffee'] .hover\:bg-gray-50:hover {
+    background-color: var(--bg-hover) !important;
+}
+body[data-theme='coffee'] .hover\:bg-gray-100:hover {
+    background-color: var(--bg-active) !important;
+}
+body[data-theme='coffee'] .hover\:bg-surface-50:hover {
+    background-color: var(--bg-hover) !important;
+}
+body[data-theme='coffee'] .hover\:bg-surface-100:hover {
+    background-color: var(--bg-active) !important;
+}
+body[data-theme='coffee'] .hover\:bg-white:hover {
+    background-color: var(--bg-hover) !important;
+}
+body[data-theme='coffee'] input:not([type='checkbox']):not([type='radio']):not([type='color']),
+body[data-theme='coffee'] textarea,
+body[data-theme='coffee'] select {
+    background-color: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-default) !important;
+}
+body[data-theme='coffee'] input::placeholder,
+body[data-theme='coffee'] textarea::placeholder {
+    color: var(--text-subtle) !important;
+}
+body[data-theme='coffee'] .glass-card {
+    background: rgba(39, 23, 16, 0.92) !important;
+}
+body[data-theme='coffee'] .bg-white\/60,
+body[data-theme='coffee'] .bg-white\/50,
+body[data-theme='coffee'] .bg-white\/70,
+body[data-theme='coffee'] .bg-white\/80 {
+    background-color: rgba(39, 23, 16, 0.75) !important;
+}
+body[data-theme='coffee'] .shadow-sm,
+body[data-theme='coffee'] .shadow,
+body[data-theme='coffee'] .shadow-md,
+body[data-theme='coffee'] .shadow-lg,
+body[data-theme='coffee'] .shadow-xl,
+body[data-theme='coffee'] .shadow-card,
+body[data-theme='coffee'] .shadow-sidebar {
+    box-shadow: none !important;
+}
+body[data-theme='coffee'] .divide-gray-100 > * + * {
+    border-color: var(--border-subtle) !important;
+}
+body[data-theme='coffee'] .divide-gray-200 > * + * {
+    border-color: var(--border-default) !important;
+}
+body[data-theme='coffee'] .divide-surface-100 > * + * {
+    border-color: var(--border-subtle) !important;
+}
+body[data-theme='coffee'] .divide-surface-200 > * + * {
+    border-color: var(--border-default) !important;
+}
+body[data-theme='coffee'] .ring-surface-100,
+body[data-theme='coffee'] .ring-1.ring-surface-100 {
+    --tw-ring-color: var(--border-subtle) !important;
+}
+
 /* ── Dark theme global overrides ────────────────────────────────────────────── */
 
 /* Override hardcoded bg-white / bg-gray-* everywhere in dark mode */

@@ -83,8 +83,8 @@ interface AppContextType {
     setOrg: (org: Organization) => void;
     currentUser: User | null;
     setCurrentUser: (user: User) => void;
-    theme: 'light' | 'dark';
-    setTheme: (theme: 'light' | 'dark') => void;
+    theme: 'light' | 'dark' | 'coffee';
+    setTheme: (theme: 'light' | 'dark' | 'coffee') => void;
     sidebarCollapsed: boolean;
     setSidebarCollapsed: (collapsed: boolean) => void;
     attendanceRecords: AttendanceRecord[];
@@ -113,7 +113,7 @@ export const AppContext = createContext<AppContextType>({
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [org, setOrg] = useState<Organization | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [theme, setThemeState] = useState<'light' | 'dark'>('dark');
+    const [theme, setThemeState] = useState<'light' | 'dark' | 'coffee'>('dark');
     const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
     const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
     const [selectedWeekStart, setSelectedWeekStartState] = useState<string>(currentWeekMonday());
@@ -124,7 +124,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!currentUser) return;
         if (prefLoadedFor === currentUser.id) return;
         prefsApi().get(currentUser.id)
-            .then((prefs: { theme?: 'light' | 'dark'; sidebarCollapsed?: boolean; selectedWeekStart?: string | null } | null) => {
+            .then((prefs: { theme?: 'light' | 'dark' | 'coffee'; sidebarCollapsed?: boolean; selectedWeekStart?: string | null } | null) => {
                 if (!prefs) return;
                 if (prefs.theme) setThemeState(prefs.theme);
                 if (typeof prefs.sidebarCollapsed === 'boolean') setSidebarCollapsedState(prefs.sidebarCollapsed);
@@ -196,7 +196,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         document.body.dataset.theme = theme;
     }, [theme]);
 
-    const setTheme = useCallback((t: 'light' | 'dark') => {
+    const setTheme = useCallback((t: 'light' | 'dark' | 'coffee') => {
         setThemeState(t);
         if (currentUser) {
             prefsApi().set({ userId: currentUser.id, theme: t })

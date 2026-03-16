@@ -100,7 +100,7 @@ const AppearanceLoader: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI?.appearancePrefs;
         if (!api) return;
-        api.get(authUser.id).then((prefs: { themeMode: 'light'|'dark'|'system'; accentColor: string } | null) => {
+        api.get(authUser.id).then((prefs: { themeMode: 'light'|'dark'|'coffee'|'system'; accentColor: string } | null) => {
             if (!prefs) return;
             const palette = ACCENT_PALETTES[prefs.accentColor];
             if (palette) {
@@ -124,7 +124,7 @@ const AppearanceLoader: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
-        const unsub = electronAPI.onAppearancePrefChanged?.((_: unknown, payload: { doc?: { userId: string; themeMode: 'light'|'dark'|'system'; accentColor: string } }) => {
+        const unsub = electronAPI.onAppearancePrefChanged?.((_: unknown, payload: { doc?: { userId: string; themeMode: 'light'|'dark'|'coffee'|'system'; accentColor: string } }) => {
             const doc = payload.doc;
             if (!doc || doc.userId !== authUser.id) return;
             const palette = ACCENT_PALETTES[doc.accentColor];
