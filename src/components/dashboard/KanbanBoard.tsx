@@ -3,16 +3,73 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Tag, User, Calendar, ChevronDown, ImagePlus,
   Check, Edit3, Trash2, MessageSquare, Send,
+  ArrowRight, Flag, UserPlus, UserMinus, FileText, Plus, Pencil,
 } from 'lucide-react';
-import { Task, TaskStatus, TaskCommentItem } from '../../types';
+import { Task, TaskStatus, TaskCommentItem, TaskActivityEntry } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useMembersContext } from '../../context/MembersContext';
+import { useAuth } from '../../context/AuthContext';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import KanbanColumn from './KanbanColumn';
 import TaskFormModal from '../modals/TaskFormModal';
 const TODAY = new Date().toISOString().split('T')[0];
 const WEEK_START = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })();
 const WEEK_END   = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().split('T')[0]; })();
+
+// ── Activity Log helpers ────────────────────────────────────────────────────
+const activityIconMap: Record<string, { icon: React.ComponentType<any>; color: string }> = {
+  created:             { icon: Plus,      color: '#68B266' },
+  status_changed:      { icon: ArrowRight, color: '#6366f1' },
+  priority_changed:    { icon: Flag,      color: '#FFA500' },
+  assignee_added:      { icon: UserPlus,  color: '#68B266' },
+  assignee_removed:    { icon: UserMinus, color: '#D8727D' },
+  due_date_changed:    { icon: Calendar,  color: '#a855f7' },
+  title_changed:       { icon: Pencil,    color: '#6b7280' },
+  description_changed: { icon: FileText,  color: '#6b7280' },
+};
+const activityLabelMap: Record<string, string> = {
+  created:             'created this task',
+  status_changed:      'changed status',
+  priority_changed:    'changed priority',
+  assignee_added:      'added assignee',
+  assignee_removed:    'removed assignee',
+  due_date_changed:    'changed due date',
+  title_changed:       'changed title',
+  description_changed: 'updated description',
+};
+function formatActivityTime(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+const ActivityEntryRow: React.FC<{ entry: TaskActivityEntry; currentUserId: string }> = ({ entry, currentUserId }) => {
+  const { icon: Icon, color } = activityIconMap[entry.type] ?? { icon: ArrowRight, color: '#6b7280' };
+  const label = activityLabelMap[entry.type] ?? entry.type;
+  const actor = entry.actorId === currentUserId ? 'You' : entry.actorName;
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: color + '20' }}>
+        <Icon size={11} style={{ color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-gray-700 leading-snug">
+          <span className="font-semibold">{actor}</span> {label}
+          {(entry.from || entry.to) && (
+            <span className="inline-flex items-center gap-1 ml-1">
+              {entry.from && <span className="bg-surface-100 text-gray-500 rounded px-1 py-0.5 text-[10px]">{entry.from}</span>}
+              {entry.from && entry.to && <ArrowRight size={9} className="text-gray-400" />}
+              {entry.to && <span className="bg-surface-100 text-gray-500 rounded px-1 py-0.5 text-[10px]">{entry.to}</span>}
+            </span>
+          )}
+        </p>
+        <p className="text-[10px] text-gray-400 mt-0.5">{formatActivityTime(entry.timestamp)}</p>
+      </div>
+    </div>
+  );
+};
+// ── End Activity Log helpers ────────────────────────────────────────────────
 
 const statusStyles: Record<TaskStatus, { bg: string; text: string; label: string; dot: string }> = {
   'todo':               { bg: 'bg-primary-50',     text: 'text-primary-600',  label: 'To Do',              dot: 'bg-primary-500' },
@@ -45,8 +102,10 @@ interface KanbanBoardProps {
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
   const { allTasks, moveTask, updateTask, deleteTask, createTask, projects, activeProject } = useProjects();
   const { members, getMemberColor } = useMembersContext();
+  const { user: authUser } = useAuth() ?? { user: null };
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [detailTab, setDetailTab] = useState<'details' | 'activity'>('details');
   const [editMode, setEditMode] = useState(false);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -72,6 +131,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
     setComments(task.commentData ?? []);
     setCommentInput('');
     setDetailImage(null);
+    setDetailTab('details');
   };
 
   const startEdit = (task: Task) => {
@@ -226,6 +286,24 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
                 </div>
               </div>
 
+              {/* Tab bar */}
+              <div className="flex border-b border-surface-100 shrink-0">
+                {(['details', 'activity'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setDetailTab(tab)}
+                    className={`flex-1 py-2.5 text-xs font-semibold capitalize transition-colors ${
+                      detailTab === tab
+                        ? 'text-primary-600 border-b-2 border-primary-500'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {detailTab === 'details' && (
               <div className="flex-1 px-5 py-4 flex flex-col gap-4">
                 {/* Title */}
                 <div>
@@ -440,6 +518,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
                   </div>
                 )}
               </div>
+              )}
+
+              {detailTab === 'activity' && (
+                <div className="flex-1 overflow-y-auto p-4">
+                  {(selectedTask.activity ?? []).length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center mt-8">No activity yet.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {[...(selectedTask.activity ?? [])].reverse().map(entry => (
+                        <ActivityEntryRow key={entry.id} entry={entry} currentUserId={authUser?.id ?? ''} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
