@@ -20,6 +20,7 @@ interface Props {
     member: User | null;
     roles: RoleDoc[];
     onClose: () => void;
+    initialSection?: Section;
 }
 
 type Section = 'profile' | 'role' | 'activity' | 'attendance';
@@ -48,14 +49,14 @@ const Field: React.FC<{
 const inputCls = "w-full border border-surface-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-300 bg-white transition-colors";
 const readonlyCls = "w-full bg-surface-50 rounded-lg px-3 py-2 text-sm text-gray-500 border border-surface-100";
 
-export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
+export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose, initialSection }) => {
     const { updateMember } = useMembersContext();
     const { user: authUser } = useAuth();
     const { showToast } = useToast();
     const { allTasks } = useProjects();
     const { attendanceRecords } = useContext(AppContext);
 
-    const [section, setSection] = useState<Section>('profile');
+    const [section, setSection] = useState<Section>(initialSection ?? 'profile');
     const [saving, setSaving] = useState(false);
 
     const [form, setForm] = useState({
@@ -83,9 +84,9 @@ export const UserRoleDrawer: React.FC<Props> = ({ member, roles, onClose }) => {
                 role: member.role ?? '',
                 status: member.status ?? 'active',
             });
-            setSection('profile');
+            setSection(initialSection ?? 'profile');
         }
-    }, [member?.id]);
+    }, [member?.id, initialSection]);
 
     const isSelf = member?.id === authUser?.id;
 

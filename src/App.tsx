@@ -1,4 +1,32 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, Component } from 'react';
+
+// ── Error Boundary ────────────────────────────────────────────────────────────
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
+    constructor(props: { children: React.ReactNode }) {
+        super(props);
+        this.state = { error: null };
+    }
+    static getDerivedStateFromError(error: Error) { return { error }; }
+    componentDidCatch(error: Error, info: React.ErrorInfo) {
+        console.error('[ErrorBoundary] Caught error:', error, info.componentStack);
+    }
+    render() {
+        if (this.state.error) {
+            return (
+                <div style={{ padding: 40, fontFamily: 'monospace' }}>
+                    <h2 style={{ color: '#D8727D' }}>Something went wrong</h2>
+                    <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13, color: '#374151', background: '#F5F5F5', padding: 16, borderRadius: 8 }}>
+                        {this.state.error.message}{'\n\n'}{this.state.error.stack}
+                    </pre>
+                    <button onClick={() => this.setState({ error: null })} style={{ marginTop: 16, padding: '8px 16px', background: '#5030E5', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                        Try again
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 import { motion, AnimatePresence } from 'framer-motion';
 import { HashRouter, Routes, Route, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
@@ -218,6 +246,14 @@ const Root: React.FC = () => {
     const [splashDone, setSplashDone] = useState(false);
     const returningUser = !!localStorage.getItem('pm_auth_session');
     const [dbDisconnected, setDbDisconnected] = useState(false);
+    const navigate = useNavigate();
+
+    // When auth transitions to authenticated (e.g. after register), navigate to root
+    React.useEffect(() => {
+        if (isAuthenticated && splashDone && !isLoading) {
+            navigate('/', { replace: true });
+        }
+    }, [isAuthenticated, splashDone, isLoading]);
 
     // Listen for DB disconnect/reconnect events from main process
     React.useEffect(() => {
@@ -267,6 +303,7 @@ const Root: React.FC = () => {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 const App: React.FC = () => (
+    <ErrorBoundary>
     <AuthProvider>
         <AppProvider>
             <AuthAppSync />
@@ -289,6 +326,7 @@ const App: React.FC = () => (
             </RolePermsProvider>
         </AppProvider>
     </AuthProvider>
+    </ErrorBoundary>
 );
 
 export default App;
