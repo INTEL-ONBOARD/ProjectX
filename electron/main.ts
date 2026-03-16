@@ -252,6 +252,18 @@ function startMessageStream(): void {
     }
 }
 
+async function ensureDefaultData() {
+    // Ensure Toursurv org exists
+    const orgExists = await OrgModel.findOne({ orgId: 'org-toursurv' }).lean();
+    if (!orgExists) {
+        await OrgModel.create({ orgId: 'org-toursurv', name: 'Toursurv', workStart: '09:00', workEnd: '18:00', createdAt: new Date().toISOString() });
+        console.log('Seeded default org: Toursurv');
+    }
+    // Backfill orgId on any existing users that don't have one
+    await AuthUserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
+    await UserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
+}
+
 async function connectDB() {
     const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectx?retryWrites=true&w=majority';
     if (!uri) { console.error('MONGODB_URI not set'); return; }
@@ -273,6 +285,7 @@ async function connectDB() {
             await mongoose.connect(uri, opts);
             console.log('MongoDB connected');
             if (mainWindow) mainWindow.webContents.send('db:connected');
+            await ensureDefaultData();
             return;
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -488,14 +501,8 @@ function registerDbHandlers() {
             const hashed = await bcrypt.hash('password123', 10);
             await AuthUserModel.create({ appId: 'auth-default', name: 'Admin User', email: 'admin@projectm.com', password: hashed, role: 'admin' });
         }
-        // Ensure a User (member) record exists for every AuthUser
-        const allAuthUsers = await AuthUserModel.find().lean() as any[];
-        for (const au of allAuthUsers) {
-            const memberExists = await UserModel.findOne({ appId: au.appId }).lean();
-            if (!memberExists) {
-                await UserModel.create({ appId: au.appId, name: au.name, email: au.email, role: au.role, status: 'active' });
-            }
-        }
+        // Ensure a User (member) record exists only for the hardcoded seed accounts
+        // (do NOT auto-recreate members for every AuthUser — that would un-delete removed users)
         const adminExists = await AuthUserModel.findOne({ email: 'admin@gmail.com' }).lean();
         if (!adminExists) {
             const hashed2 = await bcrypt.hash('Admin@123', 10);

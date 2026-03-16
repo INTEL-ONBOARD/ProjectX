@@ -106,6 +106,7 @@ interface ElectronAPI {
   onDbConnectionFailed(cb: (_: unknown, message: string) => void): () => void;
   onDbDisconnected(cb: () => void): () => void;
   onDbReconnected(cb: () => void): () => void;
+  onNewMessage(cb: (_: unknown, msg: { id: string; from: string; to: string; text: string; time: string; read: boolean; reactions: Record<string, unknown>; deleted: boolean }) => void): () => void;
   onUpdateChecking(cb: () => void): () => void;
   onUpdateAvailable(cb: (_: unknown, info: { version: string; releaseDate?: string; releaseNotes?: string | null }) => void): () => void;
   onUpdateNotAvailable(cb: () => void): () => void;
