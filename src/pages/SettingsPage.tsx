@@ -150,10 +150,11 @@ const InputField: React.FC<{
 
 const ACCENT_COLORS = [
   { hex: '#EF4444', label: 'Red' },
-  { hex: '#F97316', label: 'Orange' },
-  { hex: '#FACC15', label: 'Yellow' },
-  { hex: '#22C55E', label: 'Green' },
-  { hex: '#3B82F6', label: 'Blue' },
+  { hex: '#F59E0B', label: 'Orange' },
+  { hex: '#5030E5', label: 'Purple' },
+  { hex: '#10B981', label: 'Green' },
+  { hex: '#0EA5E9', label: 'Blue' },
+  { hex: '#8B5CF6', label: 'Violet' },
 ];
 
 // ── Section header ────────────────────────────────────────────────────────────
@@ -300,6 +301,7 @@ const SettingsPage: React.FC = () => {
         if (!prefs) return;
         setThemeMode(prefs.themeMode);
         setAccentColor(prefs.accentColor);
+        applyAccentColor(prefs.accentColor);
       })
       .catch((err: unknown) => console.error('[SettingsPage] Failed to load appearance prefs:', err));
   }, [currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -318,7 +320,7 @@ const SettingsPage: React.FC = () => {
     const unsubAppear = electronAPI.onAppearancePrefChanged?.((_: unknown, payload: { doc?: AppearPrefs & { userId: string } }) => {
       if (payload.doc?.userId === currentUser.id) {
         if (payload.doc.themeMode) setThemeMode(payload.doc.themeMode);
-        if (payload.doc.accentColor) setAccentColor(payload.doc.accentColor);
+        if (payload.doc.accentColor) { setAccentColor(payload.doc.accentColor); applyAccentColor(payload.doc.accentColor); }
       }
     });
     return () => { unsubNotif?.(); unsubAppear?.(); };
