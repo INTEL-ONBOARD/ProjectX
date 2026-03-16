@@ -78,7 +78,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    // Load unread count from DB; recompute whenever the user leaves the messages page
+    // Unread message badge: query DB on mount and whenever user leaves the messages page.
+    // 520ms delay after leaving messages page lets markMessagesRead finish before we recount.
     useEffect(() => {
         if (!user?.id || members.length === 0) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,23 +99,23 @@ const Sidebar: React.FC<SidebarProps> = ({
             setUnreadMsgCount(total);
         };
 
-        // Increment on new incoming message only when NOT on messages page
+        if (onMessagesPage) {
+            // User is on messages page — hide badge immediately, no listener needed
+            setUnreadMsgCount(0);
+            return;
+        }
+
+        // Not on messages page: recompute from DB (520ms delay on first call so any
+        // markMessagesRead calls from the messages page have time to finish in MongoDB)
+        const timer = setTimeout(recompute, 520);
+
+        // Increment badge in real-time when a new message arrives while away from messages page
         const unsub = api?.onNewMessage?.((_: unknown, msg: { from: string; to: string }) => {
             if (msg.to !== user.id) return;
-            if (onMessagesPage) return; // user is already viewing messages, no badge needed
             setUnreadMsgCount(prev => prev + 1);
         });
 
-        // Always recompute fresh from DB on mount or when leaving messages page
-        if (!onMessagesPage) {
-            // Small delay when navigating away from messages page so markMessagesRead DB calls finish first
-            const timer = setTimeout(recompute, 300);
-            return () => { clearTimeout(timer); unsub?.(); };
-        } else {
-            setUnreadMsgCount(0); // user is on messages page — they're reading
-        }
-
-        return () => unsub?.();
+        return () => { clearTimeout(timer); unsub?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, members.length, onMessagesPage]);
 

@@ -53,7 +53,7 @@ const MessagesPage: React.FC = () => {
     const memberId = (location.state as any)?.memberId;
     if (memberId) {
       setActiveId(memberId);
-      setChats(prev => ({ ...prev, [memberId]: prev[memberId] ?? [] }));
+      activeIdRef.current = memberId;
     }
   }, [location.state]);
 
@@ -61,9 +61,11 @@ const MessagesPage: React.FC = () => {
   useEffect(() => {
     if (!activeId && conversations.length > 0) {
       setActiveId(conversations[0].id);
+      activeIdRef.current = conversations[0].id;
     }
   }, [conversations.length]);
 
+  // Keep ref in sync with state on every render (used inside callbacks to avoid stale closures)
   activeIdRef.current = activeId;
   const activeMember = conversations.find(m => m.id === activeId) ?? null;
   const activeColor = getMemberColor(activeId);
@@ -74,40 +76,47 @@ const MessagesPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeChats.length, activeId]);
 
-  // Pre-load messages for all conversations on mount so sidebar shows last message + unread count
+  // Load messages for the active conversation and mark them as read in DB
+  useEffect(() => {
+    if (!activeMember || !currentUserId) return;
+    const peerId = activeMember.id;
+    dbApi().getMessagesBetween(currentUserId, peerId)
+        .then((msgs: Msg[]) => {
+          // Force all messages read:true in local state — user is viewing this conversation
+          const allRead = msgs.map((m: Msg) => ({ ...m, read: true }));
+          setChats(prev => ({ ...prev, [peerId]: allRead }));
+          // Persist to DB so other sessions + sidebar recompute reflect reality
+          dbApi().markMessagesRead(currentUserId, peerId)
+            .catch((err: unknown) => console.error('[MessagesPage] markRead failed:', err));
+        })
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to load active conv:', err));
+  }, [activeMember?.id, currentUserId]);
+
+  // Pre-load messages for non-active conversations (for last-message preview + unread badges)
+  // Runs after active-conv effect so activeIdRef.current is always set before we check it
   useEffect(() => {
     if (!currentUserId || conversations.length === 0) return;
     conversations.forEach(peer => {
-      // Skip the active conversation — the active-conversation effect handles it and marks as read
-      if (peer.id === activeMember?.id) return;
-      // Skip conversations already loaded — don't overwrite read state set by the active-conv effect
+      // Skip whichever conversation is active — active-conv effect owns that slot and marks read
+      if (peer.id === activeIdRef.current) return;
+      // Skip if already loaded — never overwrite existing local state (could have been marked read)
       setChats(prev => {
-        if (prev[peer.id] !== undefined) return prev; // already loaded, don't overwrite
+        if (prev[peer.id] !== undefined) return prev;
         dbApi().getMessagesBetween(currentUserId, peer.id)
-          .then((msgs: Msg[]) => setChats(p => ({ ...p, [peer.id]: msgs as Msg[] })))
-          .catch((err: unknown) => console.error('[MessagesPage] Failed to preload messages for', peer.id, err));
+          .then((msgs: Msg[]) => setChats(p => {
+            // Double-check: only write if the slot is still empty (active-conv effect may have
+            // loaded it between the time we started the fetch and now)
+            if (p[peer.id] !== undefined) return p;
+            return { ...p, [peer.id]: msgs as Msg[] };
+          }))
+          .catch((err: unknown) => console.error('[MessagesPage] preload failed for', peer.id, err));
         return prev;
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId, conversations.length]);
 
-  // Load messages for the active conversation and mark them as read
-  useEffect(() => {
-    if (!activeMember || !currentUserId) return;
-    const peerId = activeMember.id;
-    dbApi().getMessagesBetween(currentUserId, peerId)
-        .then((msgs: Msg[]) => {
-          // Mark all incoming messages as read since the user is viewing this conversation
-          const read = msgs.map((m: Msg) => ({ ...m, read: true }));
-          setChats(prev => ({ ...prev, [peerId]: read }));
-          dbApi().markMessagesRead(currentUserId, peerId)
-            .catch((err: unknown) => console.error('[MessagesPage] Failed to mark messages as read:', err));
-        })
-        .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
-  }, [activeMember?.id, currentUserId]);
-
-  // Mark new_message notifications as read when viewing a conversation
+  // Mark new_message notifications as read when viewing any conversation
   useEffect(() => {
     if (!activeMember) return;
     notifications
@@ -116,7 +125,9 @@ const MessagesPage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMember?.id, notifications.length]);
 
-  // Real-time: listen for new messages pushed from main via change stream
+  // Real-time: listen for new messages pushed from main process via change stream
+  // Uses activeIdRef (not activeId closure) so we always have the latest active conversation
+  // without needing to re-register the listener on every conversation switch
   useEffect(() => {
     if (!currentUserId) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,24 +135,24 @@ const MessagesPage: React.FC = () => {
     if (!api?.onNewMessage) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const unsub = api.onNewMessage((_: unknown, msg: any) => {
-      // Skip messages the current user sent (already shown via optimistic update)
-      if (msg.from === currentUserId) return;
-      // Skip messages not addressed to the current user
-      if (msg.to !== currentUserId) return;
+      if (msg.from === currentUserId) return; // own message — already shown optimistically
+      if (msg.to !== currentUserId) return;   // not for me
       const peerId = msg.from;
+      const isActive = peerId === activeIdRef.current; // use ref — never stale
       setChats(prev => {
         const existing = prev[peerId] ?? [];
-        if (existing.some((m: Msg) => m.id === msg.id)) return prev;
-        const isActive = peerId === activeId;
-        const newMsg = { id: msg.id, from: msg.from, text: msg.text, time: msg.time, read: isActive };
+        if (existing.some((m: Msg) => m.id === msg.id)) return prev; // dedupe
+        const newMsg: Msg = { id: msg.id, from: msg.from, text: msg.text, time: msg.time, read: isActive };
         if (isActive) {
+          // User is watching this conversation — mark read in DB immediately
           dbApi().markMessagesRead(currentUserId, peerId).catch(() => {});
         }
         return { ...prev, [peerId]: [...existing, newMsg] };
       });
     });
     return () => unsub?.();
-  }, [currentUserId, activeId]);
+  // Only depends on currentUserId — activeIdRef.current is always fresh without being a dep
+  }, [currentUserId]);
 
   // Load conv meta (pin/star/archive) on mount
   useEffect(() => {
