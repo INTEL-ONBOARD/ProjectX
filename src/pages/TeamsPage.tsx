@@ -402,7 +402,7 @@ const ProjectRow: React.FC<{
           {sc.label}
         </span>
       </td>
-      <td className="px-4 py-3.5 text-xs text-gray-400">{project.dueDate}</td>
+      <td className="px-4 py-3.5 text-xs text-gray-400 whitespace-nowrap">{project.dueDate}</td>
       <td className="px-4 py-3.5">
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
           {confirmDelete ? (
@@ -682,7 +682,7 @@ const TeamsPage: React.FC = () => {
                       <thead>
                         <tr className="border-b border-surface-100 bg-surface-50">
                           {['Project', 'Members', 'Tasks', 'Progress', 'Priority', 'Status', 'Due Date', ''].map(h => (
-                            <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider first:pl-5">{h}</th>
+                            <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider first:pl-5${h === 'Due Date' ? ' whitespace-nowrap' : ''}`}>{h}</th>
                           ))}
                         </tr>
                       </thead>

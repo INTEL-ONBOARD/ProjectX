@@ -15,6 +15,7 @@ const STATUS_META = [
   { key: 'ready-for-qa',       label: 'Ready for QA',        color: '#30C5E5' },
   { key: 'deployment-pending', label: 'Deployment Pending',  color: '#9C27B0' },
   { key: 'blocker',            label: 'Blocker',             color: '#D8727D' },
+  { key: 'on-hold',            label: 'On Hold',             color: '#78716C' },
   { key: 'done',               label: 'Done',                color: '#68B266' },
 ] as const;
 
@@ -229,6 +230,9 @@ const ReportsPage: React.FC = () => {
                       )}
                     </div>
 
+                    <span className="text-[10px] font-semibold text-gray-400 w-8 text-right shrink-0">
+                      {total > 0 ? `${Math.round((statuses.find(s => s.key === 'done')?.count ?? 0) / total * 100)}%` : '0%'}
+                    </span>
                     <span className="text-xs font-semibold text-gray-600 w-6 text-right shrink-0">{total}</span>
                     <motion.div
                       animate={{ rotate: isOpen ? 180 : 0 }}

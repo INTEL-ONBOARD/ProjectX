@@ -79,10 +79,11 @@ const statusStyles: Record<string, { bg: string; text: string; label: string; do
   'ready-for-qa':       { bg: 'bg-[#30C5E520]',    text: 'text-[#30C5E5]',   label: 'Ready for QA',       dot: 'bg-[#30C5E5]' },
   'deployment-pending': { bg: 'bg-[#9C27B020]',    text: 'text-[#9C27B0]',   label: 'Deployment Pending', dot: 'bg-[#9C27B0]' },
   'blocker':            { bg: 'bg-[#D8727D22]',    text: 'text-[#D8727D]',   label: 'Blocker',            dot: 'bg-[#D8727D]' },
+  'on-hold':            { bg: 'bg-[#78716C22]',    text: 'text-[#78716C]',   label: 'On Hold',            dot: 'bg-[#78716C]' },
   'done':               { bg: 'bg-[#83C29D33]',    text: 'text-[#68B266]',   label: 'Done',               dot: 'bg-[#68B266]' },
 };
 
-const tabs = ['All', 'To Do', 'In Progress', 'Ready for QA', 'Deployment Pending', 'Blocker', 'Done'];
+const tabs = ['All', 'To Do', 'In Progress', 'Ready for QA', 'Deployment Pending', 'Blocker', 'On Hold', 'Done'];
 
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
@@ -138,7 +139,7 @@ const TasksPage: React.FC = () => {
 
   const totalTasks = allTasks.length;
 
-  const tabStatusMap: (TaskStatus | null)[] = [null, 'todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'done'];
+  const tabStatusMap: (TaskStatus | null)[] = [null, 'todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'on-hold', 'done'];
   const tabTasks = activeTab === 0 ? allTasks : allTasks.filter(t => t.status === tabStatusMap[activeTab]);
 
   const filteredTasks = searchQuery.trim()
@@ -326,8 +327,8 @@ const TasksPage: React.FC = () => {
                       transition={{ duration: 0.35, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
                       onClick={() => { setSelectedTask(task); setDetailImage(null); setShowStatusDrop(false); setEditMode(false); setConfirmDelete(false); }}
                     >
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-900 text-xs">{task.title}</div>
+                      <td className="px-4 py-3 w-[35%]">
+                        <div className="font-semibold text-gray-900 text-xs line-clamp-2">{task.title}</div>
                         <div className="text-[10px] text-gray-400">{task.comments} comments · {task.files} files</div>
                       </td>
                       <td className="px-4 py-3">
