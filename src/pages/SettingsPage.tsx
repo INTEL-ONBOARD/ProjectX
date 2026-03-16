@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User, Bell, Palette, Shield, CreditCard,
+  User, Bell, Palette, Shield,
   Check, Clock, Moon, Sun, Monitor,
   Smartphone, Mail, Eye, EyeOff, AlertTriangle,
   Download, Trash2,
@@ -84,7 +84,7 @@ const TABS = [
   { id: 'notifications', label: 'Notifications', Icon: Bell       },
   { id: 'appearance',    label: 'Appearance',    Icon: Palette    },
   { id: 'security',      label: 'Security',      Icon: Shield     },
-  { id: 'billing',       label: 'Billing',       Icon: CreditCard },
+  // { id: 'billing',       label: 'Billing',       Icon: CreditCard },
   { id: 'about',         label: 'About',         Icon: Info       },
 ] as const;
 
@@ -138,7 +138,7 @@ const InputField: React.FC<{
           ${suffix ? 'pr-10' : ''}
           ${readOnly
             ? 'bg-surface-50 text-gray-400 cursor-not-allowed'
-            : 'bg-white focus:ring-2 focus:ring-[#5030E5]/20 focus:border-[#5030E5]'
+            : 'bg-white focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500'
           }`}
       />
       {suffix && (
@@ -222,7 +222,7 @@ const navGroups = [
     label: 'App',
     items: [
       { id: 'appearance', label: 'Appearance', icon: Palette    },
-      { id: 'billing',    label: 'Billing',    icon: CreditCard },
+      // { id: 'billing',    label: 'Billing',    icon: CreditCard },
       { id: 'about',      label: 'About',      icon: Info       },
     ],
   },
@@ -237,7 +237,7 @@ const SettingsPage: React.FC = () => {
 
   const { showToast } = useToast();
 
-  const userColor = '#5030E5';
+  const userColor = 'var(--color-primary-500, #5030E5)';
 
   const [activeSection, setActiveSection] = useState('profile');
   const { state: updateState, checkForUpdate, installUpdate } = useAppUpdater();
@@ -269,11 +269,27 @@ const SettingsPage: React.FC = () => {
       .catch((err: unknown) => console.error('[SettingsPage] Failed to load notif prefs:', err));
   }, [currentUser?.id]);
 
+  // Appearance helpers — apply settings directly to the DOM
+  const ACCENT_PALETTES: Record<string, Record<string, string>> = {
+    '#5030E5': { 50:'#F0EDFF',100:'#E0DBFE',200:'#C2B7FD',300:'#A393FC',400:'#856FFB',500:'#5030E5',600:'#4024C4',700:'#301BA3',800:'#201182',900:'#100861' },
+    '#0EA5E9': { 50:'#E0F4FD',100:'#BAE7FB',200:'#7DD4F8',300:'#39BFF4',400:'#0DB1E8',500:'#0EA5E9',600:'#0385C7',700:'#0267A0',800:'#044F7B',900:'#023B59' },
+    '#10B981': { 50:'#D1FAF0',100:'#A5F3DC',200:'#6EE7C0',300:'#34D3A4',400:'#10C98E',500:'#10B981',600:'#059669',700:'#047857',800:'#065F46',900:'#064E3B' },
+    '#F59E0B': { 50:'#FFFBEB',100:'#FEF3C7',200:'#FDE68A',300:'#FCD34D',400:'#FBBF24',500:'#F59E0B',600:'#D97706',700:'#B45309',800:'#92400E',900:'#78350F' },
+    '#EF4444': { 50:'#FEF2F2',100:'#FEE2E2',200:'#FECACA',300:'#FCA5A5',400:'#F87171',500:'#EF4444',600:'#DC2626',700:'#B91C1C',800:'#991B1B',900:'#7F1D1D' },
+    '#8B5CF6': { 50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',400:'#A78BFA',500:'#8B5CF6',600:'#7C3AED',700:'#6D28D9',800:'#5B21B6',900:'#4C1D95' },
+  };
+  const applyAccentColor = (hex: string) => {
+    const palette = ACCENT_PALETTES[hex];
+    if (!palette) return;
+    const root = document.documentElement;
+    Object.entries(palette).forEach(([shade, value]) => {
+      root.style.setProperty(`--color-primary-${shade}`, value);
+    });
+  };
+
   // Appearance — persisted to MongoDB (in-memory fallback in mock mode)
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(theme === 'dark' ? 'dark' : 'light');
   const [accentColor, setAccentColor] = useState('#5030E5');
-  const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
-  const [compactMode, setCompactMode] = useState(false);
   const [timezoneValue] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const appearLoaded = useRef(false);
 
@@ -285,11 +301,9 @@ const SettingsPage: React.FC = () => {
         if (!prefs) return;
         setThemeMode(prefs.themeMode);
         setAccentColor(prefs.accentColor);
-        setFontSize(prefs.fontSize);
-        setCompactMode(prefs.compactMode);
       })
       .catch((err: unknown) => console.error('[SettingsPage] Failed to load appearance prefs:', err));
-  }, [currentUser?.id]);
+  }, [currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Security
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
@@ -304,7 +318,7 @@ const SettingsPage: React.FC = () => {
   const saveAppearance = (patch: Partial<AppearPrefs>) => {
     if (currentUser?.id) {
       const current: AppearPrefs & { userId: string } = {
-        userId: currentUser.id, themeMode, accentColor, fontSize, compactMode, ...patch,
+        userId: currentUser.id, themeMode, accentColor, fontSize: 'md', compactMode: false, ...patch,
       };
       appearApi().set(current)
         .catch((err: unknown) => console.error('[SettingsPage] Failed to save appearance prefs:', err));
@@ -432,8 +446,7 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="px-4 shrink-0">
-        <div className="max-w-5xl mx-auto">
+      <div className="px-8 shrink-0">
         <div className="flex items-center gap-1 bg-surface-50 rounded-2xl p-1 border border-surface-200 w-fit">
           {TABS.map(tab => (
             <button
@@ -441,7 +454,7 @@ const SettingsPage: React.FC = () => {
               onClick={() => setActiveSection(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap
                 ${activeSection === tab.id
-                  ? 'bg-[#5030E5] text-white shadow-sm'
+                  ? 'bg-primary-500 text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-800 hover:bg-white'
                 }`}
             >
@@ -450,12 +463,11 @@ const SettingsPage: React.FC = () => {
             </button>
           ))}
         </div>
-        </div>
       </div>
 
       {/* ── Content ── */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-5xl mx-auto">
+      <div className="flex-1 overflow-y-auto px-8 py-6">
+        <div>
           <AnimatePresence mode="wait">
 
             {/* ══ Profile ══ */}
@@ -479,13 +491,13 @@ const SettingsPage: React.FC = () => {
                       <div className="grid grid-cols-[auto_1fr] gap-6">
                         {/* Left: avatar */}
                         <div className="flex flex-col items-center gap-2 pt-1">
-                          <div className="rounded-full p-[2.5px] bg-gradient-to-br from-[#5030E5] to-[#7C3AED]">
+                          <div className="rounded-full p-[2.5px] bg-gradient-to-br from-primary-500 to-primary-700">
                             <div className="rounded-full p-[2px] bg-white">
-                              <Avatar name={nameValue} color="#5030E5" size="xl" />
+                              <Avatar name={nameValue} color="var(--color-primary-500, #5030E5)" size="xl" />
                             </div>
                           </div>
                           <span className="text-xs font-bold text-gray-900 text-center max-w-[80px] truncate">{nameValue.split(' ')[0]}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#5030E523] text-[#5030E5] font-bold">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-500/15 text-primary-600 font-bold">
                             {authUser?.role ?? 'Member'}
                           </span>
                         </div>
@@ -560,8 +572,8 @@ const SettingsPage: React.FC = () => {
                   <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#5030E510]">
-                          <Bell size={16} className="text-[#5030E5]" />
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary-500/10">
+                          <Bell size={16} className="text-primary-500" />
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 text-sm">Delivery Channels</h3>
@@ -655,7 +667,7 @@ const SettingsPage: React.FC = () => {
                             <div className="h-1.5 bg-surface-300 rounded w-3/4" />
                             <div className="h-1.5 bg-surface-200 rounded w-1/2" />
                             <div className="mt-auto flex gap-1.5">
-                              <div className="h-2 w-5 bg-[#5030E5] rounded opacity-40" />
+                              <div className="h-2 w-5 bg-primary-500 rounded opacity-40" />
                               <div className="h-2 flex-1 bg-surface-200 rounded" />
                             </div>
                           </div>
@@ -665,7 +677,7 @@ const SettingsPage: React.FC = () => {
                             <div className="h-1.5 bg-gray-600 rounded w-3/4" />
                             <div className="h-1.5 bg-gray-700 rounded w-1/2" />
                             <div className="mt-auto flex gap-1.5">
-                              <div className="h-2 w-5 bg-[#5030E5] rounded opacity-60" />
+                              <div className="h-2 w-5 bg-primary-500 rounded opacity-60" />
                               <div className="h-2 flex-1 bg-gray-700 rounded" />
                             </div>
                           </div>
@@ -684,21 +696,31 @@ const SettingsPage: React.FC = () => {
                         )},
                       ]).map(t => (
                         <button key={t.id}
-                          onClick={() => { setThemeMode(t.id); setAppTheme(t.id === 'dark' ? 'dark' : 'light'); saveAppearance({ themeMode: t.id }); flashSaved('appear'); }}
+                          onClick={() => {
+                            setThemeMode(t.id);
+                            if (t.id === 'system') {
+                              const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                              setAppTheme(prefersDark ? 'dark' : 'light');
+                            } else {
+                              setAppTheme(t.id as 'light' | 'dark');
+                            }
+                            saveAppearance({ themeMode: t.id });
+                            flashSaved('appear');
+                          }}
                           className={`flex flex-col gap-2 p-3 rounded-xl border-2 transition-all text-left ${
                             themeMode === t.id
-                              ? 'border-[#5030E5] bg-[#5030E508] shadow-[0_0_0_3px_rgba(80,48,229,0.1)]'
+                              ? 'border-primary-500 bg-primary-500/5 ring-2 ring-primary-500/20'
                               : 'border-surface-200 hover:border-surface-300'
                           }`}
                         >
                           {t.preview}
                           <div className="flex items-center justify-between px-0.5">
                             <div className="flex items-center gap-1.5">
-                              <t.Icon size={12} className={themeMode === t.id ? 'text-[#5030E5]' : 'text-gray-400'} />
-                              <span className={`text-xs font-semibold ${themeMode === t.id ? 'text-[#5030E5]' : 'text-gray-500'}`}>{t.label}</span>
+                              <t.Icon size={12} className={themeMode === t.id ? 'text-primary-500' : 'text-gray-400'} />
+                              <span className={`text-xs font-semibold ${themeMode === t.id ? 'text-primary-500' : 'text-gray-500'}`}>{t.label}</span>
                             </div>
                             {themeMode === t.id && (
-                              <div className="w-4 h-4 rounded-full bg-[#5030E5] flex items-center justify-center">
+                              <div className="w-4 h-4 rounded-full bg-primary-500 flex items-center justify-center">
                                 <Check size={9} className="text-white" strokeWidth={3} />
                               </div>
                             )}
@@ -723,7 +745,7 @@ const SettingsPage: React.FC = () => {
                       <div className="flex items-center gap-3 flex-wrap">
                         {ACCENT_COLORS.map(c => (
                           <button key={c.hex} title={c.label}
-                            onClick={() => { setAccentColor(c.hex); saveAppearance({ accentColor: c.hex }); flashSaved('appear'); }}
+                            onClick={() => { setAccentColor(c.hex); applyAccentColor(c.hex); saveAppearance({ accentColor: c.hex }); flashSaved('appear'); }}
                             className={`w-8 h-8 rounded-full transition-all relative ${accentColor === c.hex ? 'ring-2 ring-offset-2' : 'opacity-60 hover:opacity-100 hover:scale-110'}`}
                             style={{ background: c.hex, ...(accentColor === c.hex ? { ringColor: c.hex } : {}) }}
                           >
@@ -737,48 +759,6 @@ const SettingsPage: React.FC = () => {
                         <span className="ml-1 text-xs font-medium text-gray-500">
                           {ACCENT_COLORS.find(c => c.hex === accentColor)?.label ?? 'Custom'}
                         </span>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 text-sm">Display</h3>
-                          <p className="text-xs text-gray-500 mt-0.5">Text size and layout density</p>
-                        </div>
-                        <SavedBadge id="appear" />
-                      </div>
-                      {/* Font size */}
-                      <div className="flex items-center justify-between py-3 border-b border-surface-100">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">Font Size</div>
-                          <div className="text-xs text-gray-400 mt-0.5">Adjust interface text size</div>
-                        </div>
-                        <div className="flex items-center gap-1 bg-surface-50 rounded-xl p-1 border border-surface-200">
-                          {(['sm', 'md', 'lg'] as const).map((s, i) => (
-                            <button key={s}
-                              onClick={() => { setFontSize(s); saveAppearance({ fontSize: s }); flashSaved('appear'); }}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${fontSize === s ? 'bg-[#5030E5] text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
-                            >
-                              {['S', 'M', 'L'][i]}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {/* Compact mode */}
-                      <div className="flex items-center justify-between py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#EDE9FE]">
-                            <Layers size={14} className="text-[#7C3AED]" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">Compact Mode</div>
-                            <div className="text-xs text-gray-400">Reduce spacing for denser layout</div>
-                          </div>
-                        </div>
-                        <Toggle on={compactMode} onChange={() => { setCompactMode(p => { const next = !p; saveAppearance({ compactMode: next }); flashSaved('appear'); return next; })}} />
                       </div>
                     </div>
                   </motion.div>
@@ -850,7 +830,7 @@ const SettingsPage: React.FC = () => {
                         }
                       />
                       <motion.button onClick={handleUpdatePassword}
-                        className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-[#5030E5] hover:bg-[#4020C5] transition-colors"
+                        className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-primary-500 hover:bg-primary-600 transition-colors"
                         whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
                       >
                         Update Password
@@ -927,7 +907,7 @@ const SettingsPage: React.FC = () => {
               >
                 {/* Banner */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="rounded-2xl p-6 bg-gradient-to-br from-[#5030E5] to-[#7C3AED] text-white overflow-hidden relative">
+                  <div className="rounded-2xl p-6 bg-gradient-to-br from-primary-500 to-primary-700 text-white overflow-hidden relative">
                     <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
                     <div className="relative flex items-center justify-between">
                       <div>
@@ -953,14 +933,14 @@ const SettingsPage: React.FC = () => {
                     <div className="grid grid-cols-3 gap-4">
                       {([
                         { name: 'Free',       price: '$0/mo',  features: ['Up to 3 projects', '5 team members', 'Basic analytics'],     cta: 'Current Plan', active: true,  accentBar: 'bg-surface-200',                                        shadow: '' },
-                        { name: 'Pro',        price: '$12/mo', features: ['Unlimited projects', '25 team members', 'Advanced analytics'], cta: 'Upgrade to Pro', active: false, accentBar: 'bg-gradient-to-r from-[#5030E5] to-[#7C3AED]',       shadow: 'shadow-[0_4px_24px_rgba(80,48,229,0.15)]' },
+                        { name: 'Pro',        price: '$12/mo', features: ['Unlimited projects', '25 team members', 'Advanced analytics'], cta: 'Upgrade to Pro', active: false, accentBar: 'bg-gradient-to-r from-primary-500 to-primary-700',       shadow: 'shadow-[0_4px_24px_rgba(80,48,229,0.15)]' },
                         { name: 'Enterprise', price: 'Custom', features: ['Unlimited everything', 'SSO & SAML', 'Dedicated support'],     cta: 'Contact Us',   active: false, accentBar: 'bg-gradient-to-r from-[#F59E0B] to-[#FCD34D]',       shadow: '' },
                       ]).map((plan, i) => (
-                        <div key={plan.name} className={`relative rounded-xl border-2 overflow-hidden ${i === 1 ? 'border-[#5030E5]' : 'border-surface-200'} ${plan.shadow}`}>
-                          {i === 1 && <span className="absolute -top-px left-1/2 -translate-x-1/2 text-[9px] font-bold px-2.5 py-0.5 rounded-b-lg bg-[#5030E5] text-white">Popular</span>}
+                        <div key={plan.name} className={`relative rounded-xl border-2 overflow-hidden ${i === 1 ? 'border-primary-500' : 'border-surface-200'} ${plan.shadow}`}>
+                          {i === 1 && <span className="absolute -top-px left-1/2 -translate-x-1/2 text-[9px] font-bold px-2.5 py-0.5 rounded-b-lg bg-primary-500 text-white">Popular</span>}
                           <div className={`h-1 w-full ${plan.accentBar}`} />
                           <div className="p-4 pt-5">
-                            <div className={`text-sm font-bold mb-0.5 ${i === 1 ? 'text-[#5030E5]' : 'text-gray-900'}`}>{plan.name}</div>
+                            <div className={`text-sm font-bold mb-0.5 ${i === 1 ? 'text-primary-500' : 'text-gray-900'}`}>{plan.name}</div>
                             <div className="text-xl font-extrabold text-gray-900 tracking-tight mb-3">{plan.price}</div>
                             <ul className="space-y-2 mb-4">
                               {plan.features.map(f => (
@@ -971,7 +951,7 @@ const SettingsPage: React.FC = () => {
                             </ul>
                             <button className={`w-full py-2 rounded-lg text-xs font-semibold transition-colors ${
                               plan.active ? 'bg-surface-100 text-gray-400 cursor-default' :
-                              i === 1 ? 'bg-[#5030E5] text-white hover:bg-[#4020C5]' :
+                              i === 1 ? 'bg-primary-500 text-white hover:bg-primary-600' :
                               'border border-surface-200 text-gray-600 hover:bg-surface-50'
                             }`}>{plan.cta}</button>
                           </div>
@@ -1066,7 +1046,7 @@ const SettingsPage: React.FC = () => {
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
                   <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
                     <div className="p-6 flex items-center gap-5">
-                      <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold bg-gradient-to-br from-[#5030E5] to-[#7C3AED] shrink-0 shadow-lg">
+                      <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-extrabold bg-gradient-to-br from-primary-500 to-primary-700 shrink-0 shadow-lg">
                         PX
                       </div>
                       <div>

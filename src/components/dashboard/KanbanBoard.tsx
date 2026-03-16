@@ -97,9 +97,10 @@ interface Filters {
 interface KanbanBoardProps {
   filters?: Filters;
   todayMode?: boolean;
+  viewMode?: 'grid' | 'list';
 }
 
-const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
+const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode = 'grid' }) => {
   const { allTasks, moveTask, updateTask, deleteTask, createTask, projects, activeProject } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const { user: authUser } = useAuth() ?? { user: null };
@@ -216,8 +217,63 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
   const currentStatusStyle = statusStyles[currentStatus];
   const proj = selectedTask ? projects.find(p => p.id === selectedTask.projectId) : null;
 
+  const projectTasks = applyFilters(allTasks.filter(t => t.projectId === activeProject));
+
   return (
     <>
+      {viewMode === 'list' ? (
+        <motion.div
+          className="flex-1 overflow-y-auto px-8 pb-6"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          {columns.map(col => {
+            const colTasks = projectTasks.filter(t => t.status === col.status);
+            if (colTasks.length === 0) return null;
+            return (
+              <div key={col.status} className="mb-6">
+                <div className="flex items-center gap-2 mb-2 pt-2">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: col.dotColor }} />
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{col.title}</span>
+                  <span className="text-xs text-gray-400">({colTasks.length})</span>
+                </div>
+                <div className="rounded-xl border border-surface-200 overflow-hidden">
+                  {colTasks.map((task, i) => {
+                    const taskMembers = members.filter(m => task.assignees.includes(m.id));
+                    const isOverdue = task.dueDate && task.dueDate < TODAY && task.status !== 'done';
+                    return (
+                      <button
+                        key={task.id}
+                        onClick={() => openTask(task)}
+                        className={`w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-surface-50 transition-colors ${i > 0 ? 'border-t border-surface-100' : ''}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium text-gray-800 truncate block">{task.title}</span>
+                        </div>
+                        {task.priority && (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${priorityStyles[task.priority]?.bg ?? ''} ${priorityStyles[task.priority]?.text ?? ''}`}>
+                            {priorityStyles[task.priority]?.label ?? task.priority}
+                          </span>
+                        )}
+                        {taskMembers.length > 0 && (
+                          <div className="shrink-0">
+                            <AvatarGroup names={taskMembers.map(m => m.name)} colors={taskMembers.map(m => getMemberColor(m.id))} size="sm" max={3} />
+                          </div>
+                        )}
+                        {task.dueDate && (
+                          <span className={`text-[11px] shrink-0 ${isOverdue ? 'text-[#D8727D] font-semibold' : 'text-gray-400'}`}>
+                            {task.dueDate}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </motion.div>
+      ) : (
       <motion.div
         className="flex-1 overflow-x-auto overflow-y-hidden px-8 pb-6"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -243,6 +299,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode }) => {
           <div className="shrink-0 w-8 h-full" />
         </div>
       </motion.div>
+      )}
 
       {/* Task Form Modal */}
       <AnimatePresence>

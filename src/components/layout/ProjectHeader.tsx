@@ -14,9 +14,10 @@ import { useToast } from '../../hooks/useToast';
 interface ProjectHeaderProps {
   onFilterChange?: (filters: { priority: string; assignees: string[]; dueDateFilter: string }) => void;
   onTodayToggle?: (active: boolean) => void;
+  onViewChange?: (mode: 'grid' | 'list') => void;
 }
 
-const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayToggle }) => {
+const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayToggle, onViewChange }) => {
   const navigate = useNavigate();
   const { projects, activeProject, updateProject } = useProjects();
   const { members, addMember, getMemberColor } = useMembersContext();
@@ -102,24 +103,6 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayTo
               {projectName}
             </motion.h1>
           )}
-          {activeProject && (
-            <div className="flex items-center gap-1.5 mt-2">
-              <motion.button
-                onClick={() => { setNameValue(projectName); setEditingName(true); }}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-              >
-                <Pencil size={16} />
-              </motion.button>
-              <motion.button
-                onClick={handleShare}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-              >
-                <Link2 size={16} />
-              </motion.button>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -155,23 +138,16 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onFilterChange, onTodayTo
         </div>
 
         <div className="flex items-center gap-2">
-          <motion.button
-            onClick={handleShare}
-            className="flex items-center gap-2 px-4 py-2 border border-surface-300 rounded-lg text-gray-600 text-sm font-medium hover:bg-surface-100 transition-colors"
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-          >
-            <Share2 size={16} /> Share
-          </motion.button>
           <div className="flex items-center bg-surface-100 rounded-lg p-1">
             <motion.button
-              onClick={() => { setViewMode('grid'); }}
+              onClick={() => { setViewMode('grid'); onViewChange?.('grid'); }}
               className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:text-gray-600'}`}
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
             >
               <LayoutGrid size={16} />
             </motion.button>
             <motion.button
-              onClick={() => { setViewMode('list'); navigate('/tasks'); }}
+              onClick={() => { setViewMode('list'); onViewChange?.('list'); }}
               className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-primary-500 text-white' : 'text-gray-400 hover:text-gray-600'}`}
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
             >

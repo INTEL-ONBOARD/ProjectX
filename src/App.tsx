@@ -77,6 +77,47 @@ const AuthAppSync: React.FC = () => {
     return null;
 };
 
+// ── Apply appearance prefs to DOM once on login ───────────────────────────────
+// Lives at app level so navigating away from / back to SettingsPage never
+// causes a flash-to-default while the page re-fetches its own prefs.
+const ACCENT_PALETTES: Record<string, Record<string, string>> = {
+    '#5030E5': { 50:'#F0EDFF',100:'#E0DBFE',200:'#C2B7FD',300:'#A393FC',400:'#856FFB',500:'#5030E5',600:'#4024C4',700:'#301BA3',800:'#201182',900:'#100861' },
+    '#0EA5E9': { 50:'#E0F4FD',100:'#BAE7FB',200:'#7DD4F8',300:'#39BFF4',400:'#0DB1E8',500:'#0EA5E9',600:'#0385C7',700:'#0267A0',800:'#044F7B',900:'#023B59' },
+    '#10B981': { 50:'#D1FAF0',100:'#A5F3DC',200:'#6EE7C0',300:'#34D3A4',400:'#10C98E',500:'#10B981',600:'#059669',700:'#047857',800:'#065F46',900:'#064E3B' },
+    '#F59E0B': { 50:'#FFFBEB',100:'#FEF3C7',200:'#FDE68A',300:'#FCD34D',400:'#FBBF24',500:'#F59E0B',600:'#D97706',700:'#B45309',800:'#92400E',900:'#78350F' },
+    '#EF4444': { 50:'#FEF2F2',100:'#FEE2E2',200:'#FECACA',300:'#FCA5A5',400:'#F87171',500:'#EF4444',600:'#DC2626',700:'#B91C1C',800:'#991B1B',900:'#7F1D1D' },
+    '#8B5CF6': { 50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',400:'#A78BFA',500:'#8B5CF6',600:'#7C3AED',700:'#6D28D9',800:'#5B21B6',900:'#4C1D95' },
+};
+let appearanceLoaded = false;
+const AppearanceLoader: React.FC = () => {
+    const { user: authUser } = useAuth();
+    const { setTheme } = useContext(AppContext);
+    useEffect(() => {
+        if (!authUser?.id || appearanceLoaded) return;
+        appearanceLoaded = true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI?.appearancePrefs;
+        if (!api) return;
+        api.get(authUser.id).then((prefs: { themeMode: 'light'|'dark'|'system'; accentColor: string } | null) => {
+            if (!prefs) return;
+            const palette = ACCENT_PALETTES[prefs.accentColor];
+            if (palette) {
+                const root = document.documentElement;
+                Object.entries(palette).forEach(([shade, value]) => {
+                    root.style.setProperty(`--color-primary-${shade}`, value as string);
+                });
+            }
+            if (prefs.themeMode === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                setTheme(prefersDark ? 'dark' : 'light');
+            } else {
+                setTheme(prefs.themeMode);
+            }
+        }).catch(() => { /* non-fatal */ });
+    }, [authUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    return null;
+};
+
 // ── Layout wrapper ────────────────────────────────────────────────────────────
 const Layout: React.FC<{
     children: React.ReactNode;
@@ -112,10 +153,11 @@ const Layout: React.FC<{
 const KanbanRoute: React.FC = () => {
     const [filters, setFilters] = React.useState({ priority: 'all', assignees: [] as string[], dueDateFilter: 'all' });
     const [todayMode, setTodayMode] = React.useState(false);
+    const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
     return (
         <>
-            <ProjectHeader onFilterChange={setFilters} onTodayToggle={setTodayMode} />
-            <KanbanBoard filters={filters} todayMode={todayMode} />
+            <ProjectHeader onFilterChange={setFilters} onTodayToggle={setTodayMode} onViewChange={setViewMode} />
+            <KanbanBoard filters={filters} todayMode={todayMode} viewMode={viewMode} />
         </>
     );
 };
@@ -257,12 +299,25 @@ const Root: React.FC = () => {
 
     // Listen for DB disconnect/reconnect events from main process
     React.useEffect(() => {
+        // Layer 1: instant show on network loss; hide only after DB confirms reconnection
+        const handleOffline = () => setDbDisconnected(true);
+        window.addEventListener('offline', handleOffline);
+
+        // Layer 2: mongoose events via Electron IPC
+        // - disconnected: also triggers overlay as fallback (e.g. Atlas outage without internet drop)
+        // - reconnected:  the ONLY thing that hides the overlay (DB is actually ready)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
-        if (!api) return;
+        if (!api) return () => {
+            window.removeEventListener('offline', handleOffline);
+        };
         const unsubDisconnect = api.onDbDisconnected?.(() => setDbDisconnected(true));
-        const unsubReconnect = api.onDbReconnected?.(() => setDbDisconnected(false));
-        return () => { unsubDisconnect?.(); unsubReconnect?.(); };
+        const unsubReconnect  = api.onDbReconnected?.(() => setDbDisconnected(false));
+        return () => {
+            window.removeEventListener('offline', handleOffline);
+            unsubDisconnect?.();
+            unsubReconnect?.();
+        };
     }, []);
 
     // 1. Splash — show until both the animation completes AND auth has resolved
@@ -307,6 +362,7 @@ const App: React.FC = () => (
     <AuthProvider>
         <AppProvider>
             <AuthAppSync />
+            <AppearanceLoader />
             <RolePermsProvider>
                 <RolesProvider>
                 <MembersProvider>

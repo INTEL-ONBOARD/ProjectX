@@ -4,6 +4,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Accent colour palette (overridden via JS when user picks a colour) ─────── */
+:root {
+    --color-primary-50:  #F0EDFF;
+    --color-primary-100: #E0DBFE;
+    --color-primary-200: #C2B7FD;
+    --color-primary-300: #A393FC;
+    --color-primary-400: #856FFB;
+    --color-primary-500: #5030E5;
+    --color-primary-600: #4024C4;
+    --color-primary-700: #301BA3;
+    --color-primary-800: #201182;
+    --color-primary-900: #100861;
+}
+
 /* Base styles */
 * {
     margin: 0;
@@ -35,6 +49,13 @@ body[data-theme='dark'] {
 body[data-theme='dark'] #root {
     filter: saturate(0.96) brightness(0.96);
 }
+
+body[data-compact='true'] .p-4 { padding: 0.5rem !important; }
+body[data-compact='true'] .p-6 { padding: 0.75rem !important; }
+body[data-compact='true'] .gap-4 { gap: 0.5rem !important; }
+body[data-compact='true'] .gap-6 { gap: 0.75rem !important; }
+body[data-compact='true'] .py-3 { padding-top: 0.375rem !important; padding-bottom: 0.375rem !important; }
+body[data-compact='true'] .py-4 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
