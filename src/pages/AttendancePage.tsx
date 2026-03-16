@@ -46,7 +46,7 @@ const TodaySessionCard: React.FC = () => {
     if (state !== 'WORKING' && state !== 'ON_BREAK') return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [state, todayRecord?.checkIn]);
+  }, [state]);
 
   // ── Time math ───────────────────────────────────────────────────────────────
   const fmt = (ms: number) => {

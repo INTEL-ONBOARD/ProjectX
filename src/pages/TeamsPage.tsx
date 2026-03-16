@@ -431,43 +431,14 @@ const ProjectRow: React.FC<{
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const TeamsPage: React.FC = () => {
-  const { projects: contextProjects, allTasks, createProject, updateProject, deleteProject, setActiveProject } = useProjects();
+  const { projects: contextProjects, allTasks, createProject, updateProject, deleteProject, setActiveProject, projectRichData: contextRichData, setProjectRichData } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const { user: authUser } = useAuth();
   const navigate = useNavigate();
 
-  // Merge context projects with local rich display data
-  const [localRichData, setLocalRichData] = useState<Record<string, Partial<ProjectData>>>(initialRichData);
-
-  useEffect(() => {
-    dbApi().getProjectRich()
-        .then((docs: Array<{ projectId: string; description: string; status: 'active' | 'on-hold' | 'completed'; priority: 'low' | 'medium' | 'high'; memberIds: string[]; dueDate: string; starred: boolean; category: string }>) => {
-            const richMap: Record<string, Partial<ProjectData>> = {};
-            docs.forEach(d => { richMap[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category }; });
-            setLocalRichData(richMap);
-        })
-        .catch((err: unknown) => console.error('[TeamsPage] Failed to load project rich data:', err));
-  }, []);
-
-  // Real-time sync for project rich data
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI) return;
-    const unsub = electronAPI.onProjectRichChanged?.((_: unknown, payload: { op: string; doc?: { projectId: string; description: string; status: 'active' | 'on-hold' | 'completed'; priority: 'low' | 'medium' | 'high'; memberIds: string[]; dueDate: string; starred: boolean; category: string }; id?: string }) => {
-      const { op, doc } = payload;
-      if (op === 'insert' || op === 'update' || op === 'replace') {
-        if (doc) setLocalRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, dueDate: doc.dueDate, starred: doc.starred, category: doc.category } }));
-      } else if (op === 'delete') {
-        dbApi().getProjectRich().then((docs: Array<{ projectId: string; description: string; status: 'active' | 'on-hold' | 'completed'; priority: 'low' | 'medium' | 'high'; memberIds: string[]; dueDate: string; starred: boolean; category: string }>) => {
-          const richMap: Record<string, Partial<ProjectData>> = {};
-          docs.forEach(d => { richMap[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category }; });
-          setLocalRichData(richMap);
-        }).catch(() => {});
-      }
-    });
-    return () => { unsub?.(); };
-  }, []);
+  // Use rich data from ProjectContext (always live, even when off this page)
+  const localRichData = contextRichData;
+  const setLocalRichData = setProjectRichData;
 
   // Build membersById lookup for child components
   const membersById = Object.fromEntries(members.map(m => [m.id, m]));
@@ -536,9 +507,12 @@ const TeamsPage: React.FC = () => {
         .catch((err: unknown) => console.error('[TeamsPage] Failed to persist star:', err));
   };
 
-  const handleDeleteProject = (id: string) => {
-    deleteProject(id).catch(console.error);
-    dbApi().deleteProjectRich(id).catch(console.error);
+  const handleDeleteProject = async (id: string) => {
+    try {
+      await Promise.all([deleteProject(id), dbApi().deleteProjectRich(id)]);
+    } catch (err) {
+      console.error('[TeamsPage] Failed to delete project:', err);
+    }
     setLocalRichData(prev => {
       const next = { ...prev };
       delete next[id];

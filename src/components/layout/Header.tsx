@@ -92,14 +92,19 @@ const Header: React.FC = () => {
 
     return (
         <motion.header
-            className="h-16 border-b border-surface-200 flex items-center justify-between px-6 shrink-0"
-            style={{ background: 'var(--bg-header)' }}
+            className="h-16 border-b border-surface-200 flex items-center justify-between px-6 shrink-0 titlebar-drag"
+            style={{
+                background: 'var(--bg-header)',
+                // On Windows, native window controls (138px wide) overlay the top-right corner
+                // Push header content left so widgets don't sit under the buttons
+                paddingRight: (window as any).electronAPI?.platform === 'win32' ? '150px' : undefined,
+            }}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
         >
             {/* Search */}
-            <div ref={searchRef} className="relative w-[340px]">
+            <div ref={searchRef} className="relative w-[340px] titlebar-no-drag">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 <input
                     type="text"
@@ -179,7 +184,7 @@ const Header: React.FC = () => {
             </div>
 
             {/* Right section */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 titlebar-no-drag">
                 {/* Calendar with dropdown */}
                 <div ref={calendarRef} className="relative">
                     <motion.button

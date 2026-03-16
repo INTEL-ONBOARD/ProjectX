@@ -128,7 +128,7 @@ const AuthUserSchema = new mongoose_1.Schema({
 });
 const UserPrefSchema = new mongoose_1.Schema({
     userId: { type: String, required: true, unique: true },
-    theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    theme: { type: String, enum: ['light', 'dark', 'coffee'], default: 'light' },
     sidebarCollapsed: { type: Boolean, default: false },
     selectedWeekStart: { type: String, default: null },
     hasSeenWalkthrough: { type: Boolean, default: false },
@@ -160,7 +160,7 @@ const NotificationSchema = new mongoose_1.Schema({
 });
 const AppearancePrefSchema = new mongoose_1.Schema({
     userId: { type: String, required: true, unique: true },
-    themeMode: { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
+    themeMode: { type: String, enum: ['light', 'dark', 'coffee', 'system'], default: 'light' },
     accentColor: { type: String, default: '#5030E5' },
     fontSize: { type: String, enum: ['sm', 'md', 'lg'], default: 'md' },
     compactMode: { type: Boolean, default: false },
@@ -269,7 +269,7 @@ function fireSystemNotif(title, body) {
     if (!electron_1.Notification.isSupported())
         return;
     try {
-        new electron_1.Notification({ title, body, silent: false }).show();
+        new electron_1.Notification({ title, body, silent: false, icon: path_1.default.join(__dirname, '../build/icon.png') }).show();
     }
     catch (_) { }
 }
@@ -1530,6 +1530,13 @@ function createWindow() {
     }
 }
 // ─── App lifecycle ─────────────────────────────────────────────────────────────
+
+// Must be set before app is ready so Windows notifications show "Project M" not "electron.app.*"
+electron_1.app.setName('Project M');
+if (process.platform === 'win32') {
+    electron_1.app.setAppUserModelId('com.intel-onboard.projectm');
+}
+
 electron_1.app.whenReady().then(async () => {
     registerDbHandlers();
     electron_1.ipcMain.handle('update:check', () => checkForUpdates(true));

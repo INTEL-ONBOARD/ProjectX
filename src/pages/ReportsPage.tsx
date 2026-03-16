@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, BarChart3, TrendingUp, Users, AlertCircle, ChevronDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
@@ -73,6 +73,7 @@ const ReportsPage: React.FC = () => {
     return { project, statuses, total, summaryBar };
   }), [ctxProjects, ctxAllTasks]);
 
+  const saveSnapshotRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!user || !snapshotLoaded) return;
     const counts: Record<string, number> = {};
@@ -80,7 +81,12 @@ const ReportsPage: React.FC = () => {
       statuses.forEach(s => { counts[`${project.id}:${s.key}`] = s.count; })
     );
     previousCounts.current = counts;
-    userPrefsApi().set({ userId: user.id, taskBreakdownSnapshot: counts }).catch(() => {});
+    // Debounce: only persist to DB if stats haven't changed for 1s
+    if (saveSnapshotRef.current) clearTimeout(saveSnapshotRef.current);
+    saveSnapshotRef.current = setTimeout(() => {
+      userPrefsApi().set({ userId: user.id, taskBreakdownSnapshot: counts }).catch(() => {});
+    }, 1000);
+    return () => { if (saveSnapshotRef.current) clearTimeout(saveSnapshotRef.current); };
   }, [perProjectStats, user?.id, snapshotLoaded]);
 
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());

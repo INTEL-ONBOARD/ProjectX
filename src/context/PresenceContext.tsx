@@ -7,8 +7,8 @@ const dbApi = () => (window as any).electronAPI.db;
 export function getPresenceStatus(lastSeen?: string | null): 'online' | 'away' | 'offline' {
     if (!lastSeen) return 'offline';
     const diffMs = Date.now() - new Date(lastSeen).getTime();
-    if (diffMs < 8_000) return 'online';
-    if (diffMs < 20_000) return 'away';
+    if (diffMs < 12_000) return 'online';
+    if (diffMs < 25_000) return 'away';
     return 'offline';
 }
 

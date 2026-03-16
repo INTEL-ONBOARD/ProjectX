@@ -5,11 +5,23 @@ import { useAuth } from './AuthContext';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = () => (window as any).electronAPI.db;
 
+export interface ProjectRichData {
+  description: string;
+  status: 'active' | 'on-hold' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  memberIds: string[];
+  dueDate: string;
+  starred: boolean;
+  category: string;
+}
+
 interface ProjectContextValue {
   projects: Project[];
   allTasks: Task[];
   activeProject: string;
   setActiveProject: (id: string) => void;
+  projectRichData: Record<string, Partial<ProjectRichData>>;
+  setProjectRichData: React.Dispatch<React.SetStateAction<Record<string, Partial<ProjectRichData>>>>;
   createProject: (name: string, color: string) => Promise<Project>;
   updateProject: (id: string, changes: Partial<Pick<Project, 'name' | 'color'>>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
@@ -33,6 +45,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [projects, setProjects] = useState<Project[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [activeProject, setActiveProject] = useState<string>('');
+  const [projectRichData, setProjectRichData] = useState<Record<string, Partial<ProjectRichData>>>({});
   const [loading, setLoading] = useState(true);
   const { user: authUser } = useAuth() ?? { user: null };
 
@@ -100,6 +113,32 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => { unsubProject?.(); unsubTask?.(); unsubReconnect?.(); };
   }, []);
 
+  // Load project rich data and keep it live via change stream
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toRichMap = (docs: any[]): Record<string, Partial<ProjectRichData>> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const m: Record<string, Partial<ProjectRichData>> = {};
+      docs.forEach((d: any) => { m[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category }; });
+      return m;
+    };
+    api().getProjectRich().then((docs: unknown[]) => setProjectRichData(toRichMap(docs as any[]))).catch(() => {});
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsub = electronAPI.onProjectRichChanged?.((_: unknown, payload: { op: string; doc?: any }) => {
+      const { op, doc } = payload;
+      if (op === 'insert' || op === 'update' || op === 'replace') {
+        if (doc) setProjectRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, dueDate: doc.dueDate, starred: doc.starred, category: doc.category } }));
+      } else if (op === 'delete') {
+        api().getProjectRich().then((docs: unknown[]) => setProjectRichData(toRichMap(docs as any[]))).catch(() => {});
+      }
+    });
+    return () => { unsub?.(); };
+  }, []);
+
   const createProject = async (name: string, color: string): Promise<Project> => {
     const newProject = await api().createProject(name, color) as Project;
     setProjects(prev => [...prev, newProject]);
@@ -160,6 +199,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <ProjectContext.Provider value={{
       projects, allTasks, activeProject, setActiveProject, loading,
+      projectRichData, setProjectRichData,
       createProject, updateProject, deleteProject,
       createTask, updateTask, deleteTask, moveTask, scrubAssignee,
     }}>

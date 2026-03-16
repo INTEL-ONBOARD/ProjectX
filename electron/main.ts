@@ -102,7 +102,7 @@ const AuthUserSchema = new Schema({
 
 const UserPrefSchema = new Schema({
     userId:               { type: String, required: true, unique: true },
-    theme:                { type: String, enum: ['light', 'dark'], default: 'light' },
+    theme:                { type: String, enum: ['light', 'dark', 'coffee'], default: 'light' },
     sidebarCollapsed:     { type: Boolean, default: false },
     selectedWeekStart:    { type: String, default: null },
     hasSeenWalkthrough:   { type: Boolean, default: false },
@@ -137,7 +137,7 @@ const NotificationSchema = new Schema({
 
 const AppearancePrefSchema = new Schema({
     userId:      { type: String, required: true, unique: true },
-    themeMode:   { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
+    themeMode:   { type: String, enum: ['light', 'dark', 'coffee', 'system'], default: 'light' },
     accentColor: { type: String, default: '#5030E5' },
     fontSize:    { type: String, enum: ['sm', 'md', 'lg'], default: 'md' },
     compactMode: { type: Boolean, default: false },
@@ -257,7 +257,7 @@ const systemNotifsEnabled = new Map<string, boolean>();
 function fireSystemNotif(title: string, body: string): void {
     if (!Notification.isSupported()) return;
     try {
-        new Notification({ title, body, silent: false }).show();
+        new Notification({ title, body, silent: false, icon: path.join(__dirname, '../build/icon.png') }).show();
     } catch (_) {}
 }
 
@@ -1319,6 +1319,12 @@ function createWindow() {
 }
 
 // ─── App lifecycle ─────────────────────────────────────────────────────────────
+
+// Must be set before app is ready so Windows notifications show "Project M" not "electron.app.*"
+app.setName('Project M');
+if (process.platform === 'win32') {
+    app.setAppUserModelId('com.intel-onboard.projectm');
+}
 
 app.whenReady().then(async () => {
     registerDbHandlers();
