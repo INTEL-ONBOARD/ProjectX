@@ -183,6 +183,30 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     const onMessagesPage = location.pathname === '/messages';
 
+    const sensors = useSensors(useSensor(PointerSensor));
+
+    const handleDragEnd = async (event: DragEndEvent) => {
+        if (!user?.id) return;
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = orderedNavIds.indexOf(active.id as string);
+        const newIndex = orderedNavIds.indexOf(over.id as string);
+        const newOrder = arrayMove(orderedNavIds, oldIndex, newIndex);
+
+        setNavOrder(newOrder);
+
+        // Fire-and-forget save: read full prefs, merge navOrder, write back
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const api = (window as any).electronAPI;
+            const current = await api?.userPrefs?.get(user?.id);
+            await api?.userPrefs?.set({ ...current, navOrder: newOrder });
+        } catch (err) {
+            console.error('[Sidebar] Failed to save navOrder:', err);
+        }
+    };
+
     useEffect(() => {
         const handler = (e: MouseEvent) => {
             if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -293,52 +317,31 @@ const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Navigation */}
             <nav className="mt-4 px-3 flex-1 flex flex-col min-h-0">
-                <ul className="space-y-1 shrink-0">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = location.pathname === item.id;
-                        return (
-                            <motion.li key={item.id} whileHover={{ x: 2 }} transition={{ duration: 0.15 }} className="relative">
-                                {isActive && (
-                                    <motion.div
-                                        className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-500 rounded-r-full"
-                                        layoutId="nav-indicator"
-                                        transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                                    />
-                                )}
-                                <button
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext
+                        items={navItems.map(i => i.id)}
+                        strategy={verticalListSortingStrategy}
+                        disabled={collapsed}
+                    >
+                        <ul className="space-y-1">
+                            {navItems.map((item) => (
+                                <SortableNavItem
+                                    key={item.id}
+                                    item={item}
+                                    isActive={location.pathname === item.id}
+                                    collapsed={collapsed}
+                                    unreadMsgCount={unreadMsgCount}
+                                    onMessagesPage={onMessagesPage}
                                     onClick={() => navigate(item.id)}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${isActive
-                                        ? 'bg-primary-50 text-primary-600'
-                                        : 'text-gray-500 hover:bg-surface-100 hover:text-gray-700'
-                                        }`}
-                                >
-                                    <div className="relative shrink-0">
-                                        <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
-                                        {item.id === '/messages' && unreadMsgCount > 0 && !onMessagesPage && (
-                                            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] rounded-full bg-primary-500 text-white text-[9px] font-bold flex items-center justify-center px-1 leading-none">
-                                                {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <AnimatePresence>
-                                        {!collapsed && (
-                                            <motion.span
-                                                className="text-sm font-medium whitespace-nowrap"
-                                                initial={{ opacity: 0, width: 0 }}
-                                                animate={{ opacity: 1, width: 'auto' }}
-                                                exit={{ opacity: 0, width: 0 }}
-                                                transition={{ duration: 0.2 }}
-                                            >
-                                                {item.label}
-                                            </motion.span>
-                                        )}
-                                    </AnimatePresence>
-                                </button>
-                            </motion.li>
-                        );
-                    })}
-                </ul>
+                                />
+                            ))}
+                        </ul>
+                    </SortableContext>
+                </DndContext>
 
                 {/* My Projects section */}
                 <AnimatePresence>
