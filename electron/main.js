@@ -186,6 +186,30 @@ const toTask = d => ({ id: d.appId, title: d.title, description: d.description ?
 
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
+const toMsg = d => ({ id: d.msgId, from: d.fromId, to: d.toId, text: d.text, time: d.timestamp, read: false, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
+
+let messageStream = null;
+
+function startMessageStream() {
+    if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
+    try {
+        messageStream = MessageModel.watch([{ $match: { operationType: 'insert' } }]);
+        messageStream.on('change', change => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const d = change.fullDocument;
+            if (!d) return;
+            mainWindow.webContents.send('msg:new', toMsg(d));
+        });
+        messageStream.on('error', err => {
+            console.error('[changeStream] error:', err.message);
+            messageStream = null;
+        });
+        console.log('[changeStream] message stream started');
+    } catch (err) {
+        console.error('[changeStream] failed to start:', err.message);
+    }
+}
+
 async function connectDB() {
     const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectx?retryWrites=true&w=majority';
     if (!uri) { console.error('MONGODB_URI not set'); return; }
@@ -252,8 +276,6 @@ function registerDbHandlers() {
     ipcMain.handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
 
     // Messages
-    const toMsg = d => ({ id: d.msgId, from: d.fromId, to: d.toId, text: d.text, time: d.timestamp, read: false, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
-
     ipcMain.handle('db:messages:getBetween', async (_e, userId, peerId) => {
         const msgs = await MessageModel.find({ $or: [{ fromId: userId, toId: peerId }, { fromId: peerId, toId: userId }] }).sort({ timestamp: 1 }).lean();
         return safe(msgs.map(toMsg));
@@ -599,6 +621,7 @@ function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
         if (autoUpdater) setTimeout(() => checkForUpdates(), 3000);
+        startMessageStream();
     });
 
     mainWindow.on('closed', () => { mainWindow = null; });
@@ -616,5 +639,8 @@ app.whenReady().then(async () => {
     createWindow();
 });
 
+app.on('before-quit', () => {
+    if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
