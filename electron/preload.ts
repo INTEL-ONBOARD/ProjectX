@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // App info
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
     openExternal: (url: string): Promise<void> => ipcRenderer.invoke('app:openExternal', url),
+    setTitleBarColor: (color: string, symbolColor: string): Promise<boolean> => ipcRenderer.invoke('app:setTitleBarColor', color, symbolColor),
     getLoginItemSettings: (): Promise<{ openAtLogin: boolean }> => ipcRenderer.invoke('app:getLoginItemSettings'),
     setOpenAtLogin: (value: boolean): Promise<boolean> => ipcRenderer.invoke('app:setOpenAtLogin', value),
     getBackgroundMode: (): Promise<boolean> => ipcRenderer.invoke('app:getBackgroundMode'),

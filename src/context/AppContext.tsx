@@ -191,9 +191,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return () => { unsub?.(); unsubReconnect?.(); };
     }, []);
 
-    // Apply theme to DOM
+    // Apply theme to DOM and sync Windows title bar color
     useEffect(() => {
         document.body.dataset.theme = theme;
+        // Only relevant on Windows — no-op on other platforms
+        const titleBarColors: Record<string, { bg: string; symbol: string }> = {
+            dark:   { bg: '#1A1F35', symbol: '#CBD5E1' },
+            coffee: { bg: '#1E120B', symbol: '#C4A98A' },
+            light:  { bg: '#FFFFFF', symbol: '#374151' },
+        };
+        const c = titleBarColors[theme] ?? titleBarColors.dark;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).electronAPI?.setTitleBarColor?.(c.bg, c.symbol);
     }, [theme]);
 
     const setTheme = useCallback((t: 'light' | 'dark' | 'coffee') => {

@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Calendar, HelpCircle, Bell, ChevronDown, BookOpen, PlayCircle, Headphones, Bug, LogOut, Settings, CheckSquare, Users, MessageCircle, CheckSquare2, Clock } from 'lucide-react';
+import { Search, Calendar, HelpCircle, Bell, ChevronDown, BookOpen, PlayCircle, Headphones, Bug, LogOut, Settings, CheckSquare, Users, MessageCircle, CheckSquare2, Clock, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -277,11 +277,16 @@ const Header: React.FC = () => {
                                     <div className="max-h-72 overflow-y-auto">
                                         {notifications.slice(0, 15).map(notif => {
                                             const IconComp = notif.type === 'new_message' ? MessageCircle
-                                                : notif.type === 'task_assigned' ? CheckSquare2 : Clock;
+                                                : notif.type === 'task_assigned' ? CheckSquare2
+                                                : notif.type === 'permission_request' ? ShieldAlert
+                                                : Clock;
                                             const iconColor = notif.type === 'new_message' ? 'text-primary-500 bg-primary-50'
                                                 : notif.type === 'task_assigned' ? 'text-[#68B266] bg-[#83C29D20]'
+                                                : notif.type === 'permission_request' ? 'text-[#D97706] bg-[#D9770615]'
                                                 : 'text-[#D8727D] bg-[#D8727D15]';
-                                            const navTarget = notif.type === 'new_message' ? '/messages' : '/tasks';
+                                            const navTarget = notif.type === 'new_message' ? '/messages'
+                                                : notif.type === 'permission_request' ? '/users'
+                                                : '/tasks';
                                             return (
                                                 <button
                                                     key={notif.id}

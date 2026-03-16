@@ -44,7 +44,7 @@ import MembersPage from './pages/MembersPage';
 import UsersPage from './pages/UsersPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AppProvider, AppContext, User } from './context/AppContext';
-import { MembersProvider } from './context/MembersContext';
+import { MembersProvider, useMembersContext } from './context/MembersContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RolePermsProvider, useRolePerms } from './context/RolePermsContext';
 import { RolesProvider } from './context/RolesContext';
@@ -218,19 +218,118 @@ const AuthScreens: React.FC = () => {
     );
 };
 
+// ── Permission-denied modal ───────────────────────────────────────────────────
+const PermissionDeniedModal: React.FC<{ path: string; onClose: () => void }> = ({ path, onClose }) => {
+    const { user } = useAuth();
+    const { members } = useMembersContext();
+    const [requested, setRequested] = React.useState(false);
+    const [sending, setSending] = React.useState(false);
+
+    const pageName = path === '/' ? 'Task Board'
+        : path.slice(1).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+    const handleRequest = async () => {
+        if (!user || requested) return;
+        setSending(true);
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const api = (window as any).electronAPI;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const admins = members.filter((m: any) => m.role === 'admin');
+            const refId = `permreq-${user.id}-${path}-${Date.now()}`;
+            for (const admin of admins) {
+                await api.notifs.create({
+                    userId: admin.id,
+                    type: 'permission_request',
+                    title: `${user.name} requested access`,
+                    body: `Wants permission to access ${pageName}`,
+                    refId,
+                });
+            }
+            setRequested(true);
+        } catch { /* ignore */ }
+        setSending(false);
+    };
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.45)' }}>
+            <motion.div
+                initial={{ scale: 0.92, opacity: 0, y: 16 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.92, opacity: 0, y: 16 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="rounded-2xl p-8 w-full max-w-sm mx-4 flex flex-col items-center text-center"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}
+            >
+                {/* Icon */}
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ background: 'rgba(220,38,38,0.12)' }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                </div>
+
+                {/* Text */}
+                <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Access Restricted</h2>
+                <p className="text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>
+                    You don't have permission to access <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{pageName}</span>.
+                </p>
+                <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Contact your admin or request access below.</p>
+
+                {/* Actions */}
+                <div className="flex flex-col gap-2.5 w-full">
+                    {!requested ? (
+                        <button
+                            onClick={handleRequest}
+                            disabled={sending}
+                            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-primary-500 hover:bg-primary-600 transition-colors disabled:opacity-60"
+                        >
+                            {sending ? 'Sending…' : 'Request Permission'}
+                        </button>
+                    ) : (
+                        <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center" style={{ background: 'rgba(34,197,94,0.12)', color: '#4ADE80' }}>
+                            ✓ Request sent to admin
+                        </div>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 rounded-xl text-sm font-semibold transition-colors" style={{ color: 'var(--text-muted)' }}
+                    >
+                        Go Back
+                    </button>
+                </div>
+            </motion.div>
+        </div>
+    );
+};
+
 // ── Route guard ───────────────────────────────────────────────────────────────
 const ProtectedRoute: React.FC<{ path: string; children: React.ReactNode }> = ({ path, children }) => {
     const { user } = useAuth();
     const { getAllowedRoutes } = useRolePerms();
     const navigate = useNavigate();
+    const [showDenied, setShowDenied] = React.useState(false);
     // Admins always have full access — never restrict them
     const isAdmin = user?.role === 'admin';
     const allowed = isAdmin ? null : getAllowedRoutes(user?.role ?? 'member');
     const blocked = !isAdmin && allowed !== null && !allowed.includes(path);
+
     useEffect(() => {
-        if (blocked) navigate('/settings', { replace: true });
-    }, [blocked, navigate]);
-    if (blocked) return null;
+        if (blocked) setShowDenied(true);
+    }, [blocked]);
+
+    if (blocked) {
+        return (
+            <AnimatePresence>
+                {showDenied && (
+                    <PermissionDeniedModal
+                        path={path}
+                        onClose={() => { setShowDenied(false); navigate(-1); }}
+                    />
+                )}
+            </AnimatePresence>
+        );
+    }
     return <>{children}</>;
 };
 

@@ -127,7 +127,7 @@ const NotifPrefSchema = new Schema({
 const NotificationSchema = new Schema({
     notifId:   { type: String, required: true, unique: true },
     userId:    { type: String, required: true },
-    type:      { type: String, enum: ['task_overdue', 'task_assigned', 'new_message'], required: true },
+    type:      { type: String, enum: ['task_overdue', 'task_assigned', 'new_message', 'permission_request'], required: true },
     title:     { type: String, required: true },
     body:      { type: String, default: '' },
     refId:     { type: String, default: '' },
@@ -1269,9 +1269,15 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
         },
-        titleBarStyle: 'hiddenInset',
+        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
         trafficLightPosition: { x: 15, y: 15 },
-        backgroundColor: '#F5F5F5',
+        // Windows: overlay the native title bar buttons with theme-matching colors
+        titleBarOverlay: process.platform === 'win32' ? {
+            color: '#1A1F35',
+            symbolColor: '#CBD5E1',
+            height: 40,
+        } : false,
+        backgroundColor: '#1A1F35',
         autoHideMenuBar: true,
         show: false,
     });
@@ -1313,6 +1319,12 @@ app.whenReady().then(async () => {
     ipcMain.handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
     ipcMain.handle('app:version', () => app.getVersion());
     ipcMain.handle('app:openExternal', (_e, url: string) => shell.openExternal(url));
+    ipcMain.handle('app:setTitleBarColor', (_e, color: string, symbolColor: string) => {
+        if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setTitleBarOverlay({ color, symbolColor, height: 40 });
+        }
+        return true;
+    });
     ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings());
     ipcMain.handle('app:setOpenAtLogin', (_e, value: boolean) => { app.setLoginItemSettings({ openAtLogin: value }); return true; });
     ipcMain.handle('app:getBackgroundMode', () => backgroundModeEnabled);

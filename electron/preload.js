@@ -6,6 +6,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     // App info
     getVersion: () => electron_1.ipcRenderer.invoke('app:version'),
     openExternal: (url) => electron_1.ipcRenderer.invoke('app:openExternal', url),
+    setTitleBarColor: (color, symbolColor) => electron_1.ipcRenderer.invoke('app:setTitleBarColor', color, symbolColor),
     getLoginItemSettings: () => electron_1.ipcRenderer.invoke('app:getLoginItemSettings'),
     setOpenAtLogin: (value) => electron_1.ipcRenderer.invoke('app:setOpenAtLogin', value),
     getBackgroundMode: () => electron_1.ipcRenderer.invoke('app:getBackgroundMode'),

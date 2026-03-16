@@ -151,7 +151,7 @@ const NotifPrefSchema = new mongoose_1.Schema({
 const NotificationSchema = new mongoose_1.Schema({
     notifId: { type: String, required: true, unique: true },
     userId: { type: String, required: true },
-    type: { type: String, enum: ['task_overdue', 'task_assigned', 'new_message'], required: true },
+    type: { type: String, enum: ['task_overdue', 'task_assigned', 'new_message', 'permission_request'], required: true },
     title: { type: String, required: true },
     body: { type: String, default: '' },
     refId: { type: String, default: '' },
@@ -1482,9 +1482,15 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
         },
-        titleBarStyle: 'hiddenInset',
+        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
         trafficLightPosition: { x: 15, y: 15 },
-        backgroundColor: '#F5F5F5',
+        // Windows: overlay the native title bar buttons with theme-matching colors
+        titleBarOverlay: process.platform === 'win32' ? {
+            color: '#1A1F35',
+            symbolColor: '#CBD5E1',
+            height: 40,
+        } : false,
+        backgroundColor: '#1A1F35',
         autoHideMenuBar: true,
         show: false,
     });
@@ -1523,6 +1529,12 @@ electron_1.app.whenReady().then(async () => {
         autoUpdater.quitAndInstall(false, true); });
     electron_1.ipcMain.handle('app:version', () => electron_1.app.getVersion());
     electron_1.ipcMain.handle('app:openExternal', (_e, url) => electron_1.shell.openExternal(url));
+    electron_1.ipcMain.handle('app:setTitleBarColor', (_e, color, symbolColor) => {
+        if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setTitleBarOverlay({ color, symbolColor, height: 40 });
+        }
+        return true;
+    });
     electron_1.ipcMain.handle('app:getLoginItemSettings', () => electron_1.app.getLoginItemSettings());
     electron_1.ipcMain.handle('app:setOpenAtLogin', (_e, value) => { electron_1.app.setLoginItemSettings({ openAtLogin: value }); return true; });
     electron_1.ipcMain.handle('app:getBackgroundMode', () => backgroundModeEnabled);

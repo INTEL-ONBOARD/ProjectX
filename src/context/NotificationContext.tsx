@@ -6,7 +6,7 @@ import { useMembersContext } from './MembersContext';
 export interface AppNotification {
     id: string;
     userId: string;
-    type: 'task_overdue' | 'task_assigned' | 'new_message';
+    type: 'task_overdue' | 'task_assigned' | 'new_message' | 'permission_request';
     title: string;
     body: string;
     refId: string;
