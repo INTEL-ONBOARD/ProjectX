@@ -32,6 +32,7 @@ const TaskSchema = new Schema({
     images:      [String],
     dueDate:     String,
     projectId:   String,
+    activity:    { type: Array, default: [] },
 });
 
 const ProjectSchema = new Schema({
@@ -185,7 +186,7 @@ const toUser = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '',
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null });
+const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser    = (d: any) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -299,10 +300,70 @@ function registerDbHandlers() {
 
     // Tasks
     ipcMain.handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
-    ipcMain.handle('db:tasks:create', async (_e, taskData: object) => { const d = await TaskModel.create({ appId: `t${Date.now()}`, ...taskData }); return safe(toTask(d.toObject())); });
-    ipcMain.handle('db:tasks:update', async (_e, id: string, changes: object) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toTask(d)) : null; });
+    ipcMain.handle('db:tasks:create', async (_e, taskData: any) => {
+        const { actorId, actorName, ...rest } = taskData;
+        const entry = {
+            id: crypto.randomUUID(),
+            type: 'created',
+            actorId: actorId ?? 'system',
+            actorName: actorName ?? 'System',
+            timestamp: new Date().toISOString(),
+        };
+        const doc = await TaskModel.create({ appId: 't' + Date.now(), ...rest, activity: [entry] });
+        return safe(toTask(doc.toObject()));
+    });
+    ipcMain.handle('db:tasks:update', async (_e, id: string, changes: any) => {
+        const { actorId, actorName, ...rest } = changes;
+        const actor = { actorId: actorId ?? 'system', actorName: actorName ?? 'System' };
+        const current = await TaskModel.findOne({ appId: id }).lean();
+        if (!current) return null;
+        const entries: any[] = [];
+        const ts = new Date().toISOString();
+        const scalarFields: [string, string][] = [
+            ['status', 'status_changed'], ['priority', 'priority_changed'],
+            ['dueDate', 'due_date_changed'], ['title', 'title_changed'],
+            ['description', 'description_changed'],
+        ];
+        for (const [field, type] of scalarFields) {
+            if (rest[field] !== undefined && String(rest[field]) !== String((current as any)[field] ?? '')) {
+                entries.push({ id: crypto.randomUUID(), type, ...actor, timestamp: ts, from: String((current as any)[field] ?? ''), to: String(rest[field]) });
+            }
+        }
+        if (rest.assignees !== undefined) {
+            const oldSet = new Set<string>((current as any).assignees ?? []);
+            const newSet = new Set<string>(rest.assignees);
+            for (const a of newSet) {
+                if (!oldSet.has(a)) entries.push({ id: crypto.randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
+            }
+            for (const a of oldSet) {
+                if (!newSet.has(a)) entries.push({ id: crypto.randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
+            }
+        }
+        const updateDoc: any = { $set: { ...rest } };
+        if (entries.length > 0) updateDoc.$push = { activity: { $each: entries } };
+        const updated = await TaskModel.findOneAndUpdate({ appId: id }, updateDoc, { returnDocument: 'after' });
+        return updated ? safe(toTask(updated.toObject())) : null;
+    });
     ipcMain.handle('db:tasks:delete', async (_e, id: string) => { await TaskModel.deleteOne({ appId: id }); return true; });
-    ipcMain.handle('db:tasks:move', async (_e, id: string, newStatus: string) => { const d = await TaskModel.findOneAndUpdate({ appId: id }, { status: newStatus }, { returnDocument: 'after' }).lean(); return d ? safe(toTask(d)) : null; });
+    ipcMain.handle('db:tasks:move', async (_e, id: string, newStatus: string, actorId?: string, actorName?: string) => {
+        const current = await TaskModel.findOne({ appId: id }).lean();
+        if (!current) return null;
+        const entry = {
+            id: crypto.randomUUID(),
+            type: 'status_changed',
+            actorId: actorId ?? 'system',
+            actorName: actorName ?? 'System',
+            timestamp: new Date().toISOString(),
+            from: (current as any).status,
+            to: newStatus,
+        };
+        const updated = await TaskModel.findOneAndUpdate(
+            { appId: id },
+            { $set: { status: newStatus }, $push: { activity: entry } },
+            { returnDocument: 'after' }
+        );
+        return updated ? safe(toTask(updated.toObject())) : null;
+    });
     ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId: string) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
 
     // Members
