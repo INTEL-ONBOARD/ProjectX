@@ -59,6 +59,94 @@ const ALL_NAV_ITEMS = [
     { id: '/settings', label: 'Settings', icon: Settings },
 ];
 
+interface SortableNavItemProps {
+    item: { id: string; label: string; icon: React.ElementType };
+    isActive: boolean;
+    collapsed: boolean;
+    unreadMsgCount: number;
+    onMessagesPage: boolean;
+    onClick: () => void;
+}
+
+const SortableNavItem: React.FC<SortableNavItemProps> = ({
+    item,
+    isActive,
+    collapsed,
+    unreadMsgCount,
+    onMessagesPage,
+    onClick,
+}) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: item.id });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    const Icon = item.icon;
+
+    return (
+        <li ref={setNodeRef} style={style} className="relative">
+            {isActive && (
+                <motion.div
+                    className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-500 rounded-r-full"
+                    layoutId="nav-indicator"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+            )}
+            <div className="flex items-center group">
+                {!collapsed && (
+                    <span
+                        {...attributes}
+                        {...listeners}
+                        className="pl-1 pr-0.5 py-2.5 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing shrink-0"
+                        title="Drag to reorder"
+                    >
+                        <GripVertical size={14} />
+                    </span>
+                )}
+                <button
+                    onClick={onClick}
+                    className={`flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${isActive
+                        ? 'bg-primary-50 text-primary-600'
+                        : 'text-gray-500 hover:bg-surface-100 hover:text-gray-700'
+                        }`}
+                >
+                    <div className="relative shrink-0">
+                        <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                        {item.id === '/messages' && unreadMsgCount > 0 && !onMessagesPage && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] rounded-full bg-primary-500 text-white text-[9px] font-bold flex items-center justify-center px-1 leading-none">
+                                {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
+                            </span>
+                        )}
+                    </div>
+                    <AnimatePresence>
+                        {!collapsed && (
+                            <motion.span
+                                className="text-sm font-medium whitespace-nowrap"
+                                initial={{ opacity: 0, width: 0 }}
+                                animate={{ opacity: 1, width: 'auto' }}
+                                exit={{ opacity: 0, width: 0 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                {item.label}
+                            </motion.span>
+                        )}
+                    </AnimatePresence>
+                </button>
+            </div>
+        </li>
+    );
+};
+
 const Sidebar: React.FC<SidebarProps> = ({
     collapsed,
     onToggle,
