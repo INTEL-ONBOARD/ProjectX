@@ -72,18 +72,36 @@ const MessagesPage: React.FC = () => {
     }));
   }, [activeId]);
 
-  // Load messages from DB when active peer changes, then poll every 5s
+  // Load messages from DB when active peer changes (one-time fetch)
   useEffect(() => {
     if (!activeMember) return;
     const peerId = activeMember.id;
-    const fetch = () =>
-      dbApi().getMessagesBetween(currentUserId, peerId)
-          .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [peerId]: msgs })))
-          .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
-    fetch();
-    const pollId = setInterval(fetch, 5_000);
-    return () => clearInterval(pollId);
+    dbApi().getMessagesBetween(currentUserId, peerId)
+        .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [peerId]: msgs })))
+        .catch((err: unknown) => console.error('[MessagesPage] Failed to load messages:', err));
   }, [activeMember?.id, currentUserId]);
+
+  // Real-time: listen for new messages pushed from main via change stream
+  useEffect(() => {
+    if (!currentUserId) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).electronAPI;
+    if (!api?.onNewMessage) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsub = api.onNewMessage((_: unknown, msg: any) => {
+      // Skip messages the current user sent (already shown via optimistic update)
+      if (msg.from === currentUserId) return;
+      // Skip messages not addressed to the current user
+      if (msg.to !== currentUserId) return;
+      const peerId = msg.from;
+      setChats(prev => {
+        const existing = prev[peerId] ?? [];
+        if (existing.some((m: Msg) => m.id === msg.id)) return prev;
+        return { ...prev, [peerId]: [...existing, { id: msg.id, from: msg.from, text: msg.text, time: msg.time, read: false }] };
+      });
+    });
+    return () => unsub?.();
+  }, [currentUserId]);
 
   // Load conv meta (pin/star/archive) on mount
   useEffect(() => {
