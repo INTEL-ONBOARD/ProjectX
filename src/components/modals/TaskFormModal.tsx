@@ -27,7 +27,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [priority, setPriority]     = useState<'low' | 'high'>(initial?.priority === 'high' ? 'high' : 'low');
   const [assignees, setAssignees]   = useState<string[]>(initial?.assignees ?? []);
   const [projectId, setProjectId]   = useState(initial?.projectId ?? '');
-  const [startDate, setStartDate]   = useState(initial?.startDate ?? '');
+  const [startDate, setStartDate]   = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate]       = useState(initial?.dueDate ?? '');
   const [loading, setLoading]       = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState('');

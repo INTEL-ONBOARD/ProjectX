@@ -237,6 +237,7 @@ let tray: Tray | null = null;
 let backgroundModeEnabled = false;
 // Fix 1: flag set once ready-to-show fires — prevents streams from starting before window exists
 let windowReady = false;
+let activeUserId = ''; // set on login, used to gate OS notifications to this machine's user
 
 let messageStream: any = null;
 let projectStream: any = null;
@@ -277,9 +278,9 @@ function startMessageStream(): void {
             if (!d) return;
             if (op === 'insert') {
                 mainWindow.webContents.send('msg:new', toMsgFrontend(d));
-                // System notification for the recipient
+                // System notification — only fire on the machine where the recipient is logged in
                 const recipientId: string = d.toId;
-                if (systemNotifsEnabled.get(recipientId) !== false) {
+                if (recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
                     // Look up sender name async (best-effort)
                     UserModel.findOne({ appId: d.fromId }).lean().then((sender: any) => {
                         const name = sender?.name ?? 'New message';
@@ -1360,6 +1361,7 @@ app.whenReady().then(async () => {
         applyBackgroundMode(value);
         return true;
     });
+    ipcMain.handle('app:setActiveUser', (_e, userId: string) => { activeUserId = userId ?? ''; });
     ipcMain.handle('app:getSystemNotifsEnabled', async (_e, userId: string) => {
         // Load from DB if not yet cached
         if (!systemNotifsEnabled.has(userId)) {

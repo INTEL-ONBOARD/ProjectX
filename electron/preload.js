@@ -11,6 +11,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     setOpenAtLogin: (value) => electron_1.ipcRenderer.invoke('app:setOpenAtLogin', value),
     getBackgroundMode: () => electron_1.ipcRenderer.invoke('app:getBackgroundMode'),
     setBackgroundMode: (value) => electron_1.ipcRenderer.invoke('app:setBackgroundMode', value),
+    setActiveUser: (userId) => electron_1.ipcRenderer.invoke('app:setActiveUser', userId),
     getSystemNotifsEnabled: (userId) => electron_1.ipcRenderer.invoke('app:getSystemNotifsEnabled', userId),
     setSystemNotifsEnabled: (userId, value) => electron_1.ipcRenderer.invoke('app:setSystemNotifsEnabled', userId, value),
     // Update controls

@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setOpenAtLogin: (value: boolean): Promise<boolean> => ipcRenderer.invoke('app:setOpenAtLogin', value),
     getBackgroundMode: (): Promise<boolean> => ipcRenderer.invoke('app:getBackgroundMode'),
     setBackgroundMode: (value: boolean): Promise<boolean> => ipcRenderer.invoke('app:setBackgroundMode', value),
+    setActiveUser: (userId: string): Promise<void> => ipcRenderer.invoke('app:setActiveUser', userId),
     getSystemNotifsEnabled: (userId: string): Promise<boolean> => ipcRenderer.invoke('app:getSystemNotifsEnabled', userId),
     setSystemNotifsEnabled: (userId: string, value: boolean): Promise<boolean> => ipcRenderer.invoke('app:setSystemNotifsEnabled', userId, value),
 

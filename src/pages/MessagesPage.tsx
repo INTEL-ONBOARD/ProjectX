@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Send, Search, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, Trash2, X, MessageSquare } from 'lucide-react';
+import { Plus, Send, Search, Paperclip, Smile, Check, CheckCheck, Pin, Star, Archive, ArchiveRestore, Trash2, X, MessageSquare } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
@@ -20,12 +20,66 @@ const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
 const fmtTime = (t: string) => {
   if (!t) return '';
-  try {
-    return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return t; // fallback for legacy HH:MM strings already in DB
+  const d = new Date(t);
+  if (!isNaN(d.getTime())) return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  // Legacy strings: "22:38" (already 24h) or "10:41 PM" (12h AM/PM) — parse both
+  const ampm = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const m = ampm[2];
+    const period = ampm[3].toUpperCase();
+    if (period === 'AM' && h === 12) h = 0;
+    if (period === 'PM' && h !== 12) h += 12;
+    return `${String(h).padStart(2, '0')}:${m}`;
   }
+  return t; // already "HH:MM" 24h — return as-is
 };
+
+const isoMs = (t: string): number | null => {
+  if (!t) return null;
+  const ms = new Date(t).getTime();
+  return isNaN(ms) ? null : ms;
+};
+
+// Convert any timestamp to epoch ms for sorting.
+// ISO strings → real epoch ms.
+// Legacy "HH:MM" or "H:MM AM/PM" → today's date at that time (epoch ms).
+// Unknown → null.
+const sortKey = (t: string): number | null => {
+  if (!t) return null;
+  // Try ISO first
+  const ms = new Date(t).getTime();
+  if (!isNaN(ms)) return ms;
+  // Try legacy 12h "H:MM AM/PM"
+  const ampm = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const m = parseInt(ampm[2], 10);
+    const period = ampm[3].toUpperCase();
+    if (period === 'AM' && h === 12) h = 0;
+    if (period === 'PM' && h !== 12) h += 12;
+    const d = new Date(); d.setHours(h, m, 0, 0);
+    return d.getTime();
+  }
+  // Try legacy 24h "HH:MM"
+  const hhmm = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (hhmm) {
+    const d = new Date(); d.setHours(parseInt(hhmm[1], 10), parseInt(hhmm[2], 10), 0, 0);
+    return d.getTime();
+  }
+  return null;
+};
+
+// Sort messages chronologically by epoch ms.
+const sortMsgs = (msgs: Msg[]): Msg[] =>
+  msgs.map((m, i) => ({ m, i, key: sortKey(m.time) }))
+    .sort((a, b) => {
+      if (a.key === null && b.key === null) return a.i - b.i;
+      if (a.key === null) return -1;
+      if (b.key === null) return 1;
+      return a.key - b.key;
+    })
+    .map(x => x.m);
 
 const MessagesPage: React.FC = () => {
   useContext(AppContext); // keep context subscription for future use
@@ -48,7 +102,7 @@ const MessagesPage: React.FC = () => {
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
-  const [msgFilter, setMsgFilter] = useState<'all' | 'unread' | 'pinned'>('all');
+  const [msgFilter, setMsgFilter] = useState<'all' | 'unread' | 'pinned' | 'archived'>('all');
   const [showNewConvo, setShowNewConvo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,10 +127,14 @@ const MessagesPage: React.FC = () => {
   const activeColor = getMemberColor(activeId);
   const activeChats = chats[activeId] ?? [];
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom — instant on conversation switch, smooth on new message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+  }, [activeId]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChats.length, activeId]);
+  }, [activeChats.length]);
 
   // Mark conversation read in DB immediately when user switches to it.
   // Called independently of the message fetch so the DB write starts right away —
@@ -314,7 +372,7 @@ const MessagesPage: React.FC = () => {
       if (deletedMsg) {
         setChats(prev => ({
           ...prev,
-          [targetId]: [...(prev[targetId] ?? []), deletedMsg].sort((a, b) => a.time.localeCompare(b.time)),
+          [targetId]: sortMsgs([...(prev[targetId] ?? []), deletedMsg]),
         }));
       }
       showToast('Failed to delete message.', 'error');
@@ -351,6 +409,7 @@ const MessagesPage: React.FC = () => {
 
   const filteredConvos = conversations
     .filter(m => {
+      if (msgFilter === 'archived') return archivedIds.has(m.id) && m.name.toLowerCase().includes(search.toLowerCase());
       if (archivedIds.has(m.id)) return false;
       if (!m.name.toLowerCase().includes(search.toLowerCase())) return false;
       if (msgFilter === 'pinned') return pinnedIds.includes(m.id);
@@ -363,7 +422,9 @@ const MessagesPage: React.FC = () => {
       if (aPinned !== bPinned) return aPinned ? -1 : 1;
       const aTime = getLastMsg(a.id)?.time ?? '';
       const bTime = getLastMsg(b.id)?.time ?? '';
-      return bTime.localeCompare(aTime);
+      const aMs = sortKey(aTime) ?? 0;
+      const bMs = sortKey(bTime) ?? 0;
+      return bMs - aMs;
     });
 
   return (
@@ -431,7 +492,7 @@ const MessagesPage: React.FC = () => {
 
           {/* Filters */}
           <div className="flex gap-1 px-3 py-2 border-b border-surface-100">
-            {(['all', 'unread', 'pinned'] as const).map(f => (
+            {(['all', 'unread', 'pinned', 'archived'] as const).map(f => (
               <button key={f} onClick={() => setMsgFilter(f)} className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors capitalize ${msgFilter === f ? 'bg-primary-50 text-primary-600' : 'text-gray-400 hover:bg-surface-100'}`}>{f.charAt(0).toUpperCase() + f.slice(1)}</button>
             ))}
           </div>
@@ -555,7 +616,7 @@ const MessagesPage: React.FC = () => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
-            {[...activeChats].sort((a, b) => a.time.localeCompare(b.time)).map((msg, i, arr) => {
+            {sortMsgs([...activeChats]).map((msg, i, arr) => {
               const isOwn = msg.from === myId;
               const sender = members.find(m => m.id === msg.from) ?? { name: 'Unknown' };
               const senderColor = getMemberColor(msg.from);
@@ -716,7 +777,9 @@ const MessagesPage: React.FC = () => {
           <div className="p-4 border-b border-surface-100">
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Quick Actions</div>
             {[
-              { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); setActiveId(nextConv ? nextConv.id : ''); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
+              archivedIds.has(activeId)
+                ? { icon: ArchiveRestore, label: 'Unarchive Chat', action: () => { setArchivedIds(p => { const next = new Set(p); next.delete(activeId); return next; }); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: false }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } } }
+                : { icon: Archive, label: 'Archive Chat', action: () => { setArchivedIds(p => { const next = new Set([...p, activeId]); const nextConv = conversations.find(m => !next.has(m.id) && m.id !== activeId); setActiveId(nextConv ? nextConv.id : ''); if (activeMember) { dbApi().setConvMeta({ userId: currentUserId, peerId: activeMember.id, pinned: pinnedIds.includes(activeMember.id), starred: starredIds.includes(activeMember.id), archived: true }).catch((err: unknown) => console.error('[MessagesPage] Failed to persist conv meta:', err)); } return next; }); } },
               { icon: Trash2, label: 'Clear Chat', action: clearChat },
             ].map(({ icon: Icon, label, action }) => (
               <button

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const win = () => window as any;
+const appApi = () => win().electronAPI.app as { setActiveUser: (userId: string) => Promise<void> };
 const prefsApi = () => win().electronAPI.userPrefs as {
   get: (userId: string) => Promise<{ hasSeenWalkthrough?: boolean } | null>;
   set: (prefs: { userId: string; hasSeenWalkthrough?: boolean }) => Promise<void>;
@@ -60,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const fresh = { ...restoredUser!, name: valid.name, role: valid.role };
               localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
               setUser(fresh);
+              appApi().setActiveUser(fresh.id).catch(() => {});
               prefsApi().get(fresh.id)
                 .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
                 .catch(() => {});
@@ -100,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true);
     } catch { /* ignore */ }
     setUser(authUser);
+    appApi().setActiveUser(authUser.id).catch(() => {});
   }, []);
 
   const register = useCallback(async (
@@ -118,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.clear();
     setHasSeenWalkthrough(false);
     setUser(null);
+    appApi().setActiveUser('').catch(() => {});
   }, []);
 
   const markWalkthroughSeen = useCallback(() => {

@@ -248,6 +248,7 @@ let tray = null;
 let backgroundModeEnabled = false;
 // Fix 1: flag set once ready-to-show fires — prevents streams from starting before window exists
 let windowReady = false;
+let activeUserId = ''; // set on login, used to gate OS notifications to this machine's user
 let messageStream = null;
 let projectStream = null;
 let taskStream = null;
@@ -295,9 +296,9 @@ function startMessageStream() {
                 return;
             if (op === 'insert') {
                 mainWindow.webContents.send('msg:new', toMsgFrontend(d));
-                // System notification for the recipient
+                // System notification — only fire on the machine where the recipient is logged in
                 const recipientId = d.toId;
-                if (systemNotifsEnabled.get(recipientId) !== false) {
+                if (recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
                     // Look up sender name async (best-effort)
                     UserModel.findOne({ appId: d.fromId }).lean().then((sender) => {
                         const name = sender?.name ?? 'New message';
@@ -1567,6 +1568,7 @@ electron_1.app.whenReady().then(async () => {
         applyBackgroundMode(value);
         return true;
     });
+    electron_1.ipcMain.handle('app:setActiveUser', (_e, userId) => { activeUserId = userId ?? ''; });
     electron_1.ipcMain.handle('app:getSystemNotifsEnabled', async (_e, userId) => {
         // Load from DB if not yet cached
         if (!systemNotifsEnabled.has(userId)) {
