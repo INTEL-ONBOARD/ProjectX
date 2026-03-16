@@ -1,6 +1,6 @@
 {
   "name": "projectm",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "Project Planning Desktop App",
   "main": "electron/main.js",
   "author": "",
@@ -39,7 +39,10 @@
       "output": "dist-electron"
     },
     "extraResources": [
-      { "from": ".env", "to": ".env" }
+      {
+        "from": ".env",
+        "to": ".env"
+      }
     ],
     "icon": "build/icon",
     "mac": {
