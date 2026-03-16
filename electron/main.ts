@@ -5,7 +5,10 @@ import dotenv from 'dotenv';
 import mongoose, { Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-dotenv.config({ path: path.join(__dirname, '../.env') });
+const envPath = app.isPackaged
+    ? path.join(process.resourcesPath, '.env')
+    : path.join(__dirname, '../.env');
+dotenv.config({ path: envPath });
 
 // ─── Mongoose Schemas ──────────────────────────────────────────────────────────
 
@@ -731,7 +734,7 @@ function setupDbListeners() {
 }
 
 async function connectDB() {
-    const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
+    const uri = process.env.MONGODB_URI;
     if (!uri) { console.error('MONGODB_URI not set'); return; }
     // Reduced serverSelectionTimeoutMS from 30s → 8s so failed attempts surface faster
     // and the retry loop can kick in sooner after internet is restored
