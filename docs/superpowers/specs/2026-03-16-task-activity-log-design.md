@@ -49,10 +49,18 @@ activity: { type: Array, default: [] }
 ```
 
 ### `toTask` transformer
-Include `activity` in the mapped object:
+The existing `toTask` is a single-line function mapping `d` to a plain object. Add `activity` at the end:
 ```typescript
-activity: d.activity ?? [],
+const toTask = (d: any) => ({
+    id: d.appId, title: d.title, description: d.description ?? '',
+    priority: d.priority, status: d.status, assignees: d.assignees ?? [],
+    comments: d.comments ?? 0, files: d.files ?? 0, images: d.images ?? [],
+    dueDate: d.dueDate ?? null, projectId: d.projectId ?? null,
+    commentData: d.commentData ?? [],
+    activity: d.activity ?? [],
+});
 ```
+**Important:** `activity` MUST be included here or it will be silently stripped from every IPC response.
 
 ---
 
@@ -64,7 +72,7 @@ After creating the document, append one `created` entry:
 ipcMain.handle('db:tasks:create', async (_e, taskData: any) => {
     const { actorId, actorName, ...rest } = taskData;
     const entry = {
-        id: require('crypto').randomUUID(),
+        id: crypto.randomUUID(),
         type: 'created',
         actorId: actorId ?? 'system',
         actorName: actorName ?? 'System',
@@ -110,7 +118,7 @@ ipcMain.handle('db:tasks:update', async (_e, id: string, changes: any) => {
     ];
     for (const [field, type] of scalarFields) {
         if (rest[field] !== undefined && String(rest[field]) !== String((current as any)[field] ?? '')) {
-            entries.push({ id: require('crypto').randomUUID(), type, ...actor, timestamp: ts, from: String((current as any)[field] ?? ''), to: String(rest[field]) });
+            entries.push({ id: crypto.randomUUID(), type, ...actor, timestamp: ts, from: String((current as any)[field] ?? ''), to: String(rest[field]) });
         }
     }
 
@@ -118,16 +126,18 @@ ipcMain.handle('db:tasks:update', async (_e, id: string, changes: any) => {
         const oldSet = new Set<string>((current as any).assignees ?? []);
         const newSet = new Set<string>(rest.assignees);
         for (const a of newSet) {
-            if (!oldSet.has(a)) entries.push({ id: require('crypto').randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
+            if (!oldSet.has(a)) entries.push({ id: crypto.randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
         }
         for (const a of oldSet) {
-            if (!newSet.has(a)) entries.push({ id: require('crypto').randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
+            if (!newSet.has(a)) entries.push({ id: crypto.randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
         }
     }
 
+    const updateDoc: any = { $set: { ...rest } };
+    if (entries.length > 0) updateDoc.$push = { activity: { $each: entries } };
     const updated = await TaskModel.findOneAndUpdate(
         { appId: id },
-        { ...rest, $push: { activity: { $each: entries } } },
+        updateDoc,
         { returnDocument: 'after' }
     );
     return updated ? toTask(updated.toObject()) : null;
@@ -140,7 +150,7 @@ ipcMain.handle('db:tasks:move', async (_e, id: string, newStatus: string, actorI
     const current = await TaskModel.findOne({ appId: id }).lean();
     if (!current) return null;
     const entry = {
-        id: require('crypto').randomUUID(),
+        id: crypto.randomUUID(),
         type: 'status_changed',
         actorId: actorId ?? 'system',
         actorName: actorName ?? 'System',
@@ -150,7 +160,7 @@ ipcMain.handle('db:tasks:move', async (_e, id: string, newStatus: string, actorI
     };
     const updated = await TaskModel.findOneAndUpdate(
         { appId: id },
-        { status: newStatus, $push: { activity: entry } },
+        { $set: { status: newStatus }, $push: { activity: entry } },
         { returnDocument: 'after' }
     );
     return updated ? toTask(updated.toObject()) : null;
@@ -169,7 +179,10 @@ moveTask: (id: string, newStatus: string, actorId?: string, actorName?: string):
 ```
 
 ### `src/vite-env.d.ts` (`ElectronDB` interface)
+Update three signatures to accept actor fields:
 ```typescript
+createTask(task: Omit<Task, 'id'> & { actorId?: string; actorName?: string }): Promise<Task>;
+updateTask(id: string, changes: Partial<Omit<Task, 'id'>> & { actorId?: string; actorName?: string }): Promise<Task | null>;
 moveTask(id: string, newStatus: TaskStatus, actorId?: string, actorName?: string): Promise<Task | null>;
 ```
 
@@ -279,7 +292,7 @@ Timestamp: relative if within 24h ("2 hours ago"), full date otherwise ("Mar 14,
 | `electron/main.js` | Mirror all above |
 | `electron/preload.ts` | Update `moveTask` signature |
 | `electron/preload.js` | Mirror |
-| `src/vite-env.d.ts` | Update `moveTask` type in `ElectronDB` |
+| `src/vite-env.d.ts` | Update `createTask`, `updateTask`, `moveTask` types in `ElectronDB` to accept actor fields |
 | `src/types/index.ts` | Add `TaskActivityEntry`, `TaskActivityEntryType`, `activity?` on `Task` |
 | `src/context/ProjectContext.tsx` | Import `useAuth`, pass `actorMeta` in all 3 mutations |
 | `src/pages/TasksPage.tsx` | Add tab bar + Activity tab UI |
