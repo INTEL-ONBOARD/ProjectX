@@ -728,6 +728,9 @@ async function connectDB() {
         startMessageStream();
         startDataStreams();
     });
+    mongoose.connection.on('error', (err) => {
+        console.error('[MongoDB] Connection error:', err.message);
+    });
 
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
@@ -744,8 +747,10 @@ async function connectDB() {
                 console.log(`Retrying in ${delay / 1000}s...`);
                 await new Promise(r => setTimeout(r, delay));
             } else {
-                console.error('MongoDB connection failed after 5 attempts.');
+                console.error('MongoDB connection failed after 5 attempts. Will retry in 10s...');
                 if (mainWindow) mainWindow.webContents.send('db:connection-failed', msg);
+                // Retry loop: keep trying every 10s until connected (handles offline-at-startup)
+                setTimeout(() => connectDB(), 10000);
             }
         }
     }
@@ -1276,14 +1281,10 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
         },
-        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+        titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
         trafficLightPosition: { x: 15, y: 15 },
-        // Windows: overlay the native title bar buttons with theme-matching colors
-        titleBarOverlay: process.platform === 'win32' ? {
-            color: '#1A1F35',
-            symbolColor: '#CBD5E1',
-            height: 40,
-        } : false,
+        // Windows uses default native title bar — no overlay needed
+        titleBarOverlay: false,
         backgroundColor: '#1A1F35',
         autoHideMenuBar: true,
         show: false,

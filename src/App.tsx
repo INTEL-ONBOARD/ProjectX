@@ -463,7 +463,12 @@ const Root: React.FC = () => {
     React.useEffect(() => {
         // Layer 1: instant show on network loss; hide only after DB confirms reconnection
         const handleOffline = () => setDbDisconnected(true);
+        // Network restored — don't clear overlay yet; wait for DB to confirm reconnection.
+        // The main process retry loop (connectDB) will keep calling mongoose.connect() until
+        // it succeeds, then fires db:reconnected which clears the overlay.
+        const handleOnline = () => console.log('[App] Network restored — waiting for DB reconnect...');
         window.addEventListener('offline', handleOffline);
+        window.addEventListener('online', handleOnline);
 
         // Layer 2: mongoose events via Electron IPC
         // - disconnected: also triggers overlay as fallback (e.g. Atlas outage without internet drop)
@@ -472,11 +477,13 @@ const Root: React.FC = () => {
         const api = (window as any).electronAPI;
         if (!api) return () => {
             window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('online', handleOnline);
         };
         const unsubDisconnect = api.onDbDisconnected?.(() => setDbDisconnected(true));
         const unsubReconnect  = api.onDbReconnected?.(() => setDbDisconnected(false));
         return () => {
             window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('online', handleOnline);
             unsubDisconnect?.();
             unsubReconnect?.();
         };

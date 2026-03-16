@@ -93,12 +93,7 @@ const Header: React.FC = () => {
     return (
         <motion.header
             className="h-16 border-b border-surface-200 flex items-center justify-between px-6 shrink-0 titlebar-drag"
-            style={{
-                background: 'var(--bg-header)',
-                // On Windows, native window controls (138px wide) overlay the top-right corner
-                // Push header content left so widgets don't sit under the buttons
-                paddingRight: (window as any).electronAPI?.platform === 'win32' ? '150px' : undefined,
-            }}
+            style={{ background: 'var(--bg-header)' }}
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
