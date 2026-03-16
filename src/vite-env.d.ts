@@ -84,7 +84,7 @@ interface ElectronAuth {
 }
 
 interface ElectronUserPrefs {
-  get(userId: string): Promise<{ theme?: string; sidebarCollapsed?: boolean; selectedWeekStart?: string | null; hasSeenWalkthrough?: boolean; projectsView?: string } | null>;
+  get(userId: string): Promise<{ theme?: string; sidebarCollapsed?: boolean; selectedWeekStart?: string | null; hasSeenWalkthrough?: boolean; projectsView?: string; navOrder?: string[] } | null>;
   set(prefs: object): Promise<unknown>;
 }
 
