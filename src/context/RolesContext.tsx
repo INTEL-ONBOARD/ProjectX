@@ -41,7 +41,18 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     }, []);
 
-    useEffect(() => { loadRoles(); }, [loadRoles]);
+    useEffect(() => {
+        let cancelled = false;
+        loadRoles();
+
+        const onFocus = () => { dbApi().getRoles().then((docs: RoleDoc[]) => { if (!cancelled) setRoles(docs); }).catch(() => {}); };
+        window.addEventListener('focus', onFocus);
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener('focus', onFocus);
+        };
+    }, [loadRoles]);
 
     // Real-time sync for roles
     useEffect(() => {

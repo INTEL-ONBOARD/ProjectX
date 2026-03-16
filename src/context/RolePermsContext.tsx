@@ -38,6 +38,7 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
     const [perms, setPerms] = useState<RolePerms[]>(DEFAULT_PERMS);
 
     useEffect(() => {
+        let cancelled = false;
         dbApi().getRolePerms()
             .then((data: RolePerms[]) => {
                 if (!data || data.length === 0) return;
@@ -57,6 +58,14 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
                 setPerms(merged);
             })
             .catch((err: unknown) => console.error('[RolePermsContext] Failed to load role perms:', err));
+
+        const onFocus = () => { dbApi().getRolePerms().then((data: RolePerms[]) => { if (!cancelled && data?.length) setPerms(data); }).catch(() => {}); };
+        window.addEventListener('focus', onFocus);
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener('focus', onFocus);
+        };
     }, []);
 
     // Real-time sync for role permissions

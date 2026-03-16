@@ -50,6 +50,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { user: authUser } = useAuth() ?? { user: null };
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([api().getProjects(), api().getTasks()])
       .then(([prjs, tasks]) => {
         const typedProjects = prjs as Project[];
@@ -60,6 +61,24 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       })
       .catch(err => console.error('[ProjectContext] Failed to load projects/tasks:', err))
       .finally(() => setLoading(false));
+
+    // Refetch whenever the window regains focus (catches changes from other windows)
+    const onFocus = () => {
+      Promise.all([api().getProjects(), api().getTasks()])
+        .then(([prjs, tasks]) => {
+          if (!cancelled) {
+            setProjects(prjs as Project[]);
+            setAllTasks(tasks as Task[]);
+          }
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   // Real-time sync: listen for project/task changes from other clients via MongoDB change streams
@@ -124,13 +143,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       docs.forEach((d: any) => { m[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category }; });
       return m;
     };
+    let cancelledRich = false;
     api().getProjectRich().then((docs: unknown[]) => setProjectRichData(toRichMap(docs as any[]))).catch(() => {});
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const electronAPI = (window as any).electronAPI;
-    if (!electronAPI) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsub = electronAPI.onProjectRichChanged?.((_: unknown, payload: { op: string; doc?: any }) => {
+    const unsub = electronAPI?.onProjectRichChanged?.((_: unknown, payload: { op: string; doc?: any }) => {
       const { op, doc } = payload;
       if (op === 'insert' || op === 'update' || op === 'replace') {
         if (doc) setProjectRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, dueDate: doc.dueDate, starred: doc.starred, category: doc.category } }));
@@ -138,7 +157,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         api().getProjectRich().then((docs: unknown[]) => setProjectRichData(toRichMap(docs as any[]))).catch(() => {});
       }
     });
-    return () => { unsub?.(); };
+
+    return () => { cancelledRich = true; unsub?.(); };
   }, []);
 
   const createProject = async (name: string, color: string): Promise<Project> => {

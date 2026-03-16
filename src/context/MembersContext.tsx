@@ -31,14 +31,13 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let cancelled = false;
     const subs: { unsub?: () => void; unsubReconnect?: () => void } = {};
 
-    // Step 1: fetch initial data first, THEN subscribe to change stream.
-    // This eliminates the race condition where the initial fetch overwrites change stream inserts.
+    const fetchAll = () => api().getMembers().then((docs: User[]) => { if (!cancelled) setMembers(docs as User[]); }).catch(() => {});
+
+    // Initial fetch then wire up change stream
     api().getMembers()
       .then((docs: User[]) => {
         if (cancelled) return;
         setMembers(docs as User[]);
-
-        // Step 2: wire up change stream only AFTER initial data is in state
         if (!electronAPI) return;
         subs.unsub = electronAPI.onMemberChanged?.((_: unknown, payload: { op: string; doc?: User; id?: string }) => {
           const { op, doc } = payload;
@@ -50,18 +49,21 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return exists ? prev.map(m => m.id === doc!.id ? doc! : m) : [...prev, doc!];
             });
           } else if (op === 'delete') {
-            api().getMembers().then((fresh: User[]) => setMembers(fresh)).catch(() => {});
+            fetchAll();
           }
         });
       })
       .catch((err: unknown) => console.error('[MembersContext] Failed to load members:', err));
 
-    subs.unsubReconnect = electronAPI?.onDbReconnected?.(() => {
-      api().getMembers().then((docs: User[]) => setMembers(docs)).catch(() => {});
-    });
+    subs.unsubReconnect = electronAPI?.onDbReconnected?.(() => { fetchAll(); });
+
+    // Refetch whenever the window regains focus (catches changes from other windows)
+    const onFocus = () => fetchAll();
+    window.addEventListener('focus', onFocus);
 
     return () => {
       cancelled = true;
+      window.removeEventListener('focus', onFocus);
       subs.unsub?.();
       subs.unsubReconnect?.();
     };
@@ -69,7 +71,6 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const getMemberColor = (id: string): string => {
     if (!id) return memberColors[0];
-    // Hash the id so color is stable regardless of list order or deletions
     let hash = 0;
     for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
     return memberColors[hash % memberColors.length];

@@ -136,18 +136,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // Load org from MongoDB on mount
     useEffect(() => {
+        let cancelled = false;
         dbApi().getOrg()
             .then((o: Organization | null) => { if (o) setOrg(o); })
             .catch((err: unknown) => console.error('[AppContext] Failed to load org:', err));
+
+        const onFocus = () => {
+            dbApi().getOrg().then((o: Organization | null) => { if (!cancelled && o) setOrg(o); }).catch(() => {});
+        };
+        window.addEventListener('focus', onFocus);
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener('focus', onFocus);
+        };
     }, []);
 
     // Load attendance from MongoDB on mount
     useEffect(() => {
+        let cancelled = false;
         dbApi().getAttendance()
             .then((docs: AttendanceRecord[]) => {
                 if (docs && docs.length > 0) setAttendanceRecords(docs);
             })
             .catch((err: unknown) => console.error('[AppContext] Failed to load attendance records:', err));
+
+        const onFocus = () => {
+            dbApi().getAttendance().then((docs: AttendanceRecord[]) => { if (!cancelled && docs) setAttendanceRecords(docs); }).catch(() => {});
+        };
+        window.addEventListener('focus', onFocus);
+
+        return () => {
+            cancelled = true;
+            window.removeEventListener('focus', onFocus);
+        };
     }, []);
 
     // Real-time sync for attendance

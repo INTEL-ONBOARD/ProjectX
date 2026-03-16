@@ -1060,7 +1060,7 @@ function registerDbHandlers() {
     });
     electron_1.ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
     // Members
-    electron_1.ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find({ orgId: 'org-toursurv' }).lean()).map(toUser)));
+    electron_1.ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
     electron_1.ipcMain.handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
     electron_1.ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toUser(d)) : null; });
     electron_1.ipcMain.handle('db:members:updateRole', async (_e, id, role) => {
@@ -1176,7 +1176,7 @@ function registerDbHandlers() {
         return true;
     });
     electron_1.ipcMain.handle('db:auth:getAll', async () => {
-        const docs = await AuthUserModel.find({ orgId: 'org-toursurv' }).lean();
+        const docs = await AuthUserModel.find().lean();
         return safe(docs.map(d => ({ id: d.appId, name: d.name, email: d.email, role: d.role })));
     });
     electron_1.ipcMain.handle('db:auth:validate', async (_e, userId) => {
