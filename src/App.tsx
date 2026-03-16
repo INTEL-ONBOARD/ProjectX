@@ -117,6 +117,32 @@ const AppearanceLoader: React.FC = () => {
             }
         }).catch(() => { /* non-fatal */ });
     }, [authUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Real-time sync: apply appearance changes made on other devices immediately
+    useEffect(() => {
+        if (!authUser?.id) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI) return;
+        const unsub = electronAPI.onAppearancePrefChanged?.((_: unknown, payload: { doc?: { userId: string; themeMode: 'light'|'dark'|'system'; accentColor: string } }) => {
+            const doc = payload.doc;
+            if (!doc || doc.userId !== authUser.id) return;
+            const palette = ACCENT_PALETTES[doc.accentColor];
+            if (palette) {
+                const root = document.documentElement;
+                Object.entries(palette).forEach(([shade, value]) => {
+                    root.style.setProperty(`--color-primary-${shade}`, value as string);
+                });
+            }
+            if (doc.themeMode === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                setTheme(prefersDark ? 'dark' : 'light');
+            } else {
+                setTheme(doc.themeMode);
+            }
+        });
+        return () => { unsub?.(); };
+    }, [authUser?.id, setTheme]);
     return null;
 };
 
