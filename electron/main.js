@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
+const { randomUUID } = require("crypto");
 const dotenv_1 = __importDefault(require("dotenv"));
 const mongoose_1 = __importStar(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -344,7 +345,7 @@ function registerDbHandlers() {
     electron_1.ipcMain.handle('db:tasks:create', async (_e, taskData) => {
         const { actorId, actorName, ...rest } = taskData;
         const entry = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             type: 'created',
             actorId: actorId ?? 'system',
             actorName: actorName ?? 'System',
@@ -368,7 +369,7 @@ function registerDbHandlers() {
         ];
         for (const [field, type] of scalarFields) {
             if (rest[field] !== undefined && String(rest[field]) !== String(current[field] ?? '')) {
-                entries.push({ id: crypto.randomUUID(), type, ...actor, timestamp: ts, from: String(current[field] ?? ''), to: String(rest[field]) });
+                entries.push({ id: randomUUID(), type, ...actor, timestamp: ts, from: String(current[field] ?? ''), to: String(rest[field]) });
             }
         }
         if (rest.assignees !== undefined) {
@@ -376,11 +377,11 @@ function registerDbHandlers() {
             const newSet = new Set(rest.assignees);
             for (const a of newSet) {
                 if (!oldSet.has(a))
-                    entries.push({ id: crypto.randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
+                    entries.push({ id: randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
             }
             for (const a of oldSet) {
                 if (!newSet.has(a))
-                    entries.push({ id: crypto.randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
+                    entries.push({ id: randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
             }
         }
         const updateDoc = { $set: { ...rest } };
@@ -395,7 +396,7 @@ function registerDbHandlers() {
         if (!current)
             return null;
         const entry = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             type: 'status_changed',
             actorId: actorId ?? 'system',
             actorName: actorName ?? 'System',

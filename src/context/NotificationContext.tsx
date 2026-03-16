@@ -108,44 +108,35 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         generate();
     }, [allTasks, user?.id]);
 
-    // Poll for new_message notifications every 30s
+    // Real-time new_message notifications via change stream
     useEffect(() => {
         if (!user || members.length === 0) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const dbApi = () => (window as any).electronAPI.db;
+        const api = (window as any).electronAPI;
+        if (!api?.onNewMessage) return;
 
-        const checkMessages = async () => {
-            for (const member of members) {
-                if (member.id === user.id) continue;
-                try {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const msgs: any[] = await dbApi().getMessagesBetween(user.id, member.id);
-                    for (const msg of msgs) {
-                        if (
-                            msg.from !== user.id &&
-                            msg.read === false &&
-                            !seenRefIds.current.has(`msg-${msg.id}`)
-                        ) {
-                            seenRefIds.current.add(`msg-${msg.id}`);
-                            try {
-                                const n = await notifsApi().create({
-                                    userId: user.id,
-                                    type: 'new_message',
-                                    title: `Message from ${member.name}`,
-                                    body: String(msg.text ?? '').slice(0, 60),
-                                    refId: `msg-${msg.id}`,
-                                });
-                                setNotifications(prev => [n, ...prev]);
-                            } catch { /* ignore */ }
-                        }
-                    }
-                } catch { /* ignore */ }
-            }
-        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const unsub = api.onNewMessage(async (_: unknown, msg: any) => {
+            if (msg.from === user.id) return;   // own message
+            if (msg.to !== user.id) return;     // not for me
+            const refId = `msg-${msg.id}`;
+            if (seenRefIds.current.has(refId)) return;
+            seenRefIds.current.add(refId);
+            const sender = members.find((m: { id: string }) => m.id === msg.from);
+            const senderName = sender ? (sender as { name: string }).name : 'Someone';
+            try {
+                const n = await notifsApi().create({
+                    userId: user.id,
+                    type: 'new_message',
+                    title: `Message from ${senderName}`,
+                    body: String(msg.text ?? '').slice(0, 60),
+                    refId,
+                });
+                setNotifications(prev => [n, ...prev]);
+            } catch { /* ignore */ }
+        });
 
-        checkMessages();
-        const interval = setInterval(checkMessages, 30_000);
-        return () => clearInterval(interval);
+        return () => unsub?.();
     }, [user?.id, members]);
 
     const unreadCount = notifications.filter(n => !n.read).length;

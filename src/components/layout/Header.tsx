@@ -290,7 +290,10 @@ const Header: React.FC = () => {
                                                         <div className={`text-xs font-semibold truncate ${!notif.read ? 'text-gray-900' : 'text-gray-600'}`}>{notif.title}</div>
                                                         {notif.body && <div className="text-[10px] text-gray-400 mt-0.5 truncate">{notif.body}</div>}
                                                     </div>
-                                                    {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-primary-500 shrink-0 mt-2" />}
+                                                    <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
+                                                        <div className="text-[10px] text-gray-300">{new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                        {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-primary-500" />}
+                                                    </div>
                                                 </button>
                                             );
                                         })}

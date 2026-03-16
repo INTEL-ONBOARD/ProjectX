@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import dotenv from 'dotenv';
 import mongoose, { Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
@@ -317,7 +318,7 @@ function registerDbHandlers() {
     ipcMain.handle('db:tasks:create', async (_e, taskData: any) => {
         const { actorId, actorName, ...rest } = taskData;
         const entry = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             type: 'created',
             actorId: actorId ?? 'system',
             actorName: actorName ?? 'System',
@@ -340,17 +341,17 @@ function registerDbHandlers() {
         ];
         for (const [field, type] of scalarFields) {
             if (rest[field] !== undefined && String(rest[field]) !== String((current as any)[field] ?? '')) {
-                entries.push({ id: crypto.randomUUID(), type, ...actor, timestamp: ts, from: String((current as any)[field] ?? ''), to: String(rest[field]) });
+                entries.push({ id: randomUUID(), type, ...actor, timestamp: ts, from: String((current as any)[field] ?? ''), to: String(rest[field]) });
             }
         }
         if (rest.assignees !== undefined) {
             const oldSet = new Set<string>((current as any).assignees ?? []);
             const newSet = new Set<string>(rest.assignees);
             for (const a of newSet) {
-                if (!oldSet.has(a)) entries.push({ id: crypto.randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
+                if (!oldSet.has(a)) entries.push({ id: randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
             }
             for (const a of oldSet) {
-                if (!newSet.has(a)) entries.push({ id: crypto.randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
+                if (!newSet.has(a)) entries.push({ id: randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
             }
         }
         const updateDoc: any = { $set: { ...rest } };
@@ -363,7 +364,7 @@ function registerDbHandlers() {
         const current = await TaskModel.findOne({ appId: id }).lean();
         if (!current) return null;
         const entry = {
-            id: crypto.randomUUID(),
+            id: randomUUID(),
             type: 'status_changed',
             actorId: actorId ?? 'system',
             actorName: actorName ?? 'System',
