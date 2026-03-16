@@ -49,9 +49,6 @@ const priorityConfig = {
   low:    { label: 'Low',    color: '#76A5EA' },
 };
 
-// ─── Initial rich data for display (description, status, priority, etc.) ──────
-const initialRichData: Record<string, Partial<ProjectData>> = {};
-
 // ─── Project Detail Panel ──────────────────────────────────────────────────────
 const ProjectDetail: React.FC<{
   project: ProjectData;
