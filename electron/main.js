@@ -810,6 +810,9 @@ async function connectDB() {
         console.log('MongoDB reconnected');
         if (mainWindow)
             mainWindow.webContents.send('db:reconnected');
+        // Restart all change streams — they die on disconnect and need to be re-opened
+        startMessageStream();
+        startDataStreams();
     });
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
