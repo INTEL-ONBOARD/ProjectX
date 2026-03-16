@@ -95,30 +95,27 @@ const KanbanRoute: React.FC = () => {
 // ── Auth screens (with navigate) ──────────────────────────────────────────────
 const AuthScreens: React.FC = () => {
     const navigate = useNavigate();
-    const location = useLocation();
     return (
-        <AnimatePresence mode="wait">
-            <Routes location={location} key={location.pathname}>
-                <Route path="/login" element={
-                    <LoginPage
-                        onNavigateRegister={() => navigate('/register')}
-                        onNavigateForgot={() => navigate('/forgot-password')}
-                    />
-                } />
-                <Route path="/register" element={
-                    <RegisterPage onNavigateLogin={() => navigate('/login')} />
-                } />
-                <Route path="/forgot-password" element={
-                    <ForgotPasswordPage onNavigateLogin={() => navigate('/login')} />
-                } />
-                <Route path="*" element={
-                    <LoginPage
-                        onNavigateRegister={() => navigate('/register')}
-                        onNavigateForgot={() => navigate('/forgot-password')}
-                    />
-                } />
-            </Routes>
-        </AnimatePresence>
+        <Routes>
+            <Route path="/login" element={
+                <LoginPage
+                    onNavigateRegister={() => navigate('/register')}
+                    onNavigateForgot={() => navigate('/forgot-password')}
+                />
+            } />
+            <Route path="/register" element={
+                <RegisterPage onNavigateLogin={() => navigate('/login')} />
+            } />
+            <Route path="/forgot-password" element={
+                <ForgotPasswordPage onNavigateLogin={() => navigate('/login')} />
+            } />
+            <Route path="*" element={
+                <LoginPage
+                    onNavigateRegister={() => navigate('/register')}
+                    onNavigateForgot={() => navigate('/forgot-password')}
+                />
+            } />
+        </Routes>
     );
 };
 
