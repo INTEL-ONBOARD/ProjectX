@@ -54,7 +54,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   const sf = (f: string, v: boolean) => setFocus(p => ({ ...p, [f]: v }));
   const inputCls = 'w-full px-4 py-3 rounded-xl text-sm text-gray-800 border outline-none transition-all duration-200 placeholder-gray-400';
   const inputStyle = (f: string) => ({
-    borderColor: errors[f] ? '#EF4444' : focus[f] ? '#5030E5' : 'transparent',
+    borderColor: errors[f] ? '#EF4444' : focus[f] ? '#5030E5' : '#D1D5DB',
     boxShadow: errors[f] ? '0 0 0 3px rgba(239,68,68,0.08)' : focus[f] ? '0 0 0 3px rgba(80,48,229,0.1)' : 'none',
     background: focus[f] ? 'var(--bg-card)' : 'var(--bg-input)',
   });

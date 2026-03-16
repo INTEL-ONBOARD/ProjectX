@@ -26,7 +26,7 @@ const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigateLogin
   };
 
   const inputStyle = {
-    borderColor: error ? '#EF4444' : focused ? '#5030E5' : 'transparent',
+    borderColor: error ? '#EF4444' : focused ? '#5030E5' : '#D1D5DB',
     boxShadow: error ? '0 0 0 3px rgba(239,68,68,0.08)' : focused ? '0 0 0 3px rgba(80,48,229,0.1)' : 'none',
     background: focused ? 'var(--bg-card)' : 'var(--bg-input)',
   };

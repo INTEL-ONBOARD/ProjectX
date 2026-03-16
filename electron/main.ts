@@ -954,6 +954,10 @@ function registerDbHandlers() {
         const docs = await AuthUserModel.find().lean() as any[];
         return safe(docs.map(d => ({ id: d.appId, name: d.name, email: d.email, role: d.role })));
     });
+    ipcMain.handle('db:auth:validate', async (_e, userId: string) => {
+        const found = await AuthUserModel.findOne({ appId: userId }).lean() as any;
+        return found ? safe(toAuthUser(found)) : null;
+    });
     ipcMain.handle('db:auth:updateRole', async (_e, userId: string, role: string) => {
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { role });
         return true;

@@ -12,6 +12,7 @@ const authApi = () => win().electronAPI.auth as {
   updatePassword: (userId: string, currentPassword: string, newPassword: string) => Promise<boolean>;
   updateName: (userId: string, newName: string) => Promise<void>;
   seedDefault: () => Promise<void>;
+  validate: (userId: string) => Promise<AuthUser | null>;
 };
 
 // Session token only — no credential storage
@@ -57,17 +58,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const walkthroughSeen = localStorage.getItem('pm_walkthrough_seen') === 'true';
 
     if (restoredUser) {
-      // Returning user — restore immediately, no splash
-      setUser(restoredUser);
+      // Validate cached session against DB — auto-clear if user no longer exists (e.g. DB was wiped)
+      authApi().validate(restoredUser.id)
+        .then(valid => {
+          if (valid) {
+            // User still exists — update local cache with latest data from DB
+            const fresh = { ...restoredUser, name: valid.name, role: valid.role };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+            setUser(fresh);
+          } else {
+            // User deleted from DB — clear stale session so they can register/login fresh
+            localStorage.removeItem(SESSION_KEY);
+            setUser(null);
+          }
+        })
+        .catch(() => {
+          // DB unreachable — trust local cache optimistically
+          setUser(restoredUser);
+        })
+        .finally(() => {
+          setIsLoading(false);
+          authApi().seedDefault().catch(() => {});
+          if (!walkthroughSeen) {
+            prefsApi().get(restoredUser.id)
+              .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
+              .catch(() => {});
+          }
+        });
       setHasSeenWalkthrough(walkthroughSeen);
-      setIsLoading(false);
-      // Seed and load prefs in the background (non-blocking)
-      authApi().seedDefault().catch(() => {});
-      if (!walkthroughSeen) {
-        prefsApi().get(restoredUser.id)
-          .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
-          .catch(() => {});
-      }
+      // Keep isLoading true until validate resolves
     } else {
       // New user — show splash for 2500ms then seed
       setHasSeenWalkthrough(walkthroughSeen);

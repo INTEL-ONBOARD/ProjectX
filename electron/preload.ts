@@ -176,6 +176,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         updatePassword: (userId: string, currentPassword: string, newPassword: string)     => ipcRenderer.invoke('db:auth:updatePassword', userId, currentPassword, newPassword),
         updateName:     (userId: string, newName: string)                                  => ipcRenderer.invoke('db:auth:updateName', userId, newName),
         seedDefault:    ()                                                                 => ipcRenderer.invoke('db:auth:seedDefault'),
+        validate:       (userId: string)                                                   => ipcRenderer.invoke('db:auth:validate', userId),
         getAll:         ()                                                                 => ipcRenderer.invoke('db:auth:getAll'),
         updateRole:     (userId: string, role: string)                                     => ipcRenderer.invoke('db:auth:updateRole', userId, role),
     },

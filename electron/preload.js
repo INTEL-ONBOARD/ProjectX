@@ -155,6 +155,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         updatePassword: (userId, currentPassword, newPassword) => electron_1.ipcRenderer.invoke('db:auth:updatePassword', userId, currentPassword, newPassword),
         updateName: (userId, newName) => electron_1.ipcRenderer.invoke('db:auth:updateName', userId, newName),
         seedDefault: () => electron_1.ipcRenderer.invoke('db:auth:seedDefault'),
+        validate: (userId) => electron_1.ipcRenderer.invoke('db:auth:validate', userId),
         getAll: () => electron_1.ipcRenderer.invoke('db:auth:getAll'),
         updateRole: (userId, role) => electron_1.ipcRenderer.invoke('db:auth:updateRole', userId, role),
     },

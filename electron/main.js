@@ -1178,6 +1178,10 @@ function registerDbHandlers() {
         const docs = await AuthUserModel.find().lean();
         return safe(docs.map(d => ({ id: d.appId, name: d.name, email: d.email, role: d.role })));
     });
+    electron_1.ipcMain.handle('db:auth:validate', async (_e, userId) => {
+        const found = await AuthUserModel.findOne({ appId: userId }).lean();
+        return found ? safe(toAuthUser(found)) : null;
+    });
     electron_1.ipcMain.handle('db:auth:updateRole', async (_e, userId, role) => {
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { role });
         return true;
