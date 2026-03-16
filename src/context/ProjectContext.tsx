@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Project, Task, TaskStatus } from '../types';
+import { useAuth } from './AuthContext';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = () => (window as any).electronAPI.db;
@@ -33,6 +34,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [activeProject, setActiveProject] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const { user: authUser } = useAuth() ?? { user: null };
 
   useEffect(() => {
     Promise.all([api().getProjects(), api().getTasks()])
@@ -69,13 +71,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const createTask = async (taskData: Omit<Task, 'id'> & { projectId?: string }) => {
-    const newTask = await api().createTask(taskData) as Task;
+    const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
+    const newTask = await api().createTask({ ...taskData, ...actorMeta }) as Task;
     setAllTasks(prev => [...prev, newTask]);
   };
 
   const updateTask = async (id: string, changes: Partial<Omit<Task, 'id'>>) => {
-    await api().updateTask(id, changes);
-    setAllTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
+    const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
+    const updated = await api().updateTask(id, { ...changes, ...actorMeta }) as Task | null;
+    if (updated) {
+      setAllTasks(prev => prev.map(t => t.id === id ? updated : t));
+    } else {
+      setAllTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
+    }
   };
 
   const deleteTask = async (id: string) => {
@@ -84,8 +92,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const moveTask = async (id: string, newStatus: TaskStatus) => {
-    await api().moveTask(id, newStatus);
-    setAllTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
+    const moved = await api().moveTask(id, newStatus, actorMeta.actorId, actorMeta.actorName) as Task | null;
+    if (moved) {
+      setAllTasks(prev => prev.map(t => t.id === id ? moved : t));
+    } else {
+      setAllTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    }
   };
 
   const scrubAssignee = async (memberId: string) => {
