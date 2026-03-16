@@ -16,7 +16,23 @@ import {
     Bug,
     Pencil,
     Trash2,
+    GripVertical,
 } from 'lucide-react';
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    verticalListSortingStrategy,
+    useSortable,
+    arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useProjects } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
 import { useRolePerms } from '../../context/RolePermsContext';
@@ -61,9 +77,22 @@ const Sidebar: React.FC<SidebarProps> = ({
     const { getAllowedRoutes } = useRolePerms();
     const { members } = useMembersContext();
     const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+    const [navOrder, setNavOrder] = useState<string[]>([]);
 
     const allowedRoutes = getAllowedRoutes(user?.role ?? 'member');
-    const navItems = ALL_NAV_ITEMS.filter(item => allowedRoutes.includes(item.id));
+
+    const allowedIds = ALL_NAV_ITEMS
+        .filter(item => allowedRoutes.includes(item.id))
+        .map(item => item.id);
+
+    const orderedNavIds = [
+        ...navOrder.filter(id => allowedIds.includes(id)),
+        ...allowedIds.filter(id => !navOrder.includes(id)),
+    ];
+
+    const navItems = orderedNavIds
+        .map(id => ALL_NAV_ITEMS.find(item => item.id === id)!);
+
     const onMessagesPage = location.pathname === '/messages';
 
     useEffect(() => {
@@ -75,6 +104,17 @@ const Sidebar: React.FC<SidebarProps> = ({
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI;
+        api?.userPrefs?.get(user.id)
+            .then((prefs: { navOrder?: string[] } | null) => {
+                if (prefs?.navOrder?.length) setNavOrder(prefs.navOrder);
+            })
+            .catch(() => { /* fall back to default order */ });
+    }, [user?.id]);
 
     // Unread message badge: query DB on mount and whenever user leaves the messages page.
     // 520ms delay after leaving messages page lets markMessagesRead finish before we recount.
