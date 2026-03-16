@@ -67,6 +67,8 @@ const MessagesPage: React.FC = () => {
   useEffect(() => {
     if (!currentUserId || conversations.length === 0) return;
     conversations.forEach(peer => {
+      // Skip the active conversation — the active-conversation effect handles it and marks as read
+      if (peer.id === activeMember?.id) return;
       dbApi().getMessagesBetween(currentUserId, peer.id)
         .then((msgs: Msg[]) => setChats(prev => ({ ...prev, [peer.id]: msgs as Msg[] })))
         .catch((err: unknown) => console.error('[MessagesPage] Failed to preload messages for', peer.id, err));
@@ -105,7 +107,12 @@ const MessagesPage: React.FC = () => {
       setChats(prev => {
         const existing = prev[peerId] ?? [];
         if (existing.some((m: Msg) => m.id === msg.id)) return prev;
-        return { ...prev, [peerId]: [...existing, { id: msg.id, from: msg.from, text: msg.text, time: msg.time, read: false }] };
+        const isActive = peerId === activeId;
+        const newMsg = { id: msg.id, from: msg.from, text: msg.text, time: msg.time, read: isActive };
+        if (isActive) {
+          dbApi().markMessagesRead(currentUserId, peerId).catch(() => {});
+        }
+        return { ...prev, [peerId]: [...existing, newMsg] };
       });
     });
     return () => unsub?.();
@@ -245,6 +252,15 @@ const MessagesPage: React.FC = () => {
     }
   };
 
+  const getUnread = (userId: string) => {
+    return (chats[userId] ?? []).filter(m => !m.read && m.from !== myId).length;
+  };
+
+  const getLastMsg = (userId: string) => {
+    const msgs = chats[userId] ?? [];
+    return msgs[msgs.length - 1];
+  };
+
   const filteredConvos = conversations.filter(m => {
     if (archivedIds.has(m.id)) return false;
     if (!m.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -252,15 +268,6 @@ const MessagesPage: React.FC = () => {
     if (msgFilter === 'unread') return getUnread(m.id) > 0;
     return true;
   });
-
-  const getLastMsg = (userId: string) => {
-    const msgs = chats[userId] ?? [];
-    return msgs[msgs.length - 1];
-  };
-
-  const getUnread = (userId: string) => {
-    return (chats[userId] ?? []).filter(m => !m.read && m.from !== myId).length;
-  };
 
   return (
     <motion.div

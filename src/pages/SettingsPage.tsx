@@ -1146,8 +1146,8 @@ const SettingsPage: React.FC = () => {
 {/* Install button once download is complete */}
                         {updateState.status === 'downloaded' && (
                           <motion.button onClick={installUpdate}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#5030E5] to-[#7C3AED] text-white shadow-md"
-                            whileHover={{ scale: 1.03, boxShadow: '0 8px 24px rgba(80,48,229,0.35)' }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-primary-500 text-white hover:bg-primary-600 transition-colors"
+                            whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.97 }}
                           >
                             <Download size={14} /> Install & Restart
