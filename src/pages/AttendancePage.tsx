@@ -179,7 +179,7 @@ const TodaySessionCard: React.FC = () => {
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-[#D58D49] text-[#D58D49] flex items-center justify-center gap-2 hover:bg-[#DFA87415] transition-colors disabled:opacity-60"
           >
-            <Coffee size={15} /> Break Out
+            <Coffee size={15} /> Break In
           </button>
           <button
             onClick={handlePunchOut}
@@ -198,7 +198,7 @@ const TodaySessionCard: React.FC = () => {
           className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
           style={{ background: '#D58D49' }}
         >
-          <Coffee size={15} /> Break In
+          <Coffee size={15} /> Break Out
         </button>
       )}
 

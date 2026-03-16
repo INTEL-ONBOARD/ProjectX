@@ -257,7 +257,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                         Clock Out
                     </button>
 
-                    {/* Break Out (start break) */}
+                    {/* Break In (start break) */}
                     <button
                         onClick={breakOut}
                         disabled={!isClockedIn || isClockedOut || isOnBreak}
@@ -270,10 +270,10 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                             }`}
                     >
                         <Coffee size={11} />
-                        Break Out
+                        Break In
                     </button>
 
-                    {/* Break In (end break) */}
+                    {/* Break Out (end break) */}
                     <button
                         onClick={breakIn}
                         disabled={!isOnBreak}
@@ -284,7 +284,7 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                             }`}
                     >
                         <PlayCircle size={11} />
-                        Break In
+                        Break Out
                     </button>
                 </div>
             </div>
