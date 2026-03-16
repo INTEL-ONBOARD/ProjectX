@@ -569,7 +569,15 @@ const SettingsPage: React.FC = () => {
               >
                 {/* Card 1 — Delivery Channels */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
+                  <div className="relative bg-white rounded-2xl overflow-hidden shadow-sm ring-1 ring-surface-100">
+                    {/* Blur overlay */}
+                    <div className="absolute inset-0 z-10 backdrop-blur-[3px] bg-white/60 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
+                      <div className="w-8 h-8 rounded-xl bg-primary-500/10 flex items-center justify-center">
+                        <Bell size={16} className="text-primary-500" />
+                      </div>
+                      <span className="text-sm font-semibold text-gray-700">Coming Soon</span>
+                      <span className="text-xs text-gray-400">This feature will be available soon</span>
+                    </div>
                     <div className="flex items-center justify-between px-6 py-4 border-b border-surface-100">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary-500/10">
