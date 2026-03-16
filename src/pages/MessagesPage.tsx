@@ -57,13 +57,6 @@ const MessagesPage: React.FC = () => {
     }
   }, [location.state]);
 
-  // Auto-select first conversation if none is selected
-  useEffect(() => {
-    if (!activeId && conversations.length > 0) {
-      setActiveId(conversations[0].id);
-      activeIdRef.current = conversations[0].id;
-    }
-  }, [conversations.length]);
 
   // Keep ref in sync with state on every render (used inside callbacks to avoid stale closures)
   activeIdRef.current = activeId;

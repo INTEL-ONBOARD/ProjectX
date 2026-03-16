@@ -7,8 +7,8 @@ const UpdateBanner: React.FC = () => {
     const { state, installUpdate, dismiss } = useAppUpdater();
     const { status, version, progress } = state;
 
-    // Don't show the error banner — errors are shown in Settings → About instead
-    const visible = status === 'available' || status === 'downloading' || status === 'downloaded';
+    // Update banner is hidden — updates are managed from Settings → About only
+    const visible = false;
 
     return (
         <AnimatePresence>
