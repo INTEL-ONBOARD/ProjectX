@@ -30,6 +30,58 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         electron_1.ipcRenderer.on('msg:new', cb);
         return () => electron_1.ipcRenderer.removeListener('msg:new', cb);
     },
+    onProjectChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:project:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:project:changed', cb);
+    },
+    onTaskChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:task:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:task:changed', cb);
+    },
+    onMemberChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:member:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:member:changed', cb);
+    },
+    onAttendanceChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:attendance:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:attendance:changed', cb);
+    },
+    onProjectRichChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:projectrich:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:projectrich:changed', cb);
+    },
+    onRolePermsChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:roleperms:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:roleperms:changed', cb);
+    },
+    onRoleChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:role:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:role:changed', cb);
+    },
+    onOrgChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:org:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:org:changed', cb);
+    },
+    onNotifPrefChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:notifpref:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:notifpref:changed', cb);
+    },
+    onAppearancePrefChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:appearancepref:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:appearancepref:changed', cb);
+    },
+    onConvMetaChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:convmeta:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:convmeta:changed', cb);
+    },
+    onDeptChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:dept:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:dept:changed', cb);
+    },
+    onAuthUserChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:authuser:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:authuser:changed', cb);
+    },
     // Update event listeners
     onUpdateChecking: (cb) => {
         electron_1.ipcRenderer.on('update:checking', cb);

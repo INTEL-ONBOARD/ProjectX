@@ -38,7 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
-const { randomUUID } = require("crypto");
+const crypto_1 = require("crypto");
 const dotenv_1 = __importDefault(require("dotenv"));
 const mongoose_1 = __importStar(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -242,6 +242,19 @@ const toRole = (d) => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3A
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 let mainWindow = null;
 let messageStream = null;
+let projectStream = null;
+let taskStream = null;
+let memberStream = null;
+let attendanceStream = null;
+let projectRichStream = null;
+let rolePermsStream = null;
+let rolesStream = null;
+let orgStream = null;
+let notifPrefStream = null;
+let appearancePrefStream = null;
+let convMetaStream = null;
+let deptStream = null;
+let authUserStream = null;
 function startMessageStream() {
     if (messageStream) {
         try {
@@ -276,6 +289,496 @@ function startMessageStream() {
     }
     catch (err) {
         console.error('[changeStream] failed to start:', err.message);
+    }
+}
+function startDataStreams() {
+    // Projects stream
+    if (projectStream) {
+        try {
+            projectStream.close();
+        }
+        catch (_) { }
+        projectStream = null;
+    }
+    try {
+        projectStream = ProjectModel.watch([], { fullDocument: 'updateLookup' });
+        projectStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:project:changed', { op, doc: safe(toProject(d)) });
+            }
+            else if (op === 'delete') {
+                const id = change.documentKey?._id?.toString();
+                mainWindow.webContents.send('data:project:changed', { op, id });
+            }
+        });
+        projectStream.on('error', (err) => {
+            console.error('[changeStream:project] error:', err.message);
+            try {
+                projectStream.close();
+            }
+            catch (_) { }
+            projectStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] project stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:project] failed to start:', err.message);
+    }
+    // Tasks stream
+    if (taskStream) {
+        try {
+            taskStream.close();
+        }
+        catch (_) { }
+        taskStream = null;
+    }
+    try {
+        taskStream = TaskModel.watch([], { fullDocument: 'updateLookup' });
+        taskStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:task:changed', { op, doc: safe(toTask(d)) });
+            }
+            else if (op === 'delete') {
+                const id = change.documentKey?._id?.toString();
+                mainWindow.webContents.send('data:task:changed', { op, id });
+            }
+        });
+        taskStream.on('error', (err) => {
+            console.error('[changeStream:task] error:', err.message);
+            try {
+                taskStream.close();
+            }
+            catch (_) { }
+            taskStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] task stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:task] failed to start:', err.message);
+    }
+    // Members stream
+    if (memberStream) {
+        try {
+            memberStream.close();
+        }
+        catch (_) { }
+        memberStream = null;
+    }
+    try {
+        memberStream = UserModel.watch([], { fullDocument: 'updateLookup' });
+        memberStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:member:changed', { op, doc: safe(toUser(d)) });
+            }
+            else if (op === 'delete') {
+                const id = change.documentKey?._id?.toString();
+                mainWindow.webContents.send('data:member:changed', { op, id });
+            }
+        });
+        memberStream.on('error', (err) => {
+            console.error('[changeStream:member] error:', err.message);
+            try {
+                memberStream.close();
+            }
+            catch (_) { }
+            memberStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] member stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:member] failed to start:', err.message);
+    }
+    // Attendance stream
+    if (attendanceStream) {
+        try {
+            attendanceStream.close();
+        }
+        catch (_) { }
+        attendanceStream = null;
+    }
+    try {
+        attendanceStream = AttendanceModel.watch([], { fullDocument: 'updateLookup' });
+        attendanceStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:attendance:changed', { op, doc: safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }) });
+            }
+            else if (op === 'delete') {
+                mainWindow.webContents.send('data:attendance:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        attendanceStream.on('error', (err) => {
+            console.error('[changeStream:attendance] error:', err.message);
+            try {
+                attendanceStream.close();
+            }
+            catch (_) { }
+            attendanceStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] attendance stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:attendance] failed to start:', err.message);
+    }
+    // ProjectRich stream
+    if (projectRichStream) {
+        try {
+            projectRichStream.close();
+        }
+        catch (_) { }
+        projectRichStream = null;
+    }
+    try {
+        projectRichStream = ProjectRichModel.watch([], { fullDocument: 'updateLookup' });
+        projectRichStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:projectrich:changed', { op, doc: safe(toProjectRich(d)) });
+            }
+            else if (op === 'delete') {
+                mainWindow.webContents.send('data:projectrich:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        projectRichStream.on('error', (err) => {
+            console.error('[changeStream:projectrich] error:', err.message);
+            try {
+                projectRichStream.close();
+            }
+            catch (_) { }
+            projectRichStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] projectRich stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:projectrich] failed to start:', err.message);
+    }
+    // RolePerms stream
+    if (rolePermsStream) {
+        try {
+            rolePermsStream.close();
+        }
+        catch (_) { }
+        rolePermsStream = null;
+    }
+    try {
+        rolePermsStream = RolePermsModel.watch([], { fullDocument: 'updateLookup' });
+        rolePermsStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:roleperms:changed', { op, doc: safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] }) });
+            }
+            else if (op === 'delete') {
+                mainWindow.webContents.send('data:roleperms:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        rolePermsStream.on('error', (err) => {
+            console.error('[changeStream:roleperms] error:', err.message);
+            try {
+                rolePermsStream.close();
+            }
+            catch (_) { }
+            rolePermsStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] rolePerms stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:roleperms] failed to start:', err.message);
+    }
+    // Roles stream
+    if (rolesStream) {
+        try {
+            rolesStream.close();
+        }
+        catch (_) { }
+        rolesStream = null;
+    }
+    try {
+        rolesStream = RoleModel.watch([], { fullDocument: 'updateLookup' });
+        rolesStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:role:changed', { op, doc: safe(toRole(d)) });
+            }
+            else if (op === 'delete') {
+                mainWindow.webContents.send('data:role:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        rolesStream.on('error', (err) => {
+            console.error('[changeStream:roles] error:', err.message);
+            try {
+                rolesStream.close();
+            }
+            catch (_) { }
+            rolesStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] roles stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:roles] failed to start:', err.message);
+    }
+    // Org stream
+    if (orgStream) {
+        try {
+            orgStream.close();
+        }
+        catch (_) { }
+        orgStream = null;
+    }
+    try {
+        orgStream = OrgModel.watch([], { fullDocument: 'updateLookup' });
+        orgStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:org:changed', { op, doc: safe(toOrg(d)) });
+            }
+        });
+        orgStream.on('error', (err) => {
+            console.error('[changeStream:org] error:', err.message);
+            try {
+                orgStream.close();
+            }
+            catch (_) { }
+            orgStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] org stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:org] failed to start:', err.message);
+    }
+    // NotifPref stream
+    if (notifPrefStream) {
+        try {
+            notifPrefStream.close();
+        }
+        catch (_) { }
+        notifPrefStream = null;
+    }
+    try {
+        notifPrefStream = NotifPrefModel.watch([], { fullDocument: 'updateLookup' });
+        notifPrefStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:notifpref:changed', { op, doc: safe(toNotifPref(d)) });
+            }
+        });
+        notifPrefStream.on('error', (err) => {
+            console.error('[changeStream:notifpref] error:', err.message);
+            try {
+                notifPrefStream.close();
+            }
+            catch (_) { }
+            notifPrefStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] notifPref stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:notifpref] failed to start:', err.message);
+    }
+    // AppearancePref stream
+    if (appearancePrefStream) {
+        try {
+            appearancePrefStream.close();
+        }
+        catch (_) { }
+        appearancePrefStream = null;
+    }
+    try {
+        appearancePrefStream = AppearancePrefModel.watch([], { fullDocument: 'updateLookup' });
+        appearancePrefStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:appearancepref:changed', { op, doc: safe(toAppearancePref(d)) });
+            }
+        });
+        appearancePrefStream.on('error', (err) => {
+            console.error('[changeStream:appearancepref] error:', err.message);
+            try {
+                appearancePrefStream.close();
+            }
+            catch (_) { }
+            appearancePrefStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] appearancePref stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:appearancepref] failed to start:', err.message);
+    }
+    // ConvMeta stream
+    if (convMetaStream) {
+        try {
+            convMetaStream.close();
+        }
+        catch (_) { }
+        convMetaStream = null;
+    }
+    try {
+        convMetaStream = ConvMetaModel.watch([], { fullDocument: 'updateLookup' });
+        convMetaStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:convmeta:changed', { op, doc: safe(toConvMeta(d)) });
+            }
+            else if (op === 'delete') {
+                mainWindow.webContents.send('data:convmeta:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        convMetaStream.on('error', (err) => {
+            console.error('[changeStream:convmeta] error:', err.message);
+            try {
+                convMetaStream.close();
+            }
+            catch (_) { }
+            convMetaStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] convMeta stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:convmeta] failed to start:', err.message);
+    }
+    // Dept stream
+    if (deptStream) {
+        try {
+            deptStream.close();
+        }
+        catch (_) { }
+        deptStream = null;
+    }
+    try {
+        deptStream = DeptModel.watch([], { fullDocument: 'updateLookup' });
+        deptStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:dept:changed', { op, doc: safe(toDept(d)) });
+            }
+            else if (op === 'delete') {
+                mainWindow.webContents.send('data:dept:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        deptStream.on('error', (err) => {
+            console.error('[changeStream:dept] error:', err.message);
+            try {
+                deptStream.close();
+            }
+            catch (_) { }
+            deptStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] dept stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:dept] failed to start:', err.message);
+    }
+    // AuthUser stream (for OrganizationPage users list)
+    if (authUserStream) {
+        try {
+            authUserStream.close();
+        }
+        catch (_) { }
+        authUserStream = null;
+    }
+    try {
+        authUserStream = AuthUserModel.watch([], { fullDocument: 'updateLookup' });
+        authUserStream.on('change', (change) => {
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d)
+                    mainWindow.webContents.send('data:authuser:changed', { op, doc: safe(toAuthUser(d)) });
+            }
+            else if (op === 'delete') {
+                mainWindow.webContents.send('data:authuser:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        authUserStream.on('error', (err) => {
+            console.error('[changeStream:authuser] error:', err.message);
+            try {
+                authUserStream.close();
+            }
+            catch (_) { }
+            authUserStream = null;
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startDataStreams(); }, 5000);
+        });
+        console.log('[changeStream] authUser stream started');
+    }
+    catch (err) {
+        console.error('[changeStream:authuser] failed to start:', err.message);
     }
 }
 async function ensureDefaultData() {
@@ -345,7 +848,7 @@ function registerDbHandlers() {
     electron_1.ipcMain.handle('db:tasks:create', async (_e, taskData) => {
         const { actorId, actorName, ...rest } = taskData;
         const entry = {
-            id: randomUUID(),
+            id: (0, crypto_1.randomUUID)(),
             type: 'created',
             actorId: actorId ?? 'system',
             actorName: actorName ?? 'System',
@@ -369,7 +872,7 @@ function registerDbHandlers() {
         ];
         for (const [field, type] of scalarFields) {
             if (rest[field] !== undefined && String(rest[field]) !== String(current[field] ?? '')) {
-                entries.push({ id: randomUUID(), type, ...actor, timestamp: ts, from: String(current[field] ?? ''), to: String(rest[field]) });
+                entries.push({ id: (0, crypto_1.randomUUID)(), type, ...actor, timestamp: ts, from: String(current[field] ?? ''), to: String(rest[field]) });
             }
         }
         if (rest.assignees !== undefined) {
@@ -377,11 +880,11 @@ function registerDbHandlers() {
             const newSet = new Set(rest.assignees);
             for (const a of newSet) {
                 if (!oldSet.has(a))
-                    entries.push({ id: randomUUID(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
+                    entries.push({ id: (0, crypto_1.randomUUID)(), type: 'assignee_added', ...actor, timestamp: ts, to: a });
             }
             for (const a of oldSet) {
                 if (!newSet.has(a))
-                    entries.push({ id: randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
+                    entries.push({ id: (0, crypto_1.randomUUID)(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
             }
         }
         const updateDoc = { $set: { ...rest } };
@@ -396,7 +899,7 @@ function registerDbHandlers() {
         if (!current)
             return null;
         const entry = {
-            id: randomUUID(),
+            id: (0, crypto_1.randomUUID)(),
             type: 'status_changed',
             actorId: actorId ?? 'system',
             actorName: actorName ?? 'System',
@@ -459,7 +962,7 @@ function registerDbHandlers() {
         return true;
     });
     electron_1.ipcMain.handle('db:messages:markRead', async (_e, userId, peerId) => {
-        await MessageModel.updateMany({ fromId: peerId, toId: userId, read: false }, { read: true });
+        await MessageModel.updateMany({ fromId: peerId, toId: userId, read: { $ne: true } }, { read: true });
         return true;
     });
     // Conv meta (pin/star/archive)
@@ -721,6 +1224,7 @@ function checkForUpdates(userTriggered = false) {
     if (!mainWindow)
         return;
     if (!autoUpdater) {
+        // Only report the error to the UI when the user explicitly pressed "Check for Updates"
         if (userTriggered) {
             mainWindow.webContents.send('update:error', 'Automatic updates are not configured for this build. Please download the latest version manually.');
         }
@@ -773,15 +1277,16 @@ function createWindow() {
         if (autoUpdater)
             setTimeout(() => checkForUpdates(), 3000);
         startMessageStream();
+        startDataStreams();
     });
     mainWindow.on('closed', () => { mainWindow = null; });
     // Block end-user refresh shortcuts in production (Ctrl+R, Cmd+R, F5)
     if (!process.env.VITE_DEV_SERVER_URL) {
         mainWindow.webContents.on('before-input-event', (event, input) => {
-            const isReload =
-                (input.key === 'r' && (input.control || input.meta)) ||
+            const isReload = (input.key === 'r' && (input.control || input.meta)) ||
                 (input.key === 'F5');
-            if (isReload) event.preventDefault();
+            if (isReload)
+                event.preventDefault();
         });
     }
 }
@@ -804,6 +1309,97 @@ electron_1.app.on('before-quit', () => {
         }
         catch (_) { }
         messageStream = null;
+    }
+    if (projectStream) {
+        try {
+            projectStream.close();
+        }
+        catch (_) { }
+        projectStream = null;
+    }
+    if (taskStream) {
+        try {
+            taskStream.close();
+        }
+        catch (_) { }
+        taskStream = null;
+    }
+    if (memberStream) {
+        try {
+            memberStream.close();
+        }
+        catch (_) { }
+        memberStream = null;
+    }
+    if (attendanceStream) {
+        try {
+            attendanceStream.close();
+        }
+        catch (_) { }
+        attendanceStream = null;
+    }
+    if (projectRichStream) {
+        try {
+            projectRichStream.close();
+        }
+        catch (_) { }
+        projectRichStream = null;
+    }
+    if (rolePermsStream) {
+        try {
+            rolePermsStream.close();
+        }
+        catch (_) { }
+        rolePermsStream = null;
+    }
+    if (rolesStream) {
+        try {
+            rolesStream.close();
+        }
+        catch (_) { }
+        rolesStream = null;
+    }
+    if (orgStream) {
+        try {
+            orgStream.close();
+        }
+        catch (_) { }
+        orgStream = null;
+    }
+    if (notifPrefStream) {
+        try {
+            notifPrefStream.close();
+        }
+        catch (_) { }
+        notifPrefStream = null;
+    }
+    if (appearancePrefStream) {
+        try {
+            appearancePrefStream.close();
+        }
+        catch (_) { }
+        appearancePrefStream = null;
+    }
+    if (convMetaStream) {
+        try {
+            convMetaStream.close();
+        }
+        catch (_) { }
+        convMetaStream = null;
+    }
+    if (deptStream) {
+        try {
+            deptStream.close();
+        }
+        catch (_) { }
+        deptStream = null;
+    }
+    if (authUserStream) {
+        try {
+            authUserStream.close();
+        }
+        catch (_) { }
+        authUserStream = null;
     }
 });
 electron_1.app.on('window-all-closed', () => { if (process.platform !== 'darwin')
