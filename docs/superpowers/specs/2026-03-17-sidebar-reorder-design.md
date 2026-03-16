@@ -15,8 +15,9 @@ Users can drag and drop navigation items in the sidebar to reorder them. The ord
 
 - All nav items are reorderable (no fixed anchors)
 - Reorder is done via drag-and-drop directly in the sidebar (inline)
-- A drag handle (⠿) appears on hover next to each nav item
+- A drag handle (`GripVertical` icon) appears on hover next to each nav item
 - Clicking the item itself still navigates as before
+- Dragging is disabled when the sidebar is collapsed (handle hidden, dnd-kit disabled)
 - Order persists per-user across restarts
 - Role-based visibility is unaffected
 
@@ -24,34 +25,50 @@ Users can drag and drop navigation items in the sidebar to reorder them. The ord
 
 ## Data & Persistence
 
-### Schema change — `electron/main.js`
+### Schema & mapper changes — `electron/main.ts` (edit first, then mirror to `main.js`)
 
 Add `navOrder` to `UserPrefSchema`:
 
-```js
+```ts
 navOrder: { type: [String], default: [] }
 ```
 
-Update `toUserPref` mapper to include:
+Update `toUserPref` mapper — this change is **required** for `db:userpref:get` to return `navOrder` (the mapper is a whitelist, not pass-through):
 
-```js
+```ts
 navOrder: d.navOrder ?? []
 ```
 
-No new IPC channels are needed. The existing `db:userpref:get` and `db:userpref:set` handlers pass through arbitrary fields.
+### IPC save strategy
 
-### Save behaviour
+The existing `db:userpref:set` handler uses `findOneAndUpdate` with the raw prefs object (no `$set` wrapper). Fields present in the payload are set; fields absent are left untouched on the MongoDB document. However, the `toUserPref` mapper is a whitelist — any schema fields it does not enumerate (e.g. `taskBreakdownSnapshot`) are not returned to the renderer. If the renderer spreads the `get` result and writes it back, those untracked fields will be dropped from the document. To avoid this, the implementation must **read the full current prefs, merge `navOrder` into them, then write the full object**:
 
-- On drop: local state updates immediately, then `db:userpref:set` is called in the background (fire-and-forget)
-- On load: `navOrder` is read from `UserPref` on sidebar mount
+```ts
+const current = await electronAPI.userPrefs.get(user.id);
+await electronAPI.userPrefs.set({ ...current, navOrder: newOrder });
+```
+
+### API namespace
+
+All pref access uses `electronAPI.userPrefs.get(userId)` / `electronAPI.userPrefs.set(prefs)` — **not** `electronAPI.db.*`.
+
+---
+
+## Type definitions — `src/vite-env.d.ts`
+
+Add `navOrder?: string[]` to the `ElectronUserPrefs` return type so TypeScript is aware of the field.
 
 ---
 
 ## Sidebar Component — `src/components/layout/Sidebar.tsx`
 
-### Dependency
+### Dependencies (install first)
 
-Add `@dnd-kit/core` and `@dnd-kit/sortable` packages.
+```
+npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+```
+
+`@dnd-kit/utilities` provides `arrayMove`.
 
 ### State
 
@@ -59,42 +76,64 @@ Add `@dnd-kit/core` and `@dnd-kit/sortable` packages.
 const [navOrder, setNavOrder] = useState<string[]>([]);
 ```
 
-Initialised from `UserPref` on mount via `electronAPI.db.getUserPref(user.id)`.
+Initialised from `UserPref` on mount:
+
+```ts
+useEffect(() => {
+  electronAPI.userPrefs.get(user.id).then(prefs => {
+    if (prefs?.navOrder?.length) setNavOrder(prefs.navOrder);
+  }).catch(() => { /* fall back to ALL_NAV_ITEMS default order */ });
+}, [user?.id]);
+```
 
 ### Derived nav items
 
 ```ts
-const orderedNavItems = [
-  // items in saved order that are allowed
-  ...navOrder.filter(id => allowedRoutes.includes(id)),
-  // any allowed items not yet in navOrder (e.g. new routes)
-  ...ALL_NAV_ITEMS
-    .filter(item => allowedRoutes.includes(item.id) && !navOrder.includes(item.id))
-].map(id => ALL_NAV_ITEMS.find(item => item.id === id)!);
+const allowedIds = ALL_NAV_ITEMS
+  .filter(item => allowedRoutes.includes(item.id))
+  .map(item => item.id);
+
+const orderedNavIds = [
+  // saved order, filtered to allowed
+  ...navOrder.filter(id => allowedIds.includes(id)),
+  // allowed items not yet in navOrder (e.g. new routes added in future)
+  ...allowedIds.filter(id => !navOrder.includes(id)),
+];
+
+const orderedNavItems = orderedNavIds
+  .map(id => ALL_NAV_ITEMS.find(item => item.id === id)!);
 ```
 
-### Drag-and-drop
+### Drag-and-drop integration
 
-- Wrap nav list in `<DndContext>` and `<SortableContext>`
-- Each nav item wrapped in `useSortable` hook
-- Drag handle icon (e.g. `GripVertical` from lucide-react) shown on hover, used as the drag activator
-- On `dragEnd`: call `arrayMove` to reorder, update `navOrder` state, call `db:userpref:set` with new order
+**`motion.li` / dnd-kit conflict:** `useSortable` applies its own CSS `transform` via a `style` prop. This conflicts with Framer Motion's `whileHover={{ x: 2 }}` and the `layoutId="nav-indicator"` active indicator. Resolution: replace `<motion.li>` with a plain `<li>` and apply the `transform` style from `useSortable`. The `layoutId` active indicator can remain on the inner element unaffected.
 
-### Role changes
+Each nav item is wrapped in a `SortableNavItem` sub-component using `useSortable`. The `GripVertical` handle uses `{...attributes} {...listeners}` so only the handle initiates a drag — the nav button click still navigates.
 
-Saved `navOrder` may contain route IDs the user no longer has access to. These are silently filtered out at render time and do not corrupt the stored order.
+When `collapsed === true`: wrap `<DndContext>` conditionally or set `disabled` on the `<SortableContext>` so no drag is initiated; hide the `GripVertical` handle.
+
+On `dragEnd`:
+1. Compute new order with `arrayMove`
+2. `setNavOrder(newOrder)` — instant local update
+3. Fire-and-forget save: read current prefs, merge, write back
 
 ---
 
 ## Error Handling
 
-- If `getUserPref` fails on mount: fall back to `ALL_NAV_ITEMS` default order silently
-- If `setUserPref` fails on save: local state is already correct; log the error, no user-facing feedback needed
+- `userPrefs.get` fails on mount → fall back to `ALL_NAV_ITEMS` default order silently
+- `userPrefs.set` fails on save → local state is already correct; log the error, no user-facing feedback
+
+---
+
+## main.ts / main.js sync
+
+`main.ts` is the source of truth. After editing `main.ts`, manually mirror the same changes to `main.js` (schema field + `toUserPref` mapper line).
 
 ---
 
 ## Out of Scope
 
-- Reordering "My Projects" list (separate feature)
+- Reordering "My Projects" list
 - Admin-enforced nav order
 - Animated drag preview customisation beyond dnd-kit defaults
