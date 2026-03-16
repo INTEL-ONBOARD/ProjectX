@@ -648,11 +648,11 @@ const SettingsPage: React.FC = () => {
               <motion.div key="appearance"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
-                className="flex flex-col gap-4"
+                className="grid grid-cols-2 gap-4 items-stretch"
               >
-                {/* Card 1 — Theme (full width) */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
-                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
+                {/* Card 1 — Theme */}
+                <motion.div className="h-full" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0 }}>
+                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100 h-full">
                     <div className="flex items-start justify-between mb-4">
                       <div>
                         <h3 className="font-semibold text-gray-900 text-sm">Theme</h3>
@@ -731,10 +731,9 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </motion.div>
 
-                {/* Row 2 — Accent Color + Display side-by-side */}
-                <div className="grid grid-cols-2 gap-4 items-start">
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
-                    <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
+                {/* Card 2 — Accent Color */}
+                <motion.div className="h-full" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }}>
+                    <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100 h-full flex flex-col">
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <h3 className="font-semibold text-gray-900 text-sm">Accent Color</h3>
@@ -760,9 +759,13 @@ const SettingsPage: React.FC = () => {
                           {ACCENT_COLORS.find(c => c.hex === accentColor)?.label ?? 'Custom'}
                         </span>
                       </div>
+                      <div className="mt-auto pt-5 border-t border-surface-100">
+                        <p className="text-xs text-gray-400 leading-relaxed">
+                          The selected color is applied across buttons, active states, badges, and highlights throughout the interface.
+                        </p>
+                      </div>
                     </div>
                   </motion.div>
-                </div>
               </motion.div>
             )}
 
