@@ -14,6 +14,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // DB connection event listeners
     onDbConnected: (cb) => { ipcRenderer.on('db:connected', cb); return () => ipcRenderer.removeListener('db:connected', cb); },
     onDbConnectionFailed: (cb) => { ipcRenderer.on('db:connection-failed', cb); return () => ipcRenderer.removeListener('db:connection-failed', cb); },
+    onNewMessage: (cb) => {
+        ipcRenderer.on('msg:new', cb);
+        return () => ipcRenderer.removeListener('msg:new', cb);
+    },
 
     // Update event listeners
     onUpdateChecking: (cb) => { ipcRenderer.on('update:checking', cb); return () => ipcRenderer.removeListener('update:checking', cb); },

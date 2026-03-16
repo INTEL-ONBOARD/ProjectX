@@ -40,6 +40,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('db:reconnected', cb);
         return () => ipcRenderer.removeListener('db:reconnected', cb);
     },
+    onNewMessage: (cb: (_: unknown, msg: { id: string; from: string; to: string; text: string; time: string; read: boolean; reactions: Record<string, unknown>; deleted: boolean }) => void) => {
+        ipcRenderer.on('msg:new', cb);
+        return () => ipcRenderer.removeListener('msg:new', cb);
+    },
 
     // Update event listeners
     onUpdateChecking: (cb: () => void) => {
