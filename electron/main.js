@@ -578,6 +578,7 @@ function setupAutoUpdater() {
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400, height: 900, minWidth: 1100, minHeight: 700,
+        icon: path.join(__dirname, '../build/icon.icns'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
