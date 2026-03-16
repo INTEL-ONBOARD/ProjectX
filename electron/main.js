@@ -219,7 +219,7 @@ const toMsgFrontend = (d) => ({
     to: d.toId,
     text: d.text,
     time: d.timestamp,
-    read: false,
+    read: d.read ?? false,
     reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {},
     deleted: d.deleted ?? false,
 });
@@ -433,11 +433,11 @@ function registerDbHandlers() {
     // Messages
     electron_1.ipcMain.handle('db:messages:getBetween', async (_e, userId, peerId) => {
         const msgs = await MessageModel.find({ $or: [{ fromId: userId, toId: peerId }, { fromId: peerId, toId: userId }] }).sort({ timestamp: 1 }).lean();
-        return safe(msgs.map(toMsg));
+        return safe(msgs.map(toMsgFrontend));
     });
     electron_1.ipcMain.handle('db:messages:send', async (_e, msg) => {
         const d = await MessageModel.create({ msgId: `m${Date.now()}`, ...msg });
-        return safe(toMsg(d.toObject()));
+        return safe(toMsgFrontend(d.toObject()));
     });
     electron_1.ipcMain.handle('db:messages:react', async (_e, msgId, userId, emoji) => {
         const msg = await MessageModel.findOne({ msgId }).lean();
@@ -450,7 +450,7 @@ function registerDbHandlers() {
         else
             reactions[emoji] = [...users, userId];
         const d = await MessageModel.findOneAndUpdate({ msgId }, { reactions }, { returnDocument: 'after' }).lean();
-        return d ? safe(toMsg(d)) : null;
+        return d ? safe(toMsgFrontend(d)) : null;
     });
     electron_1.ipcMain.handle('db:messages:delete', async (_e, msgId) => {
         await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
@@ -537,6 +537,11 @@ function registerDbHandlers() {
         if (!adminExists) {
             const hashed2 = await bcryptjs_1.default.hash('Admin@123', 10);
             await AuthUserModel.create({ appId: 'auth-toursurv-admin', name: 'Admin', email: 'admin@gmail.com', password: hashed2, role: 'admin' });
+        }
+        // Ensure Admin has a UserModel (member) entry so they appear in member lists and messages
+        const adminMemberExists = await UserModel.findOne({ appId: 'auth-toursurv-admin' }).lean();
+        if (!adminMemberExists) {
+            await UserModel.create({ appId: 'auth-toursurv-admin', name: 'Admin', email: 'admin@gmail.com', role: 'admin', status: 'active' });
         }
         // Re-hash any existing plain-text passwords (accounts created before hashing was added)
         const allAuthDocs = await AuthUserModel.find().lean();
