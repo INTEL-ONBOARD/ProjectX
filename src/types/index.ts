@@ -31,6 +31,26 @@ export interface TaskCommentItem {
     time: string;
 }
 
+export type TaskActivityEntryType =
+    | 'created'
+    | 'status_changed'
+    | 'priority_changed'
+    | 'assignee_added'
+    | 'assignee_removed'
+    | 'due_date_changed'
+    | 'title_changed'
+    | 'description_changed';
+
+export interface TaskActivityEntry {
+    id: string;
+    type: TaskActivityEntryType;
+    actorId: string;
+    actorName: string;
+    timestamp: string;
+    from?: string;
+    to?: string;
+}
+
 export interface Task {
     id: string;
     title: string;
@@ -44,6 +64,7 @@ export interface Task {
     images?: string[];
     dueDate?: string;
     projectId?: string;
+    activity?: TaskActivityEntry[];
 }
 
 export interface Project {
