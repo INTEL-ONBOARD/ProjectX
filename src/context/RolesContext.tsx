@@ -61,7 +61,11 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 dbApi().getRoles().then((docs: RoleDoc[]) => setRoles(docs)).catch(() => {});
             }
         });
-        return () => { unsub?.(); };
+        // Fix 7: refetch after DB reconnect
+        const unsubReconnect = electronAPI.onDbReconnected?.(() => {
+            dbApi().getRoles().then((docs: RoleDoc[]) => setRoles(docs)).catch(() => {});
+        });
+        return () => { unsub?.(); unsubReconnect?.(); };
     }, []);
 
     const addRole = useCallback((role: RoleDoc) => {

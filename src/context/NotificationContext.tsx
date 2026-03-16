@@ -45,16 +45,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const { members } = useMembersContext();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const seenRefIds = useRef<Set<string>>(new Set());
+    // Fix 4: guard so generate() never runs before loadNotifs() has populated seenRefIds
+    const notifsLoaded = useRef(false);
 
     // Load persisted notifications for current user on login
     const loadNotifs = useCallback(async () => {
         if (!user) return;
+        notifsLoaded.current = false;
         try {
             const all = await notifsApi().getAll(user.id);
             setNotifications(all);
             seenRefIds.current = new Set(all.map(n => n.refId).filter(Boolean));
             await notifsApi().deleteOld(user.id);
         } catch { /* ignore */ }
+        notifsLoaded.current = true;
     }, [user?.id]);
 
     useEffect(() => {
@@ -62,8 +66,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, [loadNotifs]);
 
     // Generate task_overdue and task_assigned notifications from allTasks
+    // Fix 4: only run after loadNotifs has resolved (notifsLoaded.current === true)
     useEffect(() => {
-        if (!user || allTasks.length === 0) return;
+        if (!user || allTasks.length === 0 || !notifsLoaded.current) return;
         const todayStr = new Date().toISOString().slice(0, 10);
 
         const generate = async () => {
@@ -138,6 +143,30 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         return () => unsub?.();
     }, [user?.id, members]);
+
+    // Fix 9: sync notification read-state and new notifications from other devices
+    useEffect(() => {
+        if (!user) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI;
+        if (!api?.onNotificationChanged) return;
+
+        const unsub = api.onNotificationChanged((_: unknown, payload: { op: string; doc?: AppNotification; id?: string }) => {
+            const { op, doc } = payload;
+            if (!doc || doc.userId !== user.id) return; // only process events for current user
+            if (op === 'insert') {
+                // Another device created a notification — add if not already present
+                setNotifications(prev => prev.some(n => n.id === doc.id) ? prev : [doc, ...prev]);
+            } else if (op === 'update' || op === 'replace') {
+                // e.g. read-state changed on another device
+                setNotifications(prev => prev.map(n => n.id === doc.id ? doc : n));
+            } else if (op === 'delete') {
+                setNotifications(prev => prev.filter(n => n.id !== doc.id));
+            }
+        });
+
+        return () => unsub?.();
+    }, [user?.id]);
 
     const unreadCount = notifications.filter(n => !n.read).length;
 

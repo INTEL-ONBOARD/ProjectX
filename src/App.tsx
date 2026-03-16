@@ -88,13 +88,15 @@ const ACCENT_PALETTES: Record<string, Record<string, string>> = {
     '#EF4444': { 50:'#FEF2F2',100:'#FEE2E2',200:'#FECACA',300:'#FCA5A5',400:'#F87171',500:'#EF4444',600:'#DC2626',700:'#B91C1C',800:'#991B1B',900:'#7F1D1D' },
     '#8B5CF6': { 50:'#F5F3FF',100:'#EDE9FE',200:'#DDD6FE',300:'#C4B5FD',400:'#A78BFA',500:'#8B5CF6',600:'#7C3AED',700:'#6D28D9',800:'#5B21B6',900:'#4C1D95' },
 };
-let appearanceLoaded = false;
+// Fix 5: use a per-user ref instead of a module-level boolean so appearance
+// re-loads correctly when a different user logs in within the same process.
 const AppearanceLoader: React.FC = () => {
     const { user: authUser } = useAuth();
     const { setTheme } = useContext(AppContext);
+    const loadedForRef = React.useRef<string | null>(null);
     useEffect(() => {
-        if (!authUser?.id || appearanceLoaded) return;
-        appearanceLoaded = true;
+        if (!authUser?.id || loadedForRef.current === authUser.id) return;
+        loadedForRef.current = authUser.id;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI?.appearancePrefs;
         if (!api) return;

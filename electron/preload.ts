@@ -45,6 +45,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('msg:new', cb);
         return () => ipcRenderer.removeListener('msg:new', cb);
     },
+    // Fix 3: receive message updates (reactions, soft-deletes) from other clients
+    onMessageUpdated: (cb: (_: unknown, msg: { id: string; from: string; to: string; text: string; time: string; read: boolean; reactions: Record<string, unknown>; deleted: boolean }) => void) => {
+        ipcRenderer.on('msg:updated', cb);
+        return () => ipcRenderer.removeListener('msg:updated', cb);
+    },
     onProjectChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
         ipcRenderer.on('data:project:changed', cb);
         return () => ipcRenderer.removeListener('data:project:changed', cb);
@@ -96,6 +101,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onAuthUserChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
         ipcRenderer.on('data:authuser:changed', cb);
         return () => ipcRenderer.removeListener('data:authuser:changed', cb);
+    },
+    // Fix 9: notification change stream — syncs read-state and new notifications across devices
+    onNotificationChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:notification:changed', cb);
+        return () => ipcRenderer.removeListener('data:notification:changed', cb);
     },
 
     // Update event listeners

@@ -1,14 +1,14 @@
 import React, { useEffect } from 'react';
 import { useAuth } from './AuthContext';
 
-const HEARTBEAT_MS = 3000;
+const HEARTBEAT_MS = 5000;
 const dbApi = () => (window as any).electronAPI.db;
 
 export function getPresenceStatus(lastSeen?: string | null): 'online' | 'away' | 'offline' {
     if (!lastSeen) return 'offline';
     const diffMs = Date.now() - new Date(lastSeen).getTime();
-    if (diffMs < 3_000) return 'online';
-    if (diffMs < 10_000) return 'away';
+    if (diffMs < 8_000) return 'online';
+    if (diffMs < 20_000) return 'away';
     return 'offline';
 }
 

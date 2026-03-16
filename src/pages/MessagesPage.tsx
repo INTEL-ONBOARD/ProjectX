@@ -154,6 +154,28 @@ const MessagesPage: React.FC = () => {
   // Only depends on currentUserId — activeIdRef.current is always fresh without being a dep
   }, [currentUserId]);
 
+  // Fix 3: handle real-time message updates (reactions, deletions) from other clients
+  useEffect(() => {
+    if (!currentUserId) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api = (window as any).electronAPI;
+    if (!api?.onMessageUpdated) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsub = api.onMessageUpdated((_: unknown, msg: any) => {
+      // msg is a full updated message doc — update it in whichever conversation it belongs to
+      const peerId = msg.from === currentUserId ? msg.to : msg.from;
+      setChats(prev => {
+        const existing = prev[peerId];
+        if (!existing) return prev;
+        const updated = existing.map((m: Msg) =>
+          m.id === msg.id ? { ...m, text: msg.text, reactions: msg.reactions, read: msg.read } : m
+        );
+        return { ...prev, [peerId]: updated };
+      });
+    });
+    return () => unsub?.();
+  }, [currentUserId]);
+
   // Load conv meta (pin/star/archive) on mount
   useEffect(() => {
     dbApi().getConvMeta(currentUserId)

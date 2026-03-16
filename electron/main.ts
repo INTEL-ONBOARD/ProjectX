@@ -227,6 +227,8 @@ const toRole = (d: any) => ({ appId: d.appId, name: d.name, color: d.color ?? '#
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
 let mainWindow: BrowserWindow | null = null;
+// Fix 1: flag set once ready-to-show fires — prevents streams from starting before window exists
+let windowReady = false;
 
 let messageStream: any = null;
 let projectStream: any = null;
@@ -242,33 +244,43 @@ let appearancePrefStream: any = null;
 let convMetaStream: any = null;
 let deptStream: any = null;
 let authUserStream: any = null;
+let notificationStream: any = null;
 
 function startMessageStream(): void {
+    if (!windowReady) return; // Fix 1: don't start until window is ready
     if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
     try {
-        messageStream = (MessageModel as any).watch([{ $match: { operationType: 'insert' } }]);
+        // Fix 3: watch all operations so reactions and soft-deletes propagate to other clients
+        messageStream = (MessageModel as any).watch([], { fullDocument: 'updateLookup' });
         messageStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
+            const op = change.operationType;
             const d = change.fullDocument;
             if (!d) return;
-            mainWindow.webContents.send('msg:new', toMsgFrontend(d));
+            if (op === 'insert') {
+                mainWindow.webContents.send('msg:new', toMsgFrontend(d));
+            } else if (op === 'update' || op === 'replace') {
+                mainWindow.webContents.send('msg:updated', toMsgFrontend(d));
+            }
         });
         messageStream.on('error', (err: any) => {
-            console.error('[changeStream] error:', err.message);
+            console.error('[changeStream:message] error:', err.message);
             try { messageStream.close(); } catch (_) {}
             messageStream = null;
+            // Fix 2: restart only this stream, not all streams
             setTimeout(() => {
                 if (mongoose.connection.readyState === 1) startMessageStream();
             }, 5000);
         });
         console.log('[changeStream] message stream started');
     } catch (err: any) {
-        console.error('[changeStream] failed to start:', err.message);
+        console.error('[changeStream:message] failed to start:', err.message);
     }
 }
 
-function startDataStreams(): void {
-    // Projects stream
+// Fix 2: each stream is its own function so an error only restarts that one stream
+function startProjectStream(): void {
+    if (!windowReady) return; // Fix 1
     if (projectStream) { try { projectStream.close(); } catch (_) {} projectStream = null; }
     try {
         projectStream = (ProjectModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -287,14 +299,16 @@ function startDataStreams(): void {
             console.error('[changeStream:project] error:', err.message);
             try { projectStream.close(); } catch (_) {}
             projectStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startProjectStream(); }, 5000);
         });
         console.log('[changeStream] project stream started');
     } catch (err: any) {
         console.error('[changeStream:project] failed to start:', err.message);
     }
+}
 
-    // Tasks stream
+function startTaskStream(): void {
+    if (!windowReady) return;
     if (taskStream) { try { taskStream.close(); } catch (_) {} taskStream = null; }
     try {
         taskStream = (TaskModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -313,14 +327,16 @@ function startDataStreams(): void {
             console.error('[changeStream:task] error:', err.message);
             try { taskStream.close(); } catch (_) {}
             taskStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startTaskStream(); }, 5000);
         });
         console.log('[changeStream] task stream started');
     } catch (err: any) {
         console.error('[changeStream:task] failed to start:', err.message);
     }
+}
 
-    // Members stream
+function startMemberStream(): void {
+    if (!windowReady) return;
     if (memberStream) { try { memberStream.close(); } catch (_) {} memberStream = null; }
     try {
         memberStream = (UserModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -339,14 +355,16 @@ function startDataStreams(): void {
             console.error('[changeStream:member] error:', err.message);
             try { memberStream.close(); } catch (_) {}
             memberStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startMemberStream(); }, 5000);
         });
         console.log('[changeStream] member stream started');
     } catch (err: any) {
         console.error('[changeStream:member] failed to start:', err.message);
     }
+}
 
-    // Attendance stream
+function startAttendanceStream(): void {
+    if (!windowReady) return;
     if (attendanceStream) { try { attendanceStream.close(); } catch (_) {} attendanceStream = null; }
     try {
         attendanceStream = (AttendanceModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -364,14 +382,16 @@ function startDataStreams(): void {
             console.error('[changeStream:attendance] error:', err.message);
             try { attendanceStream.close(); } catch (_) {}
             attendanceStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAttendanceStream(); }, 5000);
         });
         console.log('[changeStream] attendance stream started');
     } catch (err: any) {
         console.error('[changeStream:attendance] failed to start:', err.message);
     }
+}
 
-    // ProjectRich stream
+function startProjectRichStream(): void {
+    if (!windowReady) return;
     if (projectRichStream) { try { projectRichStream.close(); } catch (_) {} projectRichStream = null; }
     try {
         projectRichStream = (ProjectRichModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -389,14 +409,16 @@ function startDataStreams(): void {
             console.error('[changeStream:projectrich] error:', err.message);
             try { projectRichStream.close(); } catch (_) {}
             projectRichStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startProjectRichStream(); }, 5000);
         });
         console.log('[changeStream] projectRich stream started');
     } catch (err: any) {
         console.error('[changeStream:projectrich] failed to start:', err.message);
     }
+}
 
-    // RolePerms stream
+function startRolePermsStream(): void {
+    if (!windowReady) return;
     if (rolePermsStream) { try { rolePermsStream.close(); } catch (_) {} rolePermsStream = null; }
     try {
         rolePermsStream = (RolePermsModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -414,14 +436,16 @@ function startDataStreams(): void {
             console.error('[changeStream:roleperms] error:', err.message);
             try { rolePermsStream.close(); } catch (_) {}
             rolePermsStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startRolePermsStream(); }, 5000);
         });
         console.log('[changeStream] rolePerms stream started');
     } catch (err: any) {
         console.error('[changeStream:roleperms] failed to start:', err.message);
     }
+}
 
-    // Roles stream
+function startRolesStream(): void {
+    if (!windowReady) return;
     if (rolesStream) { try { rolesStream.close(); } catch (_) {} rolesStream = null; }
     try {
         rolesStream = (RoleModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -439,14 +463,16 @@ function startDataStreams(): void {
             console.error('[changeStream:roles] error:', err.message);
             try { rolesStream.close(); } catch (_) {}
             rolesStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startRolesStream(); }, 5000);
         });
         console.log('[changeStream] roles stream started');
     } catch (err: any) {
         console.error('[changeStream:roles] failed to start:', err.message);
     }
+}
 
-    // Org stream
+function startOrgStream(): void {
+    if (!windowReady) return;
     if (orgStream) { try { orgStream.close(); } catch (_) {} orgStream = null; }
     try {
         orgStream = (OrgModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -462,14 +488,16 @@ function startDataStreams(): void {
             console.error('[changeStream:org] error:', err.message);
             try { orgStream.close(); } catch (_) {}
             orgStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startOrgStream(); }, 5000);
         });
         console.log('[changeStream] org stream started');
     } catch (err: any) {
         console.error('[changeStream:org] failed to start:', err.message);
     }
+}
 
-    // NotifPref stream
+function startNotifPrefStream(): void {
+    if (!windowReady) return;
     if (notifPrefStream) { try { notifPrefStream.close(); } catch (_) {} notifPrefStream = null; }
     try {
         notifPrefStream = (NotifPrefModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -485,14 +513,16 @@ function startDataStreams(): void {
             console.error('[changeStream:notifpref] error:', err.message);
             try { notifPrefStream.close(); } catch (_) {}
             notifPrefStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startNotifPrefStream(); }, 5000);
         });
         console.log('[changeStream] notifPref stream started');
     } catch (err: any) {
         console.error('[changeStream:notifpref] failed to start:', err.message);
     }
+}
 
-    // AppearancePref stream
+function startAppearancePrefStream(): void {
+    if (!windowReady) return;
     if (appearancePrefStream) { try { appearancePrefStream.close(); } catch (_) {} appearancePrefStream = null; }
     try {
         appearancePrefStream = (AppearancePrefModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -508,14 +538,16 @@ function startDataStreams(): void {
             console.error('[changeStream:appearancepref] error:', err.message);
             try { appearancePrefStream.close(); } catch (_) {}
             appearancePrefStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAppearancePrefStream(); }, 5000);
         });
         console.log('[changeStream] appearancePref stream started');
     } catch (err: any) {
         console.error('[changeStream:appearancepref] failed to start:', err.message);
     }
+}
 
-    // ConvMeta stream
+function startConvMetaStream(): void {
+    if (!windowReady) return;
     if (convMetaStream) { try { convMetaStream.close(); } catch (_) {} convMetaStream = null; }
     try {
         convMetaStream = (ConvMetaModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -533,14 +565,16 @@ function startDataStreams(): void {
             console.error('[changeStream:convmeta] error:', err.message);
             try { convMetaStream.close(); } catch (_) {}
             convMetaStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startConvMetaStream(); }, 5000);
         });
         console.log('[changeStream] convMeta stream started');
     } catch (err: any) {
         console.error('[changeStream:convmeta] failed to start:', err.message);
     }
+}
 
-    // Dept stream
+function startDeptStream(): void {
+    if (!windowReady) return;
     if (deptStream) { try { deptStream.close(); } catch (_) {} deptStream = null; }
     try {
         deptStream = (DeptModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -558,14 +592,16 @@ function startDataStreams(): void {
             console.error('[changeStream:dept] error:', err.message);
             try { deptStream.close(); } catch (_) {}
             deptStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startDeptStream(); }, 5000);
         });
         console.log('[changeStream] dept stream started');
     } catch (err: any) {
         console.error('[changeStream:dept] failed to start:', err.message);
     }
+}
 
-    // AuthUser stream (for OrganizationPage users list)
+function startAuthUserStream(): void {
+    if (!windowReady) return;
     if (authUserStream) { try { authUserStream.close(); } catch (_) {} authUserStream = null; }
     try {
         authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup' });
@@ -583,12 +619,58 @@ function startDataStreams(): void {
             console.error('[changeStream:authuser] error:', err.message);
             try { authUserStream.close(); } catch (_) {}
             authUserStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDataStreams(); }, 5000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAuthUserStream(); }, 5000);
         });
         console.log('[changeStream] authUser stream started');
     } catch (err: any) {
         console.error('[changeStream:authuser] failed to start:', err.message);
     }
+}
+
+// Fix 9: Notification change stream — syncs read-state across devices in real-time
+function startNotificationStream(): void {
+    if (!windowReady) return;
+    if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
+    try {
+        notificationStream = (NotificationModel as any).watch([], { fullDocument: 'updateLookup' });
+        notificationStream.on('change', (change: any) => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d) mainWindow.webContents.send('data:notification:changed', { op, doc: safe(toNotif(d)) });
+            } else if (op === 'delete') {
+                mainWindow.webContents.send('data:notification:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        notificationStream.on('error', (err: any) => {
+            console.error('[changeStream:notification] error:', err.message);
+            try { notificationStream.close(); } catch (_) {}
+            notificationStream = null;
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startNotificationStream(); }, 5000);
+        });
+        console.log('[changeStream] notification stream started');
+    } catch (err: any) {
+        console.error('[changeStream:notification] failed to start:', err.message);
+    }
+}
+
+// Coordinator — starts all data streams (each restarts itself on error independently)
+function startDataStreams(): void {
+    startProjectStream();
+    startTaskStream();
+    startMemberStream();
+    startAttendanceStream();
+    startProjectRichStream();
+    startRolePermsStream();
+    startRolesStream();
+    startOrgStream();
+    startNotifPrefStream();
+    startAppearancePrefStream();
+    startConvMetaStream();
+    startDeptStream();
+    startAuthUserStream();
+    startNotificationStream();
 }
 
 async function ensureDefaultData() {
@@ -1098,6 +1180,8 @@ function createWindow() {
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
         if (autoUpdater) setTimeout(() => checkForUpdates(), 3000);
+        // Fix 1: set flag before starting streams so windowReady guard passes
+        windowReady = true;
         startMessageStream();
         startDataStreams();
     });
@@ -1143,6 +1227,7 @@ app.on('before-quit', () => {
     if (convMetaStream) { try { convMetaStream.close(); } catch (_) {} convMetaStream = null; }
     if (deptStream) { try { deptStream.close(); } catch (_) {} deptStream = null; }
     if (authUserStream) { try { authUserStream.close(); } catch (_) {} authUserStream = null; }
+    if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
 });
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

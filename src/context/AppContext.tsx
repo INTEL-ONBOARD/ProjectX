@@ -179,7 +179,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const unsub = electronAPI.onOrgChanged?.((_: unknown, payload: { op: string; doc?: Organization }) => {
             if (payload.doc) setOrg(payload.doc);
         });
-        return () => { unsub?.(); };
+        // Fix 7: refetch after DB reconnect
+        const unsubReconnect = electronAPI.onDbReconnected?.(() => {
+            dbApi().getOrg()
+                .then((o: Organization | null) => { if (o) setOrg(o); })
+                .catch(() => {});
+            dbApi().getAttendance()
+                .then((docs: AttendanceRecord[]) => { if (docs?.length) setAttendanceRecords(docs); })
+                .catch(() => {});
+        });
+        return () => { unsub?.(); unsubReconnect?.(); };
     }, []);
 
     // Apply theme to DOM

@@ -76,7 +76,11 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
                 dbApi().getRolePerms().then((data: RolePerms[]) => { if (data?.length) setPerms(data); }).catch(() => {});
             }
         });
-        return () => { unsub?.(); };
+        // Fix 7: refetch after DB reconnect
+        const unsubReconnect = electronAPI.onDbReconnected?.(() => {
+            dbApi().getRolePerms().then((data: RolePerms[]) => { if (data?.length) setPerms(data); }).catch(() => {});
+        });
+        return () => { unsub?.(); unsubReconnect?.(); };
     }, []);
 
     const getAllowedRoutes = useCallback((role: string): string[] => {

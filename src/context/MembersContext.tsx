@@ -54,7 +54,12 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
-    return () => { unsub?.(); };
+    // Fix 7: refetch after DB reconnect
+    const unsubReconnect = electronAPI.onDbReconnected?.(() => {
+      api().getMembers().then((docs: User[]) => setMembers(docs)).catch(() => {});
+    });
+
+    return () => { unsub?.(); unsubReconnect?.(); };
   }, []);
 
   const getMemberColor = (id: string): string => {

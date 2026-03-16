@@ -30,6 +30,11 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         electron_1.ipcRenderer.on('msg:new', cb);
         return () => electron_1.ipcRenderer.removeListener('msg:new', cb);
     },
+    // Fix 3: receive message updates (reactions, soft-deletes) from other clients
+    onMessageUpdated: (cb) => {
+        electron_1.ipcRenderer.on('msg:updated', cb);
+        return () => electron_1.ipcRenderer.removeListener('msg:updated', cb);
+    },
     onProjectChanged: (cb) => {
         electron_1.ipcRenderer.on('data:project:changed', cb);
         return () => electron_1.ipcRenderer.removeListener('data:project:changed', cb);
@@ -81,6 +86,11 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     onAuthUserChanged: (cb) => {
         electron_1.ipcRenderer.on('data:authuser:changed', cb);
         return () => electron_1.ipcRenderer.removeListener('data:authuser:changed', cb);
+    },
+    // Fix 9: notification change stream — syncs read-state and new notifications across devices
+    onNotificationChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:notification:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:notification:changed', cb);
     },
     // Update event listeners
     onUpdateChecking: (cb) => {

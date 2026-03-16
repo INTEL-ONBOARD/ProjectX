@@ -87,7 +87,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
-    return () => { unsubProject?.(); unsubTask?.(); };
+    // Fix 7: refetch after DB reconnect so changes made while offline are reflected
+    const unsubReconnect = electronAPI.onDbReconnected?.(() => {
+      Promise.all([api().getProjects(), api().getTasks()])
+        .then(([prjs, tasks]) => {
+          setProjects(prjs as Project[]);
+          setAllTasks(tasks as Task[]);
+        })
+        .catch(() => {});
+    });
+
+    return () => { unsubProject?.(); unsubTask?.(); unsubReconnect?.(); };
   }, []);
 
   const createProject = async (name: string, color: string): Promise<Project> => {
