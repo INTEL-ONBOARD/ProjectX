@@ -18,6 +18,7 @@ const statusLabels: Record<TaskStatus, string> = {
   'ready-for-qa': 'Ready for QA',
   'deployment-pending': 'Deployment Pending',
   'blocker': 'Blocker',
+  'on-hold': 'On Hold',
   'done': 'Done',
 };
 
@@ -55,7 +56,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
     return () => document.removeEventListener('mousedown', handler);
   }, [showMenu]);
 
-  const otherStatuses = (['todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'done'] as TaskStatus[]).filter(s => s !== task.status);
+  const otherStatuses = (['todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'on-hold', 'done'] as TaskStatus[]).filter(s => s !== task.status);
 
   return (
     <motion.div

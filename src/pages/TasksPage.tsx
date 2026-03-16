@@ -79,7 +79,7 @@ const statusStyles: Record<string, { bg: string; text: string; label: string; do
   'ready-for-qa':       { bg: 'bg-[#30C5E520]',    text: 'text-[#30C5E5]',   label: 'Ready for QA',       dot: 'bg-[#30C5E5]' },
   'deployment-pending': { bg: 'bg-[#9C27B020]',    text: 'text-[#9C27B0]',   label: 'Deployment Pending', dot: 'bg-[#9C27B0]' },
   'blocker':            { bg: 'bg-[#D8727D22]',    text: 'text-[#D8727D]',   label: 'Blocker',            dot: 'bg-[#D8727D]' },
-  'on-hold':            { bg: 'bg-[#78716C22]',    text: 'text-[#78716C]',   label: 'On Hold',            dot: 'bg-[#78716C]' },
+  'on-hold':            { bg: 'bg-[#EAB30820]',    text: 'text-[#EAB308]',   label: 'On Hold',            dot: 'bg-[#EAB308]' },
   'done':               { bg: 'bg-[#83C29D33]',    text: 'text-[#68B266]',   label: 'Done',               dot: 'bg-[#68B266]' },
 };
 

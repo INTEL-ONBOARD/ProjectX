@@ -15,7 +15,7 @@ const STATUS_META = [
   { key: 'ready-for-qa',       label: 'Ready for QA',        color: '#30C5E5' },
   { key: 'deployment-pending', label: 'Deployment Pending',  color: '#9C27B0' },
   { key: 'blocker',            label: 'Blocker',             color: '#D8727D' },
-  { key: 'on-hold',            label: 'On Hold',             color: '#78716C' },
+  { key: 'on-hold',            label: 'On Hold',             color: '#EAB308' },
   { key: 'done',               label: 'Done',                color: '#68B266' },
 ] as const;
 

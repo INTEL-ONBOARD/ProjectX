@@ -78,7 +78,7 @@ const statusStyles: Record<TaskStatus, { bg: string; text: string; label: string
   'ready-for-qa':       { bg: 'bg-[#30C5E520]',    text: 'text-[#30C5E5]',   label: 'Ready for QA',       dot: 'bg-[#30C5E5]' },
   'deployment-pending': { bg: 'bg-[#9C27B020]',    text: 'text-[#9C27B0]',   label: 'Deployment Pending', dot: 'bg-[#9C27B0]' },
   'blocker':            { bg: 'bg-[#D8727D22]',    text: 'text-[#D8727D]',   label: 'Blocker',            dot: 'bg-[#D8727D]' },
-  'on-hold':            { bg: 'bg-[#78716C22]',    text: 'text-[#78716C]',   label: 'On Hold',            dot: 'bg-[#78716C]' },
+  'on-hold':            { bg: 'bg-[#EAB30820]',    text: 'text-[#EAB308]',   label: 'On Hold',            dot: 'bg-[#EAB308]' },
   'done':               { bg: 'bg-[#83C29D33]',    text: 'text-[#68B266]',   label: 'Done',               dot: 'bg-[#68B266]' },
 };
 const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
@@ -214,6 +214,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     { title: 'Ready for QA',        status: 'ready-for-qa',       dotColor: '#30C5E5', lineColor: '#30C5E5' },
     { title: 'Deployment Pending',  status: 'deployment-pending', dotColor: '#9C27B0', lineColor: '#9C27B0' },
     { title: 'Blocker',             status: 'blocker',            dotColor: '#D8727D', lineColor: '#D8727D' },
+    { title: 'On Hold',             status: 'on-hold',            dotColor: '#EAB308', lineColor: '#EAB308' },
     { title: 'Done',                status: 'done',               dotColor: '#8BC34A', lineColor: '#8BC34A' },
   ];
 
