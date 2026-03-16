@@ -15,7 +15,6 @@ const authApi = () => win().electronAPI.auth as {
   validate: (userId: string) => Promise<AuthUser | null>;
 };
 
-// Session token only — no credential storage
 const SESSION_KEY = 'pm_auth_session';
 
 export interface AuthUser {
@@ -30,7 +29,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   hasSeenWalkthrough: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember?: boolean) => Promise<void>;
   register: (name: string, email: string, password: string, role: string, orgId?: string) => Promise<void>;
   logout: () => void;
   markWalkthroughSeen: () => void;
@@ -47,60 +46,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasSeenWalkthrough, setHasSeenWalkthrough] = useState(false);
 
   useEffect(() => {
-    // Restore session synchronously from localStorage so the app shows immediately
-    let restoredUser: AuthUser | null = null;
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      if (raw) restoredUser = JSON.parse(raw) as AuthUser;
-    } catch { /* ignore */ }
+    const savedSession = localStorage.getItem(SESSION_KEY);
 
-    // Restore walkthrough flag synchronously
-    const walkthroughSeen = localStorage.getItem('pm_walkthrough_seen') === 'true';
+    if (savedSession) {
+      // User previously checked "Keep me signed in" — validate against DB
+      let restoredUser: AuthUser | null = null;
+      try { restoredUser = JSON.parse(savedSession) as AuthUser; } catch { /* ignore */ }
 
-    if (restoredUser) {
-      // Validate cached session against DB — auto-clear if user no longer exists (e.g. DB was wiped)
-      authApi().validate(restoredUser.id)
-        .then(valid => {
-          if (valid) {
-            // User still exists — update local cache with latest data from DB
-            const fresh = { ...restoredUser, name: valid.name, role: valid.role };
-            localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
-            setUser(fresh);
-          } else {
-            // User deleted from DB — clear stale session so they can register/login fresh
-            localStorage.removeItem(SESSION_KEY);
-            setUser(null);
-          }
-        })
-        .catch(() => {
-          // DB unreachable — trust local cache optimistically
-          setUser(restoredUser);
-        })
-        .finally(() => {
-          setIsLoading(false);
-          authApi().seedDefault().catch(() => {});
-          if (!walkthroughSeen) {
-            prefsApi().get(restoredUser.id)
-              .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
-              .catch(() => {});
-          }
-        });
-      setHasSeenWalkthrough(walkthroughSeen);
-      // Keep isLoading true until validate resolves
-    } else {
-      // New user — show splash for 2500ms then seed
-      setHasSeenWalkthrough(walkthroughSeen);
-      const timer = setTimeout(async () => {
-        try { await authApi().seedDefault(); } catch { /* ignore */ }
-        setIsLoading(false);
-      }, 2500);
-      return () => clearTimeout(timer);
+      if (restoredUser) {
+        authApi().validate(restoredUser.id)
+          .then(valid => {
+            if (valid) {
+              const fresh = { ...restoredUser!, name: valid.name, role: valid.role };
+              localStorage.setItem(SESSION_KEY, JSON.stringify(fresh));
+              setUser(fresh);
+              prefsApi().get(fresh.id)
+                .then(prefs => { if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true); })
+                .catch(() => {});
+            } else {
+              // User no longer exists in DB — clear stale session
+              localStorage.removeItem(SESSION_KEY);
+              setUser(null);
+            }
+          })
+          .catch(() => {
+            // DB unreachable — trust local cache optimistically
+            setUser(restoredUser);
+          })
+          .finally(() => {
+            authApi().seedDefault().catch(() => {});
+            setIsLoading(false);
+          });
+        return;
+      }
     }
+
+    // No saved session — show splash then go to login
+    const timer = setTimeout(async () => {
+      try { await authApi().seedDefault(); } catch { /* ignore */ }
+      setIsLoading(false);
+    }, 2500);
+    return () => clearTimeout(timer);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, remember = false) => {
     const authUser = await authApi().login(email, password);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+    if (remember) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+    }
+    try {
+      const prefs = await prefsApi().get(authUser.id);
+      if (prefs?.hasSeenWalkthrough) setHasSeenWalkthrough(true);
+    } catch { /* ignore */ }
     setUser(authUser);
   }, []);
 
@@ -112,18 +109,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     orgId?: string
   ) => {
     const authUser = await authApi().register(name, email, password, role, orgId);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+    setHasSeenWalkthrough(false);
     setUser(authUser);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(SESSION_KEY);
+    localStorage.clear();
+    setHasSeenWalkthrough(false);
     setUser(null);
   }, []);
 
   const markWalkthroughSeen = useCallback(() => {
     setHasSeenWalkthrough(true);
-    localStorage.setItem('pm_walkthrough_seen', 'true');
     if (user) {
       prefsApi().set({ userId: user.id, hasSeenWalkthrough: true })
         .catch((err: unknown) => console.error('[AuthContext] Failed to save walkthrough flag:', err));
@@ -139,7 +136,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, name };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      // Keep saved session in sync if user had chosen "keep me signed in"
+      if (localStorage.getItem(SESSION_KEY)) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      }
       return updated;
     });
   }, []);

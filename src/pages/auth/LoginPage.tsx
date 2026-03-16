@@ -41,7 +41,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, remember);
     } catch (err: unknown) {
       const msg = cleanIpcError(err, 'Login failed.');
       if (msg.toLowerCase().includes('buffering timed out') || msg.toLowerCase().includes('timeout')) {
