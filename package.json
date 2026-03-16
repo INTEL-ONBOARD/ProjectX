@@ -1,6 +1,6 @@
 {
   "name": "projectx",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "description": "Project Planning Desktop App",
   "main": "electron/main.js",
   "author": "",

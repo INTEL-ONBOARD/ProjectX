@@ -430,7 +430,7 @@ function registerDbHandlers() {
         return true;
     });
     ipcMain.handle('db:messages:markRead', async (_e, userId: string, peerId: string) => {
-        await MessageModel.updateMany({ fromId: peerId, toId: userId, read: false }, { read: true });
+        await MessageModel.updateMany({ fromId: peerId, toId: userId, read: { $ne: true } }, { read: true });
         return true;
     });
 
