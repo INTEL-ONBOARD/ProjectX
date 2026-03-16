@@ -18,7 +18,7 @@ function addDays(dateStr: string, n: number): string {
     return `${yr}-${mo}-${dy}`;
 }
 
-const TODAY_DATE = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+const TODAY_DATE = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(); // local "YYYY-MM-DD"
 
 const TodaySessionCard: React.FC = () => {
   const { currentUser, attendanceRecords, setAttendanceRecord } = useContext(AppContext);
