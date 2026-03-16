@@ -1,9 +1,7 @@
 import React, { useEffect } from 'react';
 import { useAuth } from './AuthContext';
-import { useMembersContext } from './MembersContext';
 
-const HEARTBEAT_MS = 520;
-const POLL_MS = 520;
+const HEARTBEAT_MS = 3000;
 const dbApi = () => (window as any).electronAPI.db;
 
 export function getPresenceStatus(lastSeen?: string | null): 'online' | 'away' | 'offline' {
@@ -16,8 +14,9 @@ export function getPresenceStatus(lastSeen?: string | null): 'online' | 'away' |
 
 export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user: authUser } = useAuth();
-    const { refetchMembers } = useMembersContext();
 
+    // Only send heartbeats — member lastSeen updates are delivered via MembersContext
+    // change stream (UserModel.watch), so polling refetchMembers is no longer needed.
     useEffect(() => {
         if (!authUser) return;
 
@@ -27,14 +26,7 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             dbApi().heartbeat(authUser.id).catch(console.error);
         }, HEARTBEAT_MS);
 
-        const pollId = setInterval(() => {
-            refetchMembers().catch(console.error);
-        }, POLL_MS);
-
-        return () => {
-            clearInterval(heartbeatId);
-            clearInterval(pollId);
-        };
+        return () => { clearInterval(heartbeatId); };
     }, [authUser?.id]);
 
     return <>{children}</>;

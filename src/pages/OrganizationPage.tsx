@@ -158,6 +158,45 @@ const OrganizationPage: React.FC = () => {
             .catch((err: unknown) => console.error('[OrganizationPage] Failed to load departments:', err));
     }, []);
 
+    // Real-time sync for departments
+    useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI) return;
+        const unsub = electronAPI.onDeptChanged?.((_: unknown, payload: { op: string; doc?: { id: string; name: string; color: string; memberIds: string[] } }) => {
+            const { op, doc } = payload;
+            if (op === 'insert') {
+                if (doc) setDeptRoster(prev => prev.some(d => d.id === doc.id) ? prev : [...prev, { ...doc, icon: FolderKanban }]);
+            } else if (op === 'update' || op === 'replace') {
+                if (doc) setDeptRoster(prev => prev.map(d => d.id === doc.id ? { ...doc, icon: FolderKanban } : d));
+            } else if (op === 'delete') {
+                dbApi().getDepts().then((docs: Array<{ id: string; name: string; color: string; memberIds: string[] }>) => {
+                    setDeptRoster(docs.map(d => ({ id: d.id, name: d.name, color: d.color, memberIds: d.memberIds, icon: FolderKanban })));
+                }).catch(() => {});
+            }
+        });
+        return () => { unsub?.(); };
+    }, []);
+
+    // Real-time sync for auth users list (OrganizationPage users tab)
+    useEffect(() => {
+        if (!isAdmin) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI) return;
+        const unsub = electronAPI.onAuthUserChanged?.((_: unknown, payload: { op: string; doc?: AuthUserRow; id?: string }) => {
+            const { op, doc } = payload;
+            if (op === 'insert') {
+                if (doc) setAuthUsers(prev => prev.some(u => u.id === doc.id) ? prev : [...prev, doc]);
+            } else if (op === 'update' || op === 'replace') {
+                if (doc) setAuthUsers(prev => prev.map(u => u.id === doc.id ? doc : u));
+            } else if (op === 'delete') {
+                authApi().getAll().then((users: AuthUserRow[]) => setAuthUsers(users)).catch(() => {});
+            }
+        });
+        return () => { unsub?.(); };
+    }, [isAdmin]);
+
     const metrics = [
         { label: 'Total Members', value: String(members.length),    trend: 'In org',       color: '',        accent: true,  icon: Users,     barPct: 100 },
         { label: 'Departments',   value: String(deptRoster.length), trend: 'Roles',         color: '#5030E5', accent: false, icon: Building2, barPct: 100 },

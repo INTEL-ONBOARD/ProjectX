@@ -33,6 +33,30 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => { cancelled = true; };
   }, []);
 
+  // Real-time sync: listen for member changes from other clients via MongoDB change streams
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI) return;
+
+    const unsub = electronAPI.onMemberChanged?.((_: unknown, payload: { op: string; doc?: User; id?: string }) => {
+      const { op, doc } = payload;
+      if (op === 'insert') {
+        setMembers(prev => prev.some(m => m.id === doc!.id) ? prev : [...prev, doc!]);
+      } else if (op === 'update' || op === 'replace') {
+        setMembers(prev => {
+          const exists = prev.some(m => m.id === doc!.id);
+          return exists ? prev.map(m => m.id === doc!.id ? doc! : m) : [...prev, doc!];
+        });
+      } else if (op === 'delete') {
+        // For deletes the stream gives _id not appId — refetch to stay in sync
+        api().getMembers().then((docs: User[]) => setMembers(docs)).catch(() => {});
+      }
+    });
+
+    return () => { unsub?.(); };
+  }, []);
+
   const getMemberColor = (id: string): string => {
     if (!id) return memberColors[0];
     // Hash the id so color is stable regardless of list order or deletions

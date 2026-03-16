@@ -173,6 +173,23 @@ const MessagesPage: React.FC = () => {
         .catch((err: unknown) => console.error('[MessagesPage] Failed to load conv meta:', err));
   }, [currentUserId]);
 
+  // Real-time sync for conv meta (pin/star/archive) across devices
+  useEffect(() => {
+    if (!currentUserId) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI) return;
+    const unsub = electronAPI.onConvMetaChanged?.((_: unknown, payload: { op: string; doc?: { userId: string; peerId: string; pinned: boolean; starred: boolean; archived: boolean } }) => {
+      const { op, doc } = payload;
+      if (op === 'delete' || !doc || doc.userId !== currentUserId) return;
+      const { peerId, pinned, starred, archived } = doc;
+      setPinnedIds(prev => pinned ? (prev.includes(peerId) ? prev : [...prev, peerId]) : prev.filter(x => x !== peerId));
+      setStarredIds(prev => starred ? (prev.includes(peerId) ? prev : [...prev, peerId]) : prev.filter(x => x !== peerId));
+      setArchivedIds(prev => { const next = new Set(prev); archived ? next.add(peerId) : next.delete(peerId); return next; });
+    });
+    return () => { unsub?.(); };
+  }, [currentUserId]);
+
   const totalUnread = conversations.reduce((sum, m) => {
     const msgs = chats[m.id] ?? [];
     return sum + msgs.filter(msg => !msg.read && msg.from !== myId).length;

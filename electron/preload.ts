@@ -45,6 +45,58 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('msg:new', cb);
         return () => ipcRenderer.removeListener('msg:new', cb);
     },
+    onProjectChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:project:changed', cb);
+        return () => ipcRenderer.removeListener('data:project:changed', cb);
+    },
+    onTaskChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:task:changed', cb);
+        return () => ipcRenderer.removeListener('data:task:changed', cb);
+    },
+    onMemberChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:member:changed', cb);
+        return () => ipcRenderer.removeListener('data:member:changed', cb);
+    },
+    onAttendanceChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:attendance:changed', cb);
+        return () => ipcRenderer.removeListener('data:attendance:changed', cb);
+    },
+    onProjectRichChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:projectrich:changed', cb);
+        return () => ipcRenderer.removeListener('data:projectrich:changed', cb);
+    },
+    onRolePermsChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:roleperms:changed', cb);
+        return () => ipcRenderer.removeListener('data:roleperms:changed', cb);
+    },
+    onRoleChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:role:changed', cb);
+        return () => ipcRenderer.removeListener('data:role:changed', cb);
+    },
+    onOrgChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown }) => void) => {
+        ipcRenderer.on('data:org:changed', cb);
+        return () => ipcRenderer.removeListener('data:org:changed', cb);
+    },
+    onNotifPrefChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown }) => void) => {
+        ipcRenderer.on('data:notifpref:changed', cb);
+        return () => ipcRenderer.removeListener('data:notifpref:changed', cb);
+    },
+    onAppearancePrefChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown }) => void) => {
+        ipcRenderer.on('data:appearancepref:changed', cb);
+        return () => ipcRenderer.removeListener('data:appearancepref:changed', cb);
+    },
+    onConvMetaChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:convmeta:changed', cb);
+        return () => ipcRenderer.removeListener('data:convmeta:changed', cb);
+    },
+    onDeptChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:dept:changed', cb);
+        return () => ipcRenderer.removeListener('data:dept:changed', cb);
+    },
+    onAuthUserChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:authuser:changed', cb);
+        return () => ipcRenderer.removeListener('data:authuser:changed', cb);
+    },
 
     // Update event listeners
     onUpdateChecking: (cb: () => void) => {

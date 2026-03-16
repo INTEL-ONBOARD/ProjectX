@@ -150,6 +150,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             .catch((err: unknown) => console.error('[AppContext] Failed to load attendance records:', err));
     }, []);
 
+    // Real-time sync for attendance
+    useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI) return;
+        const unsub = electronAPI.onAttendanceChanged?.((_: unknown, payload: { op: string; doc?: AttendanceRecord; id?: string }) => {
+            const { op, doc } = payload;
+            if (op === 'insert') {
+                setAttendanceRecords(prev => prev.some(r => r.id === doc!.id) ? prev : [...prev, doc!]);
+            } else if (op === 'update' || op === 'replace') {
+                setAttendanceRecords(prev => {
+                    const exists = prev.some(r => r.id === doc!.id);
+                    return exists ? prev.map(r => r.id === doc!.id ? doc! : r) : [...prev, doc!];
+                });
+            } else if (op === 'delete') {
+                dbApi().getAttendance().then((docs: AttendanceRecord[]) => setAttendanceRecords(docs)).catch(() => {});
+            }
+        });
+        return () => { unsub?.(); };
+    }, []);
+
+    // Real-time sync for org
+    useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI) return;
+        const unsub = electronAPI.onOrgChanged?.((_: unknown, payload: { op: string; doc?: Organization }) => {
+            if (payload.doc) setOrg(payload.doc);
+        });
+        return () => { unsub?.(); };
+    }, []);
+
     // Apply theme to DOM
     useEffect(() => {
         document.body.dataset.theme = theme;

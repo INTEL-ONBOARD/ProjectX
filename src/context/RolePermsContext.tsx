@@ -58,6 +58,27 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
             .catch((err: unknown) => console.error('[RolePermsContext] Failed to load role perms:', err));
     }, []);
 
+    // Real-time sync for role permissions
+    useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI) return;
+        const unsub = electronAPI.onRolePermsChanged?.((_: unknown, payload: { op: string; doc?: RolePerms; id?: string }) => {
+            const { op, doc } = payload;
+            if (op === 'insert') {
+                setPerms(prev => prev.some(p => p.role === doc!.role) ? prev : [...prev, doc!]);
+            } else if (op === 'update' || op === 'replace') {
+                setPerms(prev => {
+                    const exists = prev.some(p => p.role === doc!.role);
+                    return exists ? prev.map(p => p.role === doc!.role ? doc! : p) : [...prev, doc!];
+                });
+            } else if (op === 'delete') {
+                dbApi().getRolePerms().then((data: RolePerms[]) => { if (data?.length) setPerms(data); }).catch(() => {});
+            }
+        });
+        return () => { unsub?.(); };
+    }, []);
+
     const getAllowedRoutes = useCallback((role: string): string[] => {
         return perms.find(p => p.role === role)?.allowedRoutes ?? ['/settings'];
     }, [perms]);

@@ -49,6 +49,47 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .finally(() => setLoading(false));
   }, []);
 
+  // Real-time sync: listen for project/task changes from other clients via MongoDB change streams
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI) return;
+
+    const unsubProject = electronAPI.onProjectChanged?.((_: unknown, payload: { op: string; doc?: Project; id?: string }) => {
+      const { op, doc } = payload;
+      if (op === 'insert') {
+        setProjects(prev => prev.some(p => p.id === doc!.id) ? prev : [...prev, doc!]);
+      } else if (op === 'update' || op === 'replace') {
+        setProjects(prev => {
+          const exists = prev.some(p => p.id === doc!.id);
+          return exists ? prev.map(p => p.id === doc!.id ? doc! : p) : [...prev, doc!];
+        });
+      } else if (op === 'delete') {
+        // For deletes the stream gives _id not appId — refetch to stay in sync
+        api().getProjects().then((prjs: Project[]) => {
+          setProjects(prjs);
+          setActiveProject(ap => prjs.some(p => p.id === ap) ? ap : (prjs[0]?.id ?? ''));
+        }).catch(() => {});
+      }
+    });
+
+    const unsubTask = electronAPI.onTaskChanged?.((_: unknown, payload: { op: string; doc?: Task; id?: string }) => {
+      const { op, doc } = payload;
+      if (op === 'insert') {
+        setAllTasks(prev => prev.some(t => t.id === doc!.id) ? prev : [...prev, doc!]);
+      } else if (op === 'update' || op === 'replace') {
+        setAllTasks(prev => {
+          const exists = prev.some(t => t.id === doc!.id);
+          return exists ? prev.map(t => t.id === doc!.id ? doc! : t) : [...prev, doc!];
+        });
+      } else if (op === 'delete') {
+        api().getTasks().then((tasks: Task[]) => setAllTasks(tasks)).catch(() => {});
+      }
+    });
+
+    return () => { unsubProject?.(); unsubTask?.(); };
+  }, []);
+
   const createProject = async (name: string, color: string): Promise<Project> => {
     const newProject = await api().createProject(name, color) as Project;
     setProjects(prev => [...prev, newProject]);

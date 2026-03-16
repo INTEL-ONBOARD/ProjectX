@@ -305,6 +305,26 @@ const SettingsPage: React.FC = () => {
       .catch((err: unknown) => console.error('[SettingsPage] Failed to load appearance prefs:', err));
   }, [currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Real-time sync for notification and appearance prefs
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI) return;
+    const unsubNotif = electronAPI.onNotifPrefChanged?.((_: unknown, payload: { doc?: NotifPrefs & { userId: string } }) => {
+      if (payload.doc?.userId === currentUser.id) {
+        setNotifications(prev => ({ ...prev, ...payload.doc }));
+      }
+    });
+    const unsubAppear = electronAPI.onAppearancePrefChanged?.((_: unknown, payload: { doc?: AppearPrefs & { userId: string } }) => {
+      if (payload.doc?.userId === currentUser.id) {
+        if (payload.doc.themeMode) setThemeMode(payload.doc.themeMode);
+        if (payload.doc.accentColor) setAccentColor(payload.doc.accentColor);
+      }
+    });
+    return () => { unsubNotif?.(); unsubAppear?.(); };
+  }, [currentUser?.id]);
+
   // Security
   const [showPassword, setShowPassword] = useState<Record<string, boolean>>({});
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });

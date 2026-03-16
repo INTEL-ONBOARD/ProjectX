@@ -449,6 +449,26 @@ const TeamsPage: React.FC = () => {
         .catch((err: unknown) => console.error('[TeamsPage] Failed to load project rich data:', err));
   }, []);
 
+  // Real-time sync for project rich data
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI) return;
+    const unsub = electronAPI.onProjectRichChanged?.((_: unknown, payload: { op: string; doc?: { projectId: string; description: string; status: 'active' | 'on-hold' | 'completed'; priority: 'low' | 'medium' | 'high'; memberIds: string[]; dueDate: string; starred: boolean; category: string }; id?: string }) => {
+      const { op, doc } = payload;
+      if (op === 'insert' || op === 'update' || op === 'replace') {
+        if (doc) setLocalRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, dueDate: doc.dueDate, starred: doc.starred, category: doc.category } }));
+      } else if (op === 'delete') {
+        dbApi().getProjectRich().then((docs: Array<{ projectId: string; description: string; status: 'active' | 'on-hold' | 'completed'; priority: 'low' | 'medium' | 'high'; memberIds: string[]; dueDate: string; starred: boolean; category: string }>) => {
+          const richMap: Record<string, Partial<ProjectData>> = {};
+          docs.forEach(d => { richMap[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category }; });
+          setLocalRichData(richMap);
+        }).catch(() => {});
+      }
+    });
+    return () => { unsub?.(); };
+  }, []);
+
   // Build membersById lookup for child components
   const membersById = Object.fromEntries(members.map(m => [m.id, m]));
 

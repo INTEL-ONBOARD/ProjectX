@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText } from 'lucide-react';
+import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, Layers, AlignLeft } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AvatarGroup } from '../components/ui/Avatar';
@@ -107,6 +107,16 @@ const TasksPage: React.FC = () => {
   useEffect(() => {
     setDetailTab('details');
   }, [selectedTask?.id]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (assigneeDropRef.current && !assigneeDropRef.current.contains(e.target as Node)) {
+        setShowAssigneeDrop(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const detailFileRef = useRef<HTMLInputElement>(null);
   const [detailImage, setDetailImage] = useState<string | null>(null);
@@ -118,6 +128,10 @@ const TasksPage: React.FC = () => {
   const [editPriority, setEditPriority] = useState<'low' | 'high'>('low');
   const [editAssignees, setEditAssignees] = useState<string[]>([]);
   const [editDueDate, setEditDueDate] = useState('');
+  const [editProjectId, setEditProjectId] = useState('');
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [showAssigneeDrop, setShowAssigneeDrop] = useState(false);
+  const assigneeDropRef = useRef<HTMLDivElement>(null);
 
   // Delete confirmation state
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -170,6 +184,9 @@ const TasksPage: React.FC = () => {
     setEditPriority(task.priority === 'high' ? 'high' : 'low');
     setEditAssignees([...task.assignees]);
     setEditDueDate(task.dueDate ?? '');
+    setEditProjectId(task.projectId ?? '');
+    setAssigneeSearch('');
+    setShowAssigneeDrop(false);
     setEditMode(true);
   };
 
@@ -181,6 +198,7 @@ const TasksPage: React.FC = () => {
       priority: editPriority as Task['priority'],
       assignees: editAssignees,
       dueDate: editDueDate || undefined,
+      projectId: editProjectId || undefined,
     };
     updateTask(selectedTask.id, changes).catch(console.error);
     setSelectedTask(prev => prev ? { ...prev, ...changes } : prev);
@@ -207,7 +225,13 @@ const TasksPage: React.FC = () => {
                 <motion.button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-surface-100 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Download size={16} /> Export
                 </motion.button>
-                <motion.button onClick={() => setShowTaskForm(true)} className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <motion.button
+                  onClick={() => contextProjects.length > 0 && setShowTaskForm(true)}
+                  className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-colors ${contextProjects.length > 0 ? 'bg-primary-500 text-white hover:bg-primary-600' : 'bg-surface-200 text-gray-400 cursor-not-allowed'}`}
+                  whileHover={{ scale: contextProjects.length > 0 ? 1.02 : 1 }}
+                  whileTap={{ scale: contextProjects.length > 0 ? 0.98 : 1 }}
+                  title={contextProjects.length === 0 ? 'Create a project first' : undefined}
+                >
                   <Plus size={16} /> New Task
                 </motion.button>
               </>
@@ -343,314 +367,362 @@ const TasksPage: React.FC = () => {
             className="fixed inset-0 top-16 z-50 flex"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           >
-            <div className="flex-1 bg-black/30" onClick={() => { setSelectedTask(null); setEditMode(false); setConfirmDelete(false); }} />
+            <div className="flex-1 bg-black/30" onClick={() => { setSelectedTask(null); setEditMode(false); setConfirmDelete(false); setShowAssigneeDrop(false); }} />
             <motion.div
-              className="w-[420px] bg-white h-full overflow-y-auto border-l border-surface-200 flex flex-col"
-              initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              className="w-[400px] bg-white h-full flex flex-col border-l border-gray-200"
+              initial={{ x: 400 }} animate={{ x: 0 }} exit={{ x: 400 }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
             >
               {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100 shrink-0">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Task Detail</span>
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 shrink-0">
                 <div className="flex items-center gap-2">
+                  <CheckSquare size={14} className="text-primary-500" />
+                  <span className="text-xs font-semibold text-gray-500">{editMode ? 'Edit Task' : 'Task Detail'}</span>
+                </div>
+                <div className="flex items-center gap-1">
                   {!editMode && (
-                    <button
-                      onClick={() => startEdit(selectedTask)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 hover:text-gray-600 transition-colors"
-                      title="Edit task"
-                    >
-                      <Pencil size={14} />
+                    <button onClick={() => startEdit(selectedTask)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100 transition-colors">
+                      <Pencil size={11} /> Edit
                     </button>
                   )}
-                  <button onClick={() => { setSelectedTask(null); setEditMode(false); setConfirmDelete(false); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 hover:text-gray-600 transition-colors">
-                    <X size={16} />
+                  <button onClick={() => { setSelectedTask(null); setEditMode(false); setConfirmDelete(false); setShowAssigneeDrop(false); }}
+                    className="ml-1 w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
+                    <X size={14} />
                   </button>
                 </div>
               </div>
 
               {/* Tab bar */}
-              <div className="flex border-b border-surface-100 shrink-0">
+              <div className="flex border-b border-gray-100 shrink-0">
                 {(['details', 'activity'] as const).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setDetailTab(tab)}
-                    className={`flex-1 py-2.5 text-xs font-semibold capitalize transition-colors ${
-                      detailTab === tab
-                        ? 'text-primary-600 border-b-2 border-primary-500'
-                        : 'text-gray-400 hover:text-gray-600'
-                    }`}
-                  >
+                  <button key={tab} onClick={() => setDetailTab(tab)}
+                    className={`flex-1 py-2.5 text-xs font-semibold capitalize transition-all relative ${
+                      detailTab === tab ? 'text-primary-600' : 'text-gray-400 hover:text-gray-500'
+                    }`}>
                     {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    {detailTab === tab && (
+                      <motion.div layoutId="detail-tab-indicator"
+                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary-500"
+                        transition={{ duration: 0.2 }} />
+                    )}
                   </button>
                 ))}
               </div>
 
               {detailTab === 'details' && (
-              <div className="flex-1 px-5 py-4 flex flex-col gap-4">
-                {/* Title + priority */}
-                <div>
-                  {editMode ? (
-                    <div className="flex flex-col gap-2 mb-1.5">
+                <div className="flex-1 overflow-y-auto">
+
+                  {/* Title + project */}
+                  <div className="px-5 py-4 border-b border-gray-100">
+                    {editMode ? (
                       <input
-                        value={editTitle}
-                        onChange={e => setEditTitle(e.target.value)}
-                        className="font-bold text-gray-900 text-base leading-snug border border-surface-200 rounded-xl px-3 py-2 focus:outline-none focus:border-primary-400"
+                        value={editTitle} onChange={e => setEditTitle(e.target.value)}
+                        className="w-full font-semibold text-gray-900 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
                         placeholder="Task title"
                       />
-                      <div className="flex gap-2">
-                        {(['low', 'high'] as const).map(p => (
-                          <button
-                            key={p} type="button"
-                            onClick={() => setEditPriority(p)}
-                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                              editPriority === p
-                                ? p === 'high'
-                                  ? 'bg-[#D8727D22] text-[#D8727D] ring-1 ring-[#D8727D]'
-                                  : 'bg-[#DFA87433] text-[#D58D49] ring-1 ring-[#D58D49]'
-                                : 'bg-surface-100 text-gray-500 hover:bg-surface-200'
-                            }`}
-                          >
-                            {p.charAt(0).toUpperCase() + p.slice(1)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h2 className="font-bold text-gray-900 text-base leading-snug">{selectedTask.title}</h2>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-md shrink-0 ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).bg} ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).text}`}>
-                        {(priorityStyles[selectedTask.priority] ?? priorityStyles.low).label}
-                      </span>
-                    </div>
-                  )}
-                  {/* Project */}
-                  {(() => {
-                    const proj = contextProjects.find(p => p.id === selectedTask.projectId);
-                    return proj ? (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: proj.color }} />
-                        <span className="text-xs text-gray-400">{proj.name}</span>
-                      </div>
-                    ) : null;
-                  })()}
-                </div>
+                    ) : (
+                      <>
+                        <h2 className="font-semibold text-gray-900 text-sm leading-snug">{selectedTask.title}</h2>
+                        {(() => {
+                          const proj = contextProjects.find(p => p.id === selectedTask.projectId);
+                          return proj ? (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
+                              <span className="text-xs text-gray-400">{proj.name}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                      </>
+                    )}
+                  </div>
 
-                {/* Status updater */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1.5 flex items-center gap-1"><Tag size={11} /> Status</div>
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowStatusDrop(v => !v)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border ${selectedStatusStyle.bg} ${selectedStatusStyle.text} border-transparent hover:opacity-80 transition-opacity`}
-                    >
-                      {selectedStatusStyle.label}
-                      <ChevronDown size={12} className={`transition-transform ${showStatusDrop ? 'rotate-180' : ''}`} />
-                    </button>
-                    <AnimatePresence>
-                      {showStatusDrop && (
-                        <motion.div
-                          className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-card-hover border border-surface-100 overflow-hidden z-10 w-52"
-                          initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
-                            const st = statusStyles[s];
+                  {/* Metadata rows */}
+                  <div className="px-5 py-3 border-b border-gray-100 flex flex-col gap-3">
+
+                    {/* Priority */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Flag size={10} /> Priority</span>
+                      {editMode ? (
+                        <div className="flex gap-1.5">
+                          {(['low', 'high'] as const).map(p => {
+                            const active = editPriority === p;
                             return (
-                              <button
-                                key={s}
-                                onClick={() => {
-                                  updateTask(selectedTask.id, { status: s }).catch(console.error);
-                                  setSelectedTask(prev => prev ? { ...prev, status: s } : prev);
-                                  setShowStatusDrop(false);
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold hover:bg-surface-50 transition-colors"
-                              >
-                                <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
-                                <span className={st.text}>{st.label}</span>
-                                {selectedTask.status === s && <span className="ml-auto text-primary-500">✓</span>}
+                              <button key={p} type="button" onClick={() => setEditPriority(p)}
+                                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all border ${
+                                  active
+                                    ? p === 'high' ? 'bg-[#D8727D15] text-[#D8727D] border-[#D8727D40]' : 'bg-[#DFA87415] text-[#D58D49] border-[#D58D4940]'
+                                    : 'bg-gray-50 text-gray-400 border-gray-200'
+                                }`}>
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? (p === 'high' ? '#D8727D' : '#D58D49') : '#D1D5DB' }} />
+                                {p.charAt(0).toUpperCase() + p.slice(1)}
                               </button>
                             );
                           })}
-                        </motion.div>
+                        </div>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).bg} ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).text}`}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
+                          {(priorityStyles[selectedTask.priority] ?? priorityStyles.low).label}
+                        </span>
                       )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                {/* Assignees */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1"><User size={11} /> Assignees</div>
-                  {editMode ? (
-                    <div className="flex flex-col gap-1 max-h-36 overflow-y-auto border border-surface-200 rounded-xl p-2">
-                      {members.map(m => (
-                        <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editAssignees.includes(m.id)}
-                            onChange={() => setEditAssignees(prev => prev.includes(m.id) ? prev.filter(a => a !== m.id) : [...prev, m.id])}
-                            className="rounded text-primary-500"
-                          />
-                          <Avatar name={m.name} color={getMemberColor(m.id)} size="sm" />
-                          <span className="text-xs text-gray-700">{m.name}</span>
-                        </label>
-                      ))}
                     </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedTask.assignees.map(id => {
-                        const member = members.find(m => m.id === id);
-                        if (!member) return null;
-                        const color = getMemberColor(id);
-                        return (
-                          <div key={id} className="flex items-center gap-1.5 bg-surface-100 rounded-full px-2.5 py-1">
-                            <Avatar name={member.name} color={color} size="sm" />
-                            <span className="text-xs font-semibold text-gray-700">{member.name.split(' ')[0]}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
 
-                {/* Due date */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1 flex items-center gap-1"><Calendar size={11} /> Due Date</div>
-                  {editMode ? (
-                    <input
-                      type="date"
-                      value={editDueDate}
-                      onChange={e => setEditDueDate(e.target.value)}
-                      className="border border-surface-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary-400"
-                    />
-                  ) : (
-                    selectedTask.dueDate ? (
-                      <span className="text-sm font-semibold text-gray-700">{selectedTask.dueDate}</span>
-                    ) : (
-                      <span className="text-sm text-gray-400">—</span>
-                    )
-                  )}
-                </div>
-
-                {/* Description */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1.5">Description</div>
-                  {editMode ? (
-                    <textarea
-                      value={editDesc}
-                      onChange={e => setEditDesc(e.target.value)}
-                      rows={4}
-                      className="w-full border border-surface-200 rounded-xl px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400 resize-none"
-                      placeholder="Describe the task…"
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-600 leading-relaxed">{selectedTask.description || 'No description provided.'}</p>
-                  )}
-                </div>
-
-                {/* Edit save/cancel buttons */}
-                {editMode && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={saveEdit}
-                      className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-primary-500 hover:bg-primary-600 transition-colors"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditMode(false)}
-                      className="flex-1 py-2 rounded-xl text-sm font-semibold text-gray-500 bg-surface-100 hover:bg-surface-200 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-
-                {/* Attachment */}
-                {!editMode && (
-                  <div>
-                    <div className="text-xs font-semibold text-gray-400 mb-1.5">Attachment</div>
-                    {detailImage ? (
-                      <div className="relative rounded-xl overflow-hidden">
-                        <img src={detailImage} alt="attachment" className="w-full h-40 object-cover rounded-xl" />
-                        <button
-                          onClick={() => setDetailImage(null)}
-                          className="absolute top-2 right-2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-                        >
-                          <X size={12} />
+                    {/* Status */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Tag size={10} /> Status</span>
+                      <div className="relative">
+                        <button onClick={() => setShowStatusDrop(v => !v)}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all hover:opacity-80 ${selectedStatusStyle.bg} ${selectedStatusStyle.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusStyles[selectedStatus]?.dot}`} />
+                          {selectedStatusStyle.label}
+                          <ChevronDown size={10} className={`ml-0.5 transition-transform ${showStatusDrop ? 'rotate-180' : ''}`} />
                         </button>
+                        <AnimatePresence>
+                          {showStatusDrop && (
+                            <motion.div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden z-20 w-44"
+                              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}>
+                              <div className="py-1">
+                                {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
+                                  const st = statusStyles[s];
+                                  const isSelected = selectedTask.status === s;
+                                  return (
+                                    <button key={s}
+                                      onClick={() => { updateTask(selectedTask.id, { status: s }).catch(console.error); setSelectedTask(prev => prev ? { ...prev, status: s } : prev); setShowStatusDrop(false); }}
+                                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold transition-colors ${isSelected ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st.dot}`} />
+                                      <span className={st.text}>{st.label}</span>
+                                      {isSelected && <span className="ml-auto text-primary-500 text-[10px]">✓</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => detailFileRef.current?.click()}
-                        className="w-full h-24 border-2 border-dashed border-surface-300 rounded-xl flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-primary-300 hover:text-primary-400 transition-colors"
-                      >
-                        <ImagePlus size={20} />
-                        <span className="text-xs font-medium">Upload image</span>
-                      </button>
-                    )}
-                    <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, (url) => {
-                      setDetailImage(url);
-                      if (selectedTask) updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
-                    })} />
-                  </div>
-                )}
-
-                {/* Stats */}
-                {!editMode && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-surface-50 rounded-xl p-3 text-center">
-                      <div className="text-lg font-bold text-gray-900">{selectedTask.comments}</div>
-                      <div className="text-[10px] text-gray-400">Comments</div>
                     </div>
-                    <div className="bg-surface-50 rounded-xl p-3 text-center">
-                      <div className="text-lg font-bold text-gray-900">{selectedTask.files}</div>
-                      <div className="text-[10px] text-gray-400">Files</div>
-                    </div>
-                  </div>
-                )}
 
-                {/* Delete section */}
-                {!editMode && (
-                  <div className="pt-2 border-t border-surface-100">
-                    {confirmDelete ? (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-xs text-gray-500 text-center">Are you sure you want to delete this task?</p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              deleteTask(selectedTask.id).catch(console.error);
-                              setSelectedTask(null);
-                              setConfirmDelete(false);
-                            }}
-                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-[#D8727D] hover:bg-[#c4636d] transition-colors"
-                          >
-                            Confirm delete
-                          </button>
-                          <button
-                            onClick={() => setConfirmDelete(false)}
-                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-gray-500 bg-surface-100 hover:bg-surface-200 transition-colors"
-                          >
-                            Cancel
-                          </button>
+                    {/* Due Date */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Calendar size={10} /> Due Date</span>
+                      {editMode ? (
+                        <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)}
+                          className="border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-primary-400 bg-white font-medium text-gray-700" />
+                      ) : (
+                        <span className={`text-xs font-medium ${selectedTask.dueDate ? 'text-gray-700' : 'text-gray-400'}`}>
+                          {selectedTask.dueDate ?? '—'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Project (edit mode) */}
+                    {editMode && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Layers size={10} /> Project</span>
+                        <div className="relative">
+                          <select value={editProjectId} onChange={e => setEditProjectId(e.target.value)}
+                            className="appearance-none border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-primary-400 bg-white pr-5 font-medium text-gray-700">
+                            <option value="">No project</option>
+                            {contextProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </select>
+                          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         </div>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmDelete(true)}
-                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold text-[#D8727D] hover:bg-[#D8727D11] transition-colors"
-                      >
-                        <Trash2 size={14} /> Delete task
-                      </button>
                     )}
                   </div>
-                )}
-              </div>
+
+                  {/* Assignees */}
+                  <div className="px-5 py-3 border-b border-gray-100">
+                    <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-2.5"><User size={10} /> Assignees</span>
+                    {editMode ? (
+                      <div ref={assigneeDropRef} className="relative">
+                        {editAssignees.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {editAssignees.map(id => {
+                              const m = members.find(x => x.id === id);
+                              if (!m) return null;
+                              return (
+                                <div key={id} className="flex items-center gap-1 bg-gray-100 rounded-md pl-1 pr-1.5 py-0.5">
+                                  <Avatar name={m.name} color={getMemberColor(id)} size="sm" />
+                                  <span className="text-xs font-medium text-gray-700">{m.name.split(' ')[0]}</span>
+                                  <button onClick={() => setEditAssignees(prev => prev.filter(a => a !== id))}
+                                    className="ml-0.5 text-gray-400 hover:text-gray-600 transition-colors">
+                                    <X size={9} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <button onClick={() => setShowAssigneeDrop(v => !v)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                            showAssigneeDrop ? 'border-primary-400 bg-white ring-1 ring-primary-100 text-gray-700' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
+                          }`}>
+                          <Search size={12} className="text-gray-400 shrink-0" />
+                          <span className="flex-1 text-left">{editAssignees.length > 0 ? `${editAssignees.length} assigned` : 'Assign members…'}</span>
+                          <ChevronDown size={11} className={`text-gray-400 transition-transform ${showAssigneeDrop ? 'rotate-180' : ''}`} />
+                        </button>
+                        <AnimatePresence>
+                          {showAssigneeDrop && (
+                            <motion.div className="absolute left-0 top-full mt-1 w-full bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 z-30 overflow-hidden"
+                              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}>
+                              <div className="px-2.5 pt-2.5 pb-1.5">
+                                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-primary-400 transition-all">
+                                  <Search size={11} className="text-gray-400 shrink-0" />
+                                  <input type="text" value={assigneeSearch} onChange={e => setAssigneeSearch(e.target.value)}
+                                    placeholder="Search…" autoFocus
+                                    className="flex-1 bg-transparent text-xs text-gray-700 placeholder-gray-400 focus:outline-none" />
+                                  {assigneeSearch && <button onClick={() => setAssigneeSearch('')}><X size={10} className="text-gray-400" /></button>}
+                                </div>
+                              </div>
+                              <div className="max-h-40 overflow-y-auto pb-1.5">
+                                {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).map(m => {
+                                  const selected = editAssignees.includes(m.id);
+                                  return (
+                                    <button key={m.id}
+                                      onClick={() => setEditAssignees(prev => selected ? prev.filter(a => a !== m.id) : [...prev, m.id])}
+                                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${selected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
+                                      <Avatar name={m.name} color={getMemberColor(m.id)} size="sm" />
+                                      <span className="flex-1 text-xs font-medium text-gray-800 truncate">{m.name}</span>
+                                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${selected ? 'bg-primary-500 border-primary-500' : 'border-gray-300'}`}>
+                                        {selected && (
+                                          <svg width="8" height="6" viewBox="0 0 10 8" fill="none">
+                                            <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                          </svg>
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                                {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).length === 0 && (
+                                  <p className="px-3 py-4 text-center text-xs text-gray-400">No members found</p>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedTask.assignees.length === 0 && <span className="text-xs text-gray-400">—</span>}
+                        {selectedTask.assignees.map(id => {
+                          const member = members.find(m => m.id === id);
+                          if (!member) return null;
+                          return (
+                            <div key={id} className="flex items-center gap-1.5 bg-gray-100 rounded-md px-2 py-1">
+                              <Avatar name={member.name} color={getMemberColor(id)} size="sm" />
+                              <span className="text-xs font-medium text-gray-700">{member.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
+                  <div className="px-5 py-3 border-b border-gray-100">
+                    <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-2"><AlignLeft size={10} /> Description</span>
+                    {editMode ? (
+                      <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 resize-none transition-all leading-relaxed"
+                        placeholder="Add notes or context…" />
+                    ) : (
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        {selectedTask.description || <span className="text-gray-400 italic">No description.</span>}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Edit save/cancel */}
+                  {editMode && (
+                    <div className="px-5 py-3 border-b border-gray-100 flex gap-2">
+                      <button onClick={() => { setEditMode(false); setShowAssigneeDrop(false); }}
+                        className="flex-1 py-2 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+                        Cancel
+                      </button>
+                      <button onClick={saveEdit}
+                        className="flex-[2] py-2 rounded-lg text-xs font-semibold text-white bg-primary-500 hover:bg-primary-600 transition-colors">
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Attachment */}
+                  {!editMode && (
+                    <div className="px-5 py-3 border-b border-gray-100">
+                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-2"><ImagePlus size={10} /> Attachment</span>
+                      {detailImage ? (
+                        <div className="relative rounded-lg overflow-hidden">
+                          <img src={detailImage} alt="attachment" className="w-full h-36 object-cover" />
+                          <button onClick={() => setDetailImage(null)}
+                            className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => detailFileRef.current?.click()}
+                          className="w-full h-16 border border-dashed border-gray-200 rounded-lg flex items-center justify-center gap-2 text-gray-400 hover:border-primary-300 hover:text-primary-400 hover:bg-primary-50/20 transition-all text-xs font-medium">
+                          <ImagePlus size={14} /> Upload image
+                        </button>
+                      )}
+                      <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, (url) => {
+                        setDetailImage(url);
+                        if (selectedTask) updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
+                      })} />
+                    </div>
+                  )}
+
+                  {/* Stats */}
+                  {!editMode && (
+                    <div className="px-5 py-3 border-b border-gray-100 flex gap-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-gray-800">{selectedTask.comments}</span>
+                        <span className="text-[11px] text-gray-400">Comments</span>
+                      </div>
+                      <div className="w-px bg-gray-100" />
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-gray-800">{selectedTask.files}</span>
+                        <span className="text-[11px] text-gray-400">Files</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delete */}
+                  {!editMode && (
+                    <div className="px-5 py-3">
+                      {confirmDelete ? (
+                        <div className="bg-red-50 border border-red-100 rounded-lg p-3 flex flex-col gap-2.5">
+                          <p className="text-xs font-semibold text-gray-700 text-center">Delete this task?</p>
+                          <div className="flex gap-2">
+                            <button onClick={() => setConfirmDelete(false)}
+                              className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
+                              Keep it
+                            </button>
+                            <button onClick={() => { deleteTask(selectedTask.id).catch(console.error); setSelectedTask(null); setConfirmDelete(false); }}
+                              className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#D8727D] hover:bg-[#c4636d] transition-colors">
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDelete(true)}
+                          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-[#D8727D] border border-[#D8727D20] hover:bg-red-50 transition-all">
+                          <Trash2 size={12} /> Delete Task
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               {detailTab === 'activity' && (
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-y-auto px-5 py-4">
                   {(selectedTask.activity ?? []).length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center mt-8">No activity yet.</p>
+                    <div className="flex flex-col items-center justify-center gap-2 mt-12 text-gray-400">
+                      <Clock size={18} className="opacity-30" />
+                      <p className="text-xs font-medium text-gray-400">No activity yet</p>
+                    </div>
                   ) : (
                     <div className="flex flex-col gap-3">
                       {[...(selectedTask.activity ?? [])].reverse().map(entry => (

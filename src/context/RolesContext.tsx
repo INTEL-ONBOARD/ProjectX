@@ -43,6 +43,27 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     useEffect(() => { loadRoles(); }, [loadRoles]);
 
+    // Real-time sync for roles
+    useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI) return;
+        const unsub = electronAPI.onRoleChanged?.((_: unknown, payload: { op: string; doc?: RoleDoc; id?: string }) => {
+            const { op, doc } = payload;
+            if (op === 'insert') {
+                setRoles(prev => prev.some(r => r.appId === doc!.appId) ? prev : [...prev, doc!]);
+            } else if (op === 'update' || op === 'replace') {
+                setRoles(prev => {
+                    const exists = prev.some(r => r.appId === doc!.appId);
+                    return exists ? prev.map(r => r.appId === doc!.appId ? doc! : r) : [...prev, doc!];
+                });
+            } else if (op === 'delete') {
+                dbApi().getRoles().then((docs: RoleDoc[]) => setRoles(docs)).catch(() => {});
+            }
+        });
+        return () => { unsub?.(); };
+    }, []);
+
     const addRole = useCallback((role: RoleDoc) => {
         setRoles(prev => [...prev, role]);
     }, []);

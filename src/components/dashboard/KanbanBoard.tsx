@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import KanbanColumn from './KanbanColumn';
 import TaskFormModal from '../modals/TaskFormModal';
+import NewProjectModal from '../modals/NewProjectModal';
 const TODAY = new Date().toISOString().split('T')[0];
 const WEEK_START = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })();
 const WEEK_END   = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().split('T')[0]; })();
@@ -124,10 +125,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [editAssignees, setEditAssignees] = useState<string[]>([]);
   const [editDueDate, setEditDueDate] = useState('');
 
-  // New project form state (used in empty state)
-  const [newProjName, setNewProjName] = useState('');
-  const [newProjColor, setNewProjColor] = useState('#5030E5');
-  const [creating, setCreating] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
 
   const openTask = (task: Task) => {
     setSelectedTask(task);
@@ -224,52 +222,47 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const projectTasks = applyFilters(allTasks.filter(t => t.projectId === activeProject));
 
-  // ── No projects empty state ──────────────────────────────────────────────
-  const PROJECT_COLORS = ['#5030E5','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6'];
 
   if (projects.length === 0) {
     return (
-      <div className="flex-1 min-h-0 flex items-center justify-center -mt-16">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="flex flex-col items-center gap-6 max-w-sm w-full"
-        >
-          <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center">
-            <FolderPlus size={28} className="text-primary-500" />
-          </div>
-          <div className="text-center">
-            <h2 className="text-lg font-bold text-gray-900">No projects yet</h2>
-            <p className="text-sm text-gray-400 mt-1">Create your first project to start organizing tasks</p>
-          </div>
-          <div className="w-full bg-white rounded-2xl p-5 shadow-card ring-1 ring-surface-100 flex flex-col gap-4">
-            <input
-              type="text"
-              placeholder="Project name"
-              value={newProjName}
-              onChange={e => setNewProjName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && newProjName.trim()) { setCreating(true); createProject(newProjName.trim(), newProjColor).finally(() => setCreating(false)); }}}
-              className="w-full px-3 py-2.5 rounded-xl border border-surface-200 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 mr-1">Color</span>
-              {PROJECT_COLORS.map(c => (
-                <button key={c} onClick={() => setNewProjColor(c)}
-                  className={`w-6 h-6 rounded-full transition-all ${newProjColor === c ? 'ring-2 ring-offset-2' : 'opacity-60 hover:opacity-100'}`}
-                  style={{ background: c, ...(newProjColor === c ? { outlineColor: c } : {}) }}
-                />
-              ))}
+      <>
+        <div className="flex-1 min-h-0 flex items-center justify-center -mt-16">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="flex flex-col items-center gap-6 max-w-sm w-full"
+          >
+            <div className="w-16 h-16 rounded-2xl bg-primary-500/10 flex items-center justify-center">
+              <FolderPlus size={28} className="text-primary-500" />
+            </div>
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-gray-900">No projects yet</h2>
+              <p className="text-sm text-gray-400 mt-1">Create your first project to start organizing tasks</p>
             </div>
             <button
-              disabled={!newProjName.trim() || creating}
-              onClick={() => { setCreating(true); createProject(newProjName.trim(), newProjColor).finally(() => setCreating(false)); }}
-              className="w-full py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => setShowNewProject(true)}
+              className="px-6 py-2.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold transition-colors"
             >
-              {creating ? 'Creating…' : 'Create Project'}
+              + Create Project
             </button>
-          </div>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+        <AnimatePresence>
+          {showNewProject && (
+            <NewProjectModal
+              onClose={() => setShowNewProject(false)}
+              onSubmit={async (name, color, rich) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const db = (window as any).electronAPI.db;
+                const proj = await createProject(name, color);
+                if (proj?.id) {
+                  await db.setProjectRich({ projectId: proj.id, description: rich.description, status: rich.status, priority: rich.priority, dueDate: rich.dueDate, category: rich.category, memberIds: [], starred: false }).catch(() => {});
+                }
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </>
     );
   }
 
@@ -344,7 +337,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
               lineColor={col.lineColor}
               index={index}
               onTaskClick={openTask}
-              onAddTask={(status) => { setFormDefaultStatus(status); setShowTaskForm(true); }}
+              onAddTask={(status) => { if (!activeProject) return; setFormDefaultStatus(status); setShowTaskForm(true); }}
               onMoveTask={(taskId, newStatus) => moveTask(taskId, newStatus).catch(console.error)}
               onDeleteTask={(taskId) => deleteTask(taskId).catch(console.error)}
             />
