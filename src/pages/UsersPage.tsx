@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Users2, Shield, UserCheck, KeyRound, UserPlus, MoreVertical, Eye, UserCog, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, Briefcase as BriefcaseIcon } from 'lucide-react';
+import { Users2, Shield, UserCheck, KeyRound, MoreVertical, Eye, UserCog, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, Briefcase as BriefcaseIcon } from 'lucide-react';
 import { useRoles } from '../context/RolesContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useRolePerms } from '../context/RolePermsContext';
@@ -325,24 +325,26 @@ const AttendanceTab: React.FC = () => {
 const UsersTab: React.FC = () => {
     const { members, getMemberColor, removeMember, refetchMembers } = useMembersContext();
     const { roles } = useRoles();
+    const { showToast } = useToast();
     const [drawerMember, setDrawerMember] = useState<User | null>(null);
+    const [drawerSection, setDrawerSection] = useState<'profile' | 'role' | 'activity' | 'attendance'>('profile');
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+    const [menuAnchor, setMenuAnchor] = useState<{ top: number; right: number } | null>(null);
     const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
-    const menuRef = useRef<HTMLDivElement>(null);
-
     useEffect(() => {
         refetchMembers().catch(console.error);
     }, []);
 
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                setMenuOpenId(null);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
+    const handleRemove = async (id: string) => {
+        setConfirmRemoveId(null);
+        try {
+            await removeMember(id);
+            await refetchMembers();
+        } catch (err: unknown) {
+            showToast('Failed to remove member.', 'error');
+            await refetchMembers().catch(console.error);
+        }
+    };
 
     const getRoleStyle = (roleName: string) => roleStyles[roleName] ?? roleStyles.member;
     const getRoleColor = (roleName: string) => roles.find(r => r.name === roleName)?.color ?? '#9ca3af';
@@ -425,10 +427,11 @@ const UsersTab: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-xs text-gray-500">{member.email ?? '—'}</td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                             <span
-                                                className={`text-xs font-semibold px-2 py-0.5 rounded-md ${role.bg} ${role.text}`}
+                                                className={`text-xs font-semibold px-2 py-0.5 rounded-md cursor-pointer hover:opacity-75 transition-opacity ${role.bg} ${role.text}`}
                                                 style={!roleStyles[member.role] ? { background: getRoleColor(member.role) + '20', color: getRoleColor(member.role) } : {}}
+                                                onClick={() => { setDrawerSection('role'); setDrawerMember(member); }}
                                             >
                                                 {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
                                             </span>
@@ -446,7 +449,7 @@ const UsersTab: React.FC = () => {
                                                         <span className="text-[10px] text-gray-500 whitespace-nowrap">Remove {member.name.split(' ')[0]}?</span>
                                                         <button
                                                             className="text-[10px] font-bold text-red-500 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors"
-                                                            onClick={() => { removeMember(member.id).catch(console.error); setConfirmRemoveId(null); }}
+                                                            onClick={() => handleRemove(member.id)}
                                                         >
                                                             Confirm
                                                         </button>
@@ -460,30 +463,41 @@ const UsersTab: React.FC = () => {
                                                 ) : (
                                                     <>
                                                         <button
-                                                            onClick={() => setMenuOpenId(menuOpenId === member.id ? null : member.id)}
+                                                            onClick={(e) => {
+                                                                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                                                const MENU_HEIGHT = 120;
+                                                                const top = rect.bottom + 4 + MENU_HEIGHT > window.innerHeight
+                                                                    ? rect.top - MENU_HEIGHT - 4
+                                                                    : rect.bottom + 4;
+                                                                setMenuAnchor({ top, right: window.innerWidth - rect.right });
+                                                                setMenuOpenId(menuOpenId === member.id ? null : member.id);
+                                                            }}
                                                             className="p-1 rounded-md hover:bg-surface-100 text-gray-300 hover:text-gray-500 transition-colors"
                                                         >
                                                             <MoreVertical size={14} />
                                                         </button>
+                                                        {menuOpenId === member.id && (
+                                                            <div className="fixed inset-0 z-40" onClick={() => setMenuOpenId(null)} />
+                                                        )}
                                                         <AnimatePresence>
-                                                            {menuOpenId === member.id && (
+                                                            {menuOpenId === member.id && menuAnchor && (
                                                                 <motion.div
-                                                                    ref={menuRef}
                                                                     initial={{ opacity: 0, scale: 0.95, y: -4 }}
                                                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                                                     exit={{ opacity: 0, scale: 0.95, y: -4 }}
                                                                     transition={{ duration: 0.12 }}
-                                                                    className="absolute right-0 top-full mt-1 z-50 bg-white border border-surface-200 rounded-xl shadow-lg py-1 w-40"
+                                                                    style={{ position: 'fixed', top: menuAnchor.top, right: menuAnchor.right }}
+                                                                    className="z-50 bg-white border border-surface-200 rounded-xl shadow-lg py-1 w-40"
                                                                 >
                                                                     <button
-                                                                        onClick={() => { setMenuOpenId(null); setDrawerMember(member); }}
+                                                                        onClick={() => { setMenuOpenId(null); setDrawerSection('profile'); setDrawerMember(member); }}
                                                                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-surface-50 transition-colors"
                                                                     >
                                                                         <Eye size={13} className="text-gray-400" />
                                                                         View Profile
                                                                     </button>
                                                                     <button
-                                                                        onClick={() => { setMenuOpenId(null); setDrawerMember(member); }}
+                                                                        onClick={() => { setMenuOpenId(null); setDrawerSection('role'); setDrawerMember(member); }}
                                                                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-surface-50 transition-colors"
                                                                     >
                                                                         <UserCog size={13} className="text-gray-400" />
@@ -524,6 +538,7 @@ const UsersTab: React.FC = () => {
                 member={drawerMember}
                 roles={roles}
                 onClose={() => setDrawerMember(null)}
+                initialSection={drawerSection}
             />
         </>
     );

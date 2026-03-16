@@ -16,6 +16,15 @@ const fi = (i: number) => ({
   transition: { delay: i * 0.06 + 0.08, duration: 0.36, ease: 'easeOut' as const },
 });
 
+/** Strip Electron's "Error invoking remote method '...': Error: " prefix. */
+const cleanIpcError = (err: unknown, fallback: string): string => {
+  const msg = err instanceof Error ? err.message : String(err);
+  const match = msg.match(/Error invoking remote method '[^']+': Error: (.+)/);
+  if (match) return match[1].trim();
+  const plain = msg.replace(/^Error:\s*/i, '').trim();
+  return plain || fallback;
+};
+
 const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateForgot }) => {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -34,7 +43,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
     try {
       await login(email, password);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Login failed.';
+      const msg = cleanIpcError(err, 'Login failed.');
       if (msg.toLowerCase().includes('buffering timed out') || msg.toLowerCase().includes('timeout')) {
         setError('Connection to the server is slow. Please wait a moment and try again.');
       } else {

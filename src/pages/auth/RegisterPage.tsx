@@ -19,6 +19,17 @@ interface OrgOption { id: string; name: string; }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dbApi = () => (window as any).electronAPI.db;
 
+/** Strip Electron's "Error invoking remote method '...': Error: " prefix. */
+const cleanIpcError = (err: unknown, fallback: string): string => {
+  const msg = err instanceof Error ? err.message : String(err);
+  // "Error invoking remote method 'db:auth:register': Error: <actual message>"
+  const match = msg.match(/Error invoking remote method '[^']+': Error: (.+)/);
+  if (match) return match[1].trim();
+  // Plain "Error: <message>" without the IPC prefix
+  const plain = msg.replace(/^Error:\s*/i, '').trim();
+  return plain || fallback;
+};
+
 const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
   const { register } = useAuth();
   const [name, setName] = useState('');
@@ -71,7 +82,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) => {
     try {
       await register(name.trim(), email.trim(), password, 'member', orgId);
     } catch (err: unknown) {
-      setGlobalError(err instanceof Error ? err.message : 'Registration failed.');
+      setGlobalError(cleanIpcError(err, 'Registration failed.'));
     } finally {
       setLoading(false);
     }

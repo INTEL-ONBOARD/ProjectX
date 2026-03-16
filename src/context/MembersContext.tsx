@@ -34,6 +34,7 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const getMemberColor = (id: string): string => {
+    if (!id) return memberColors[0];
     // Hash the id so color is stable regardless of list order or deletions
     let hash = 0;
     for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
