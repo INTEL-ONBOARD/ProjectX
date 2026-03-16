@@ -1135,8 +1135,8 @@ function registerDbHandlers() {
     ipcMain.handle('db:notifs:create', async (_e, notif: { userId: string; type: string; title: string; body?: string; refId?: string }) => {
         const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
-        // Fire OS notification if enabled for this user (skip new_message — handled by message stream)
-        if (notif.type !== 'new_message' && systemNotifsEnabled.get(notif.userId) !== false) {
+        // Fire OS notification only for the user logged in on this machine
+        if (notif.type !== 'new_message' && notif.userId === activeUserId && systemNotifsEnabled.get(notif.userId) !== false) {
             fireSystemNotif(notif.title, notif.body ?? '');
         }
         return safe(toNotif(d.toObject()));

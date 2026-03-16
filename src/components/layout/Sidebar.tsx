@@ -164,8 +164,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="mx-4 h-px bg-surface-200" />
 
             {/* Navigation */}
-            <nav className="mt-4 px-3 flex-1 overflow-hidden">
-                <ul className="space-y-1">
+            <nav className="mt-4 px-3 flex-1 flex flex-col min-h-0">
+                <ul className="space-y-1 shrink-0">
                     {navItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = location.pathname === item.id;
@@ -216,7 +216,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <AnimatePresence>
                     {!collapsed && (
                         <motion.div
-                            className="mt-8"
+                            className="mt-8 flex-1 flex flex-col min-h-0 overflow-hidden"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
@@ -236,7 +236,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                 </motion.button>
                             </div>
 
-                            <ul className="space-y-0.5">
+                            <ul className="space-y-0.5 overflow-y-auto flex-1 pr-0.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--color-surface-300) transparent' }}>
                                 {projects.map((project, index) => (
                                     <motion.li
                                         key={project.id}

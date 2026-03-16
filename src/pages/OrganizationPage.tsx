@@ -480,10 +480,18 @@ const OrganizationPage: React.FC = () => {
                                     <motion.div className="mb-4 p-4 rounded-2xl border border-surface-200 bg-surface-50 flex items-center gap-3" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                                         <input value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="Role name (e.g. developer)" onKeyDown={e => { if (e.key === 'Enter') handleCreateRole(); }}
                                             className="flex-1 border border-surface-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all bg-white" />
-                                        <div className="flex gap-1.5">
+                                        <div className="flex gap-1.5 flex-wrap items-center">
                                             {PROJECT_COLORS.map(c => (
                                                 <button key={c} type="button" onClick={() => setNewRoleColor(c)} className={`w-6 h-6 rounded-full transition-all ${newRoleColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'}`} style={{ backgroundColor: c }} />
                                             ))}
+                                            <label
+                                                className={`w-6 h-6 rounded-full cursor-pointer flex items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all overflow-hidden relative hover:scale-105 ${!PROJECT_COLORS.includes(newRoleColor) ? 'ring-2 ring-offset-1 ring-gray-400 scale-110 border-solid' : ''}`}
+                                                style={!PROJECT_COLORS.includes(newRoleColor) ? { backgroundColor: newRoleColor, borderColor: newRoleColor } : {}}
+                                                title="Custom color"
+                                            >
+                                                {PROJECT_COLORS.includes(newRoleColor) && <span className="text-gray-400 text-sm leading-none select-none">+</span>}
+                                                <input type="color" value={newRoleColor} onChange={e => setNewRoleColor(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                                            </label>
                                         </div>
                                         <button onClick={handleCreateRole} disabled={!newRoleName.trim()} className="px-4 py-2 bg-primary-500 text-white text-sm font-semibold rounded-xl hover:bg-primary-600 disabled:opacity-40 transition-colors">Create</button>
                                         <button onClick={() => setShowNewRole(false)} className="p-2 text-gray-400 hover:text-gray-600 transition-colors"><X size={14} /></button>
@@ -613,8 +621,16 @@ const OrganizationPage: React.FC = () => {
                             <div className="flex items-center justify-between mb-4"><span className="font-bold text-gray-900">New Department</span><button onClick={() => setShowAddDept(false)}><X size={16} /></button></div>
                             <div className="flex flex-col gap-3">
                                 <input value={newDeptName} onChange={e => setNewDeptName(e.target.value)} placeholder="Department name" className="border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400" />
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap items-center">
                                     {PROJECT_COLORS.map(c => <button key={c} type="button" onClick={() => setNewDeptColor(c)} className={`w-8 h-8 rounded-full transition-all ${newDeptColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'}`} style={{ backgroundColor: c }} />)}
+                                    <label
+                                        className={`w-8 h-8 rounded-full cursor-pointer flex items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all overflow-hidden relative hover:scale-105 ${!PROJECT_COLORS.includes(newDeptColor) ? 'ring-2 ring-offset-1 ring-gray-400 scale-110 border-solid' : ''}`}
+                                        style={!PROJECT_COLORS.includes(newDeptColor) ? { backgroundColor: newDeptColor, borderColor: newDeptColor } : {}}
+                                        title="Custom color"
+                                    >
+                                        {PROJECT_COLORS.includes(newDeptColor) && <span className="text-gray-400 text-lg leading-none select-none">+</span>}
+                                        <input type="color" value={newDeptColor} onChange={e => setNewDeptColor(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                                    </label>
                                 </div>
                                 <button onClick={() => {
                                     if (!newDeptName.trim()) return;

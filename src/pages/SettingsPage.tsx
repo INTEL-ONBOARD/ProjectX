@@ -149,12 +149,11 @@ const InputField: React.FC<{
 );
 
 const ACCENT_COLORS = [
-  { hex: '#5030E5', label: 'Violet' },
-  { hex: '#0EA5E9', label: 'Sky' },
-  { hex: '#10B981', label: 'Emerald' },
-  { hex: '#F59E0B', label: 'Amber' },
-  { hex: '#EF4444', label: 'Rose' },
-  { hex: '#8B5CF6', label: 'Purple' },
+  { hex: '#EF4444', label: 'Red' },
+  { hex: '#F97316', label: 'Orange' },
+  { hex: '#FACC15', label: 'Yellow' },
+  { hex: '#22C55E', label: 'Green' },
+  { hex: '#3B82F6', label: 'Blue' },
 ];
 
 // ── Section header ────────────────────────────────────────────────────────────
@@ -861,6 +860,16 @@ const SettingsPage: React.FC = () => {
                             )}
                           </button>
                         ))}
+                        <label
+                          className={`w-8 h-8 rounded-full cursor-pointer flex items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all overflow-hidden relative hover:scale-105 ${!ACCENT_COLORS.some(c => c.hex === accentColor) ? 'ring-2 ring-offset-2 scale-110 border-solid' : 'opacity-60 hover:opacity-100'}`}
+                          style={!ACCENT_COLORS.some(c => c.hex === accentColor) ? { backgroundColor: accentColor, borderColor: accentColor } : {}}
+                          title="Custom color"
+                        >
+                          {!ACCENT_COLORS.some(c => c.hex === accentColor)
+                            ? <Check size={12} className="text-white" strokeWidth={3} />
+                            : <span className="text-gray-400 text-lg leading-none select-none">+</span>}
+                          <input type="color" value={accentColor} onChange={e => { setAccentColor(e.target.value); applyAccentColor(e.target.value); saveAppearance({ accentColor: e.target.value }); flashSaved('appear'); }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                        </label>
                         <span className="ml-1 text-xs font-medium text-gray-500">
                           {ACCENT_COLORS.find(c => c.hex === accentColor)?.label ?? 'Custom'}
                         </span>

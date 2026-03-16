@@ -100,7 +100,7 @@ export const RoleCard: React.FC<Props> = ({
                                     {/* Color */}
                                     <div>
                                         <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Color</label>
-                                        <div className="flex gap-2 flex-wrap">
+                                        <div className="flex gap-2 flex-wrap items-center">
                                             {PROJECT_COLORS.map(c => (
                                                 <button
                                                     key={c} type="button"
@@ -109,6 +109,14 @@ export const RoleCard: React.FC<Props> = ({
                                                     style={{ backgroundColor: c }}
                                                 />
                                             ))}
+                                            <label
+                                                className={`w-7 h-7 rounded-full cursor-pointer flex items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all overflow-hidden relative hover:scale-105 ${!PROJECT_COLORS.includes(role.color) ? 'ring-2 ring-offset-1 ring-gray-400 scale-110 border-solid' : ''}`}
+                                                style={!PROJECT_COLORS.includes(role.color) ? { backgroundColor: role.color, borderColor: role.color } : {}}
+                                                title="Custom color"
+                                            >
+                                                {PROJECT_COLORS.includes(role.color) && <span className="text-gray-400 text-base leading-none select-none">+</span>}
+                                                <input type="color" value={role.color} onChange={e => handleColorClick(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                                            </label>
                                         </div>
                                     </div>
                                 </>

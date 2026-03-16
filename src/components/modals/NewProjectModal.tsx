@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, FolderPlus } from 'lucide-react';
+import { X, FolderPlus, ChevronDown } from 'lucide-react';
 import { PROJECT_COLORS } from '../../data/mockData';
 
 export type ProjectRichFields = {
   description: string;
-  status: 'active' | 'on-hold' | 'completed';
+  status: 'active' | 'on-hold' | 'completed' | 'live' | 'support' | 'planning';
   priority: 'low' | 'medium' | 'high';
   startDate: string;
   dueDate: string;
@@ -22,6 +22,9 @@ const STATUS_OPTIONS: { value: ProjectRichFields['status']; label: string; color
   { value: 'active',    label: 'Active',    color: 'text-[#68B266] bg-[#83C29D22]' },
   { value: 'on-hold',  label: 'On Hold',   color: 'text-[#FFA500] bg-[#FFA50020]' },
   { value: 'completed',label: 'Completed', color: 'text-primary-500 bg-primary-50' },
+  { value: 'live',     label: 'Live',      color: 'text-[#00BFFF] bg-[#00BFFF20]' },
+  { value: 'support',  label: 'Support',   color: 'text-[#C084FC] bg-[#C084FC20]' },
+  { value: 'planning', label: 'Planning',  color: 'text-[#94A3B8] bg-[#94A3B820]' },
 ];
 
 const PRIORITY_OPTIONS: { value: ProjectRichFields['priority']; label: string; color: string }[] = [
@@ -117,38 +120,32 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Status</label>
-              <div className="flex flex-col gap-1.5">
-                {STATUS_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value} type="button"
-                    onClick={() => setStatus(opt.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-left transition-all border ${
-                      status === opt.value
-                        ? `${opt.color} border-transparent ring-1 ring-current`
-                        : 'border-surface-200 text-gray-500 bg-white hover:bg-surface-50'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              <div className="relative">
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value as ProjectRichFields['status'])}
+                  className={`${inputCls} appearance-none pr-8 cursor-pointer`}
+                >
+                  {STATUS_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Priority</label>
-              <div className="flex flex-col gap-1.5">
-                {PRIORITY_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value} type="button"
-                    onClick={() => setPriority(opt.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-left transition-all border ${
-                      priority === opt.value
-                        ? `${opt.color} border-transparent ring-1 ring-current`
-                        : 'border-surface-200 text-gray-500 bg-white hover:bg-surface-50'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              <div className="relative">
+                <select
+                  value={priority}
+                  onChange={e => setPriority(e.target.value as ProjectRichFields['priority'])}
+                  className={`${inputCls} appearance-none pr-8 cursor-pointer`}
+                >
+                  {PRIORITY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
             </div>
           </div>
@@ -186,7 +183,7 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
           {/* Color */}
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-2 block">Color</label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap items-center">
               {PROJECT_COLORS.map(c => (
                 <button
                   key={c} type="button"
@@ -195,6 +192,15 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
                   style={{ backgroundColor: c }}
                 />
               ))}
+              {/* Custom color picker */}
+              <label
+                className={`w-8 h-8 rounded-full cursor-pointer flex items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all overflow-hidden relative hover:scale-105 ${!PROJECT_COLORS.includes(color) ? 'ring-2 ring-offset-2 ring-gray-400 scale-110 border-solid' : ''}`}
+                style={!PROJECT_COLORS.includes(color) ? { backgroundColor: color, borderColor: color } : {}}
+                title="Custom color"
+              >
+                {PROJECT_COLORS.includes(color) && <span className="text-gray-400 text-lg leading-none select-none">+</span>}
+                <input type="color" value={color} onChange={e => setColor(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+              </label>
             </div>
           </div>
 

@@ -11,7 +11,7 @@ const dbApi = () => (window as any).electronAPI.db;
 const authApi = () => (window as any).electronAPI.auth;
 
 const BUILT_IN = ['admin', 'guest'];
-const PRESET_COLORS = ['#5030E5', '#D97706', '#68B266', '#EF4444', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6'];
+const PRESET_COLORS = ['#EF4444', '#F97316', '#FACC15', '#22C55E', '#3B82F6'];
 
 interface Props {
     selectedRoleId: string | null;
@@ -145,6 +145,14 @@ export const RoleDetailPanel: React.FC<Props> = ({ selectedRoleId, onDeleteCompl
                             style={{ background: c }}
                         />
                     ))}
+                    <label
+                        className={`w-7 h-7 rounded-full cursor-pointer flex items-center justify-center border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all overflow-hidden relative hover:scale-105 ${!PRESET_COLORS.includes(role.color) ? 'scale-110 border-solid border-gray-800' : ''}`}
+                        style={!PRESET_COLORS.includes(role.color) ? { backgroundColor: role.color } : {}}
+                        title="Custom color"
+                    >
+                        {PRESET_COLORS.includes(role.color) && <span className="text-gray-400 text-base leading-none select-none">+</span>}
+                        <input type="color" value={role.color} onChange={e => !colorSaving && handleColorPick(e.target.value)} disabled={colorSaving} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full disabled:cursor-not-allowed" />
+                    </label>
                 </div>
             </div>
 

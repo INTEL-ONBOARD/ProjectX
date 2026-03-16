@@ -3,5 +3,5 @@ export const memberColors = [
 ];
 
 export const PROJECT_COLORS = [
-  '#7AC555', '#FFA500', '#E4CCFD', '#76A5EA', '#5030E5', '#30C5E5',
+  '#EF4444', '#F97316', '#FACC15', '#22C55E', '#3B82F6',
 ];
