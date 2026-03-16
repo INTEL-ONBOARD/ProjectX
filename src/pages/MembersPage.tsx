@@ -25,7 +25,7 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
 const getRoleStyle = (role: string) => roleStyles[role] ?? { bg: 'bg-surface-200', text: 'text-gray-500' };
 
 const MembersPage: React.FC = () => {
-  const { members, getMemberColor, addMember, updateMember, removeMember, refetchMembers } = useMembersContext();
+  const { members, getMemberColor, addMember, removeMember, refetchMembers } = useMembersContext();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const { scrubAssignee, allTasks } = useProjects();
@@ -47,7 +47,10 @@ const MembersPage: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    refetchMembers().catch(console.error);
+    const onFocus = () => refetchMembers().catch(console.error);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -164,7 +167,6 @@ const MembersPage: React.FC = () => {
                   const tc = memberTaskCounts[member.id] ?? { assigned: 0, total: 5 };
                   const pct = tc.total > 0 ? (tc.assigned / tc.total) * 100 : 0;
                   const status: 'online' | 'away' | 'offline' = getPresenceStatus(member.lastSeen);
-                  const isConfirmingRemove = confirmRemoveId === member.id;
                   return (
                     <motion.tr
                       key={member.id}

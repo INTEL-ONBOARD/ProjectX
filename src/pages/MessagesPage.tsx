@@ -18,6 +18,15 @@ type Msg = { id: string; from: string; text: string; time: string; read: boolean
 
 const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
+const fmtTime = (t: string) => {
+  if (!t) return '';
+  try {
+    return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return t; // fallback for legacy HH:MM strings already in DB
+  }
+};
+
 const MessagesPage: React.FC = () => {
   useContext(AppContext); // keep context subscription for future use
   const { showToast } = useToast();
@@ -229,7 +238,7 @@ const MessagesPage: React.FC = () => {
       id: `m${crypto.randomUUID()}`,
       from: myId,
       text,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: new Date().toISOString(),
       read: true,
     };
     setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
@@ -239,7 +248,7 @@ const MessagesPage: React.FC = () => {
         .then((saved: Msg) => {
           setChats(prev => ({
             ...prev,
-            [targetId]: (prev[targetId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id } : m),
+            [targetId]: (prev[targetId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id, time: saved.time } : m),
           }));
         })
         .catch((err: unknown) => {
@@ -340,13 +349,22 @@ const MessagesPage: React.FC = () => {
     return msgs[msgs.length - 1];
   };
 
-  const filteredConvos = conversations.filter(m => {
-    if (archivedIds.has(m.id)) return false;
-    if (!m.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (msgFilter === 'pinned') return pinnedIds.includes(m.id);
-    if (msgFilter === 'unread') return getUnread(m.id) > 0;
-    return true;
-  });
+  const filteredConvos = conversations
+    .filter(m => {
+      if (archivedIds.has(m.id)) return false;
+      if (!m.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (msgFilter === 'pinned') return pinnedIds.includes(m.id);
+      if (msgFilter === 'unread') return getUnread(m.id) > 0;
+      return true;
+    })
+    .sort((a, b) => {
+      const aPinned = pinnedIds.includes(a.id);
+      const bPinned = pinnedIds.includes(b.id);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+      const aTime = getLastMsg(a.id)?.time ?? '';
+      const bTime = getLastMsg(b.id)?.time ?? '';
+      return bTime.localeCompare(aTime);
+    });
 
   return (
     <motion.div
@@ -436,6 +454,7 @@ const MessagesPage: React.FC = () => {
                   transition={{ duration: 0.3, delay: i * 0.05 }}
                   onClick={() => {
                     setActiveId(member.id);
+                    setShowEmojiPicker(null);
                     setOpenedIds(p => new Set([...p, member.id]));
                     // Immediately mark this conversation's messages as read in local state
                     // so totalUnread and the unread badge drop instantly (before DB fetch completes)
@@ -462,7 +481,7 @@ const MessagesPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-[10px] text-gray-400">{lastMsg?.time}</span>
+                    <span className="text-[10px] text-gray-400">{fmtTime(lastMsg?.time ?? '')}</span>
                     {unread > 0 && (
                       <span className="min-w-[18px] h-[18px] rounded-full bg-primary-500 text-white text-[9px] font-bold flex items-center justify-center px-1">{unread}</span>
                     )}
@@ -536,11 +555,11 @@ const MessagesPage: React.FC = () => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
-            {activeChats.map((msg, i) => {
+            {[...activeChats].sort((a, b) => a.time.localeCompare(b.time)).map((msg, i, arr) => {
               const isOwn = msg.from === myId;
               const sender = members.find(m => m.id === msg.from) ?? { name: 'Unknown' };
               const senderColor = getMemberColor(msg.from);
-              const showAvatar = !isOwn && (i === 0 || activeChats[i - 1]?.from !== msg.from);
+              const showAvatar = !isOwn && (i === 0 || arr[i - 1]?.from !== msg.from);
               return (
                 <motion.div
                   key={msg.id}
@@ -600,7 +619,7 @@ const MessagesPage: React.FC = () => {
                       </div>
                     )}
                     <div className={`flex items-center gap-1 text-[10px] text-gray-400 mt-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                      <span>{msg.time}</span>
+                      <span>{fmtTime(msg.time)}</span>
                       {isOwn && (
                         msg.read
                           ? <CheckCheck size={12} className="text-primary-400" />
@@ -625,7 +644,7 @@ const MessagesPage: React.FC = () => {
                 if (!file || !currentUserId) return;
                 const targetId = activeId;
                 const text = `📎 ${file.name}`;
-                const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const now = new Date().toISOString();
                 const newMsg: Msg = { id: `m${crypto.randomUUID()}`, from: myId, text, time: now, read: true };
                 setChats(prev => ({ ...prev, [targetId]: [...(prev[targetId] ?? []), newMsg] }));
                 e.target.value = '';
@@ -633,7 +652,7 @@ const MessagesPage: React.FC = () => {
                   .then((saved: Msg) => {
                     setChats(prev => ({
                       ...prev,
-                      [targetId]: (prev[targetId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id } : m),
+                      [targetId]: (prev[targetId] ?? []).map(m => m.id === newMsg.id ? { ...m, id: saved.id, time: saved.time } : m),
                     }));
                   })
                   .catch((err: unknown) => {
