@@ -26,7 +26,7 @@ interface ProjectData {
   name: string;
   description: string;
   color: string;
-  status: 'active' | 'on-hold' | 'completed';
+  status: 'active' | 'on-hold' | 'completed' | 'live-and-support' | 'planning';
   priority: 'low' | 'medium' | 'high';
   memberIds: string[];
   taskTotal: number;
