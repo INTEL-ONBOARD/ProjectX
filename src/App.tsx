@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HashRouter, Routes, Route, Outlet, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import ProjectHeader from './components/layout/ProjectHeader';
@@ -95,27 +95,30 @@ const KanbanRoute: React.FC = () => {
 // ── Auth screens (with navigate) ──────────────────────────────────────────────
 const AuthScreens: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     return (
-        <Routes>
-            <Route path="/login" element={
-                <LoginPage
-                    onNavigateRegister={() => navigate('/register')}
-                    onNavigateForgot={() => navigate('/forgot-password')}
-                />
-            } />
-            <Route path="/register" element={
-                <RegisterPage onNavigateLogin={() => navigate('/login')} />
-            } />
-            <Route path="/forgot-password" element={
-                <ForgotPasswordPage onNavigateLogin={() => navigate('/login')} />
-            } />
-            <Route path="*" element={
-                <LoginPage
-                    onNavigateRegister={() => navigate('/register')}
-                    onNavigateForgot={() => navigate('/forgot-password')}
-                />
-            } />
-        </Routes>
+        <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+                <Route path="/login" element={
+                    <LoginPage
+                        onNavigateRegister={() => navigate('/register')}
+                        onNavigateForgot={() => navigate('/forgot-password')}
+                    />
+                } />
+                <Route path="/register" element={
+                    <RegisterPage onNavigateLogin={() => navigate('/login')} />
+                } />
+                <Route path="/forgot-password" element={
+                    <ForgotPasswordPage onNavigateLogin={() => navigate('/login')} />
+                } />
+                <Route path="*" element={
+                    <LoginPage
+                        onNavigateRegister={() => navigate('/register')}
+                        onNavigateForgot={() => navigate('/forgot-password')}
+                    />
+                } />
+            </Routes>
+        </AnimatePresence>
     );
 };
 
@@ -249,11 +252,7 @@ const Root: React.FC = () => {
 
     // 3. Auth screens (login / register / forgot)
     if (!isAuthenticated) {
-        return (
-            <AnimatePresence mode="wait">
-                <AuthScreens />
-            </AnimatePresence>
-        );
+        return <AuthScreens />;
     }
 
     // 4. Main app (with reconnecting overlay when DB drops)
