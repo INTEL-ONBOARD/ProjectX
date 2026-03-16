@@ -232,10 +232,10 @@ function startMessageStream(): void {
     try {
         messageStream = (MessageModel as any).watch([{ $match: { operationType: 'insert' } }]);
         messageStream.on('change', (change: any) => {
-            if (!mainWindow || (mainWindow as any).isDestroyed()) return;
+            if (!mainWindow || mainWindow.isDestroyed()) return;
             const d = change.fullDocument;
             if (!d) return;
-            (mainWindow as any).webContents.send('msg:new', toMsgFrontend(d));
+            mainWindow.webContents.send('msg:new', toMsgFrontend(d));
         });
         messageStream.on('error', (err: any) => {
             console.error('[changeStream] error:', err.message);
