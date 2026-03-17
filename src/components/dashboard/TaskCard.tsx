@@ -33,7 +33,6 @@ interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, onDeleteTask, todayMode }) => {
-  const [isDragging, setIsDragging] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -62,10 +61,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
 
   return (
     <motion.div
-      className={`bg-surface-50 rounded-2xl p-4 border cursor-pointer group relative transition-all ${isToday ? 'border-l-4 border-l-primary-500 border-surface-200' : isOverdue ? 'border-l-4 border-l-red-400 border-surface-200' : 'border-surface-200'} ${isDragging ? 'opacity-50' : ''}`}
-      draggable
-      onDragStart={e => { (e as unknown as React.DragEvent).dataTransfer.setData('taskId', task.id); setIsDragging(true); }}
-      onDragEnd={() => setIsDragging(false)}
+      className={`bg-surface-50 rounded-2xl p-4 border cursor-pointer group relative transition-all ${isToday ? 'border-l-4 border-l-primary-500 border-surface-200' : isOverdue ? 'border-l-4 border-l-red-400 border-surface-200' : 'border-surface-200'}`}
       initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.08, ease: [0.4, 0, 0.2, 1] }}
       whileHover={{ y: -3, transition: { duration: 0.2 } }}

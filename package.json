@@ -1,6 +1,6 @@
 {
   "name": "projectm",
-  "version": "2.1.9",
+  "version": "2.2.0",
   "description": "Project Planning Desktop App",
   "main": "electron/main.js",
   "author": "",

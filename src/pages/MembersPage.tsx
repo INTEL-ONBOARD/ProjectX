@@ -13,7 +13,7 @@ import InviteMemberModal from '../components/modals/InviteMemberModal';
 import { downloadCsv } from '../utils/exportCsv';
 import { User } from '../types';
 import { useToast } from '../components/ui/Toast';
-import { getPresenceStatus } from '../context/PresenceContext';
+import { usePresence } from '../context/PresenceContext';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
@@ -27,6 +27,7 @@ const getRoleStyle = (role: string) => roleStyles[role] ?? { bg: 'bg-surface-200
 
 const MembersPage: React.FC = () => {
   const { members, getMemberColor, addMember, updateMember, removeMember, refetchMembers } = useMembersContext();
+  const { getStatus } = usePresence();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const { scrubAssignee, allTasks } = useProjects();
@@ -72,7 +73,7 @@ const MembersPage: React.FC = () => {
   const adminCount = members.filter(m => m.role === 'admin').length;
   const managerCount = members.filter(m => m.role === 'manager').length;
   const memberCount = members.filter(m => m.role === 'member').length;
-  const onlineCount = members.filter(m => getPresenceStatus(m.lastSeen) === 'online').length;
+  const onlineCount = members.filter(m => getStatus(m.id) === 'online').length;
 
   const metrics = [
     { label: 'Total Members', value: String(members.length), trend: `${members.length} in team`, trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
@@ -189,7 +190,7 @@ const MembersPage: React.FC = () => {
                   const color = getMemberColor(member.id);
                   const role = getRoleStyle(member.role);
                   const tc = memberTaskCounts[member.id] ?? { assigned: 0, done: 0 };
-                  const status: 'online' | 'away' | 'offline' = getPresenceStatus(member.lastSeen);
+                  const status: 'online' | 'away' | 'offline' = getStatus(member.id);
                   return (
                     <motion.tr
                       key={member.id}
@@ -371,7 +372,7 @@ const MembersPage: React.FC = () => {
               transition={{ duration: 0.35, delay: 0.16, ease: [0.4, 0, 0.2, 1] }}>
               <h3 className="font-bold text-gray-900 text-sm mb-3">Availability</h3>
               {(['online', 'away', 'offline'] as const).map(s => {
-                const count = members.filter(m => getPresenceStatus(m.lastSeen) === s).length;
+                const count = members.filter(m => getStatus(m.id) === s).length;
                 return (
                   <div key={s} className="flex items-center gap-2 py-2 border-b border-surface-100 last:border-0">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[s] }} />
@@ -426,7 +427,7 @@ const MembersPage: React.FC = () => {
                   </div>
                   <div className="flex justify-between py-2 border-b border-surface-100">
                     <span className="text-xs text-gray-400">Status</span>
-                    <span className={`text-xs font-semibold ${getPresenceStatus(selectedMember.lastSeen) === 'online' ? 'text-[#68B266]' : getPresenceStatus(selectedMember.lastSeen) === 'away' ? 'text-[#FFA500]' : 'text-gray-400'}`}>{getPresenceStatus(selectedMember.lastSeen)}</span>
+                    <span className={`text-xs font-semibold ${getStatus(selectedMember.id) === 'online' ? 'text-[#68B266]' : getStatus(selectedMember.id) === 'away' ? 'text-[#FFA500]' : 'text-gray-400'}`}>{getStatus(selectedMember.id)}</span>
                   </div>
                 </div>
                 <motion.button

@@ -173,12 +173,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
       await moveTask(activeTask.id, targetStatus).catch(console.error);
     }
 
-    // Reorder within the target column (use updated status for the dropped task)
-    const targetColTasks = applyFilters(
-      allTasks
-        .map(t => t.id === activeTask.id ? { ...t, status: targetStatus } : t)
-        .filter(t => t.status === targetStatus && t.projectId === activeProject)
-    );
+    // Reorder within the target column using ALL tasks (not filtered) to preserve order of hidden tasks
+    const targetColTasks = allTasks
+      .map(t => t.id === activeTask.id ? { ...t, status: targetStatus } : t)
+      .filter(t => t.status === targetStatus && t.projectId === activeProject)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const oldIndex = targetColTasks.findIndex(t => t.id === active.id);
     const overIndex = targetColTasks.findIndex(t => t.id === over.id);
 

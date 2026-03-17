@@ -184,9 +184,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteProject = async (id: string) => {
     await api().deleteProject(id);
-    const remaining = projects.filter(p => p.id !== id);
-    setProjects(remaining);
-    setActiveProject(ap => ap === id ? (remaining[0]?.id ?? '') : ap);
+    setProjects(prev => {
+      const remaining = prev.filter(p => p.id !== id);
+      setActiveProject(ap => ap === id ? (remaining[0]?.id ?? '') : ap);
+      return remaining;
+    });
     setAllTasks(prev => prev.map(t => t.projectId === id ? { ...t, projectId: undefined } : t));
   };
 
@@ -208,17 +210,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteTask = async (id: string) => {
     await api().deleteTask(id);
-    // Remove from task list and scrub the deleted task from all blockedBy arrays
-    const affected = allTasks.filter(t => t.id !== id && t.blockedBy?.includes(id));
-    setAllTasks(prev => prev
-      .filter(t => t.id !== id)
-      .map(t => t.blockedBy?.includes(id) ? { ...t, blockedBy: t.blockedBy.filter(b => b !== id) } : t)
-    );
-    // Persist the blockedBy removal for each affected task
-    for (const t of affected) {
-      const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
-      api().updateTask(t.id, { ...actorMeta, blockedBy: t.blockedBy?.filter(b => b !== id) ?? [] }).catch(() => {});
-    }
+    // Compute affected tasks before mutating state, using functional updater to avoid stale closure
+    setAllTasks(prev => {
+      const affected = prev.filter(t => t.id !== id && t.blockedBy?.includes(id));
+      // Persist the blockedBy removal for each affected task (fire-and-forget)
+      for (const t of affected) {
+        const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
+        api().updateTask(t.id, { ...actorMeta, blockedBy: t.blockedBy?.filter(b => b !== id) ?? [] }).catch(() => {});
+      }
+      return prev
+        .filter(t => t.id !== id)
+        .map(t => t.blockedBy?.includes(id) ? { ...t, blockedBy: t.blockedBy.filter(b => b !== id) } : t);
+    });
   };
 
   const moveTask = async (id: string, newStatus: TaskStatus) => {

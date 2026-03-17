@@ -77,9 +77,9 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
 
   const [canSubmit, setCanSubmit] = useState(false);
 
-  const goNext = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const goNext = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (!title.trim()) { setTitleError('Title is required'); return; }
     if (title.trim().length > 200) { setTitleError('Title must be under 200 characters'); return; }
     if (startDate && dueDate && startDate > dueDate) { setTitleError('Start date cannot be after due date'); return; }
@@ -223,7 +223,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                         paddingBottom: 8,
                         transition: 'border-color 0.15s',
                       }}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); goNext(); } }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); goNext(e); } }}
                     />
                     {titleError && <p className="text-red-500 text-xs mt-1">{titleError}</p>}
                   </div>

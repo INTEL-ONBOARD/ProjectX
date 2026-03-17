@@ -620,6 +620,9 @@ function startOrgStream(): void {
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
                 if (d) mainWindow.webContents.send('data:org:changed', { op, doc: safe(toOrg(d)) });
+            } else if (op === 'delete') {
+                const id = change.documentKey?._id?.toString();
+                mainWindow.webContents.send('data:org:changed', { op, id });
             }
         });
         orgStream.on('error', (err: any) => {
@@ -746,7 +749,7 @@ function startAuthUserStream(): void {
     if (!windowReady) return;
     if (authUserStream) { try { authUserStream.close(); } catch (_) {} authUserStream = null; }
     try {
-        authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup' });
+        authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'off', projection: { password: 0 } });
         registerStream('authUser', authUserStream);
         authUserStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -861,6 +864,7 @@ function startDataStreams(): void {
         try { stream.close(); } catch {}
     }
     activeStreams.clear();
+    startMessageStream();
     startProjectStream();
     startTaskStream();
     startMemberStream();
@@ -892,18 +896,18 @@ async function ensureDefaultData() {
     // Backfill taskNumber on existing tasks that don't have one yet
     const unnumbered = await TaskModel.find({ $or: [{ taskNumber: null }, { taskNumber: { $exists: false } }] }).sort({ _id: 1 }).lean();
     if (unnumbered.length > 0) {
-        const counter = await CounterModel.findOne({ name: 'tasks' }).lean();
-        let next = (counter?.value ?? 0) + 1;
-        for (const t of unnumbered) {
-            await TaskModel.updateOne({ _id: t._id }, { $set: { taskNumber: next } });
-            next++;
-        }
-        await CounterModel.findOneAndUpdate(
+        // Atomically reserve all needed numbers up-front — counter is correct even if the app
+        // crashes mid-loop, preventing any future task from reusing an already-assigned number.
+        const counter = await CounterModel.findOneAndUpdate(
             { name: 'tasks' },
-            { $set: { value: next - 1 } },
-            { upsert: true }
+            { $inc: { value: unnumbered.length } },
+            { new: false, upsert: true }
         );
-        console.log(`[migration] Assigned taskNumbers ${(counter?.value ?? 0) + 1}–${next - 1} to ${unnumbered.length} existing tasks`);
+        const firstNumber = (counter?.value ?? 0) + 1;
+        for (let i = 0; i < unnumbered.length; i++) {
+            await TaskModel.updateOne({ _id: unnumbered[i]._id }, { $set: { taskNumber: firstNumber + i } });
+        }
+        console.log(`[migration] Assigned taskNumbers ${firstNumber}–${firstNumber + unnumbered.length - 1} to ${unnumbered.length} existing tasks`);
     }
 }
 
@@ -917,7 +921,6 @@ function setupDbListeners() {
         console.log('MongoDB reconnected');
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('db:reconnected');
         // Restart all change streams — they die on disconnect and need to be re-opened
-        startMessageStream();
         startDataStreams();
     });
     mongoose.connection.on('error', (err) => {
@@ -960,16 +963,46 @@ async function connectDB() {
 
 // ─── IPC Handlers ─────────────────────────────────────────────────────────────
 
+// Wraps ipcMain.handle so every handler has a consistent try/catch — unhandled
+// DB errors won't crash the renderer as an uncaught rejection.
+function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
+    ipcMain.handle(channel, async (_e, ...args) => {
+        try {
+            return await fn(_e, ...args);
+        } catch (err: any) {
+            console.error(`[ipc:${channel}] error:`, err?.message ?? err);
+            throw err; // re-throw so the renderer receives a rejected promise
+        }
+    });
+}
+
+// ─── IPC Authorization ─────────────────────────────────────────────────────────
+
+async function requireAdmin(): Promise<void> {
+    if (!activeUserId) throw new Error('Not authenticated.');
+    const user = await AuthUserModel.findOne({ appId: activeUserId }).lean() as any;
+    if (!user || user.role !== 'admin') throw new Error('Permission denied: admin role required.');
+}
+
+async function requireAuth(): Promise<void> {
+    if (!activeUserId) throw new Error('Not authenticated.');
+}
+
 function registerDbHandlers() {
     // Projects
-    ipcMain.handle('db:projects:getAll', async () => safe((await ProjectModel.find().lean()).map(toProject)));
-    ipcMain.handle('db:projects:create', async (_e, name: string, color: string) => { const d = await ProjectModel.create({ appId: `p${Date.now()}`, name, color }); return safe(toProject(d.toObject())); });
-    ipcMain.handle('db:projects:update', async (_e, id: string, changes: object) => { const d = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toProject(d)) : null; });
-    ipcMain.handle('db:projects:delete', async (_e, id: string) => { await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); await ProjectRichModel.deleteOne({ projectId: id }); return true; });
+    handle('db:projects:getAll', async () => safe((await ProjectModel.find().lean()).map(toProject)));
+    handle('db:projects:create', async (_e, name: string, color: string) => { const d = await ProjectModel.create({ appId: `p${randomUUID()}`, name, color }); return safe(toProject(d.toObject())); });
+    handle('db:projects:update', async (_e, id: string, changes: object) => {
+        const PROJECT_ALLOWED_FIELDS = new Set(['name', 'color']);
+        const safeChanges = Object.fromEntries(Object.entries(changes).filter(([k]) => PROJECT_ALLOWED_FIELDS.has(k)));
+        const d = await ProjectModel.findOneAndUpdate({ appId: id }, { $set: safeChanges }, { returnDocument: 'after' }).lean();
+        return d ? safe(toProject(d)) : null;
+    });
+    handle('db:projects:delete', async (_e, id: string) => { await requireAdmin(); await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); await ProjectRichModel.deleteOne({ projectId: id }); return true; });
 
     // Tasks
-    ipcMain.handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
-    ipcMain.handle('db:tasks:create', async (_e, taskData: any) => {
+    handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
+    handle('db:tasks:create', async (_e, taskData: any) => {
         const { actorId, actorName, ...rest } = taskData;
         const entry = {
             id: randomUUID(),
@@ -986,14 +1019,14 @@ function registerDbHandlers() {
         );
         const taskNumber = counter!.value;
         const doc = await TaskModel.create({
-            appId: 't' + Date.now(),
+            appId: 't' + randomUUID(),
             ...rest,
             taskNumber,
             activity: [entry],
         });
         return safe(toTask(doc.toObject()));
     });
-    ipcMain.handle('db:tasks:update', async (_e, id: string, changes: any) => {
+    handle('db:tasks:update', async (_e, id: string, changes: any) => {
         const { actorId, actorName, ...rest } = changes;
         const actor = { actorId: actorId ?? 'system', actorName: actorName ?? 'System' };
         const current = await TaskModel.findOne({ appId: id }).lean();
@@ -1020,7 +1053,9 @@ function registerDbHandlers() {
                 if (!newSet.has(a)) entries.push({ id: randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
             }
         }
-        const updateDoc: any = { $set: { ...rest } };
+        const TASK_ALLOWED_FIELDS = new Set(['title', 'description', 'priority', 'status', 'taskType', 'assignees', 'startDate', 'dueDate', 'projectId', 'blockedBy', 'recurrence', 'order', 'subtasks', 'estimatedMinutes', 'timeEntries', 'images']);
+        const safeRest = Object.fromEntries(Object.entries(rest).filter(([k]) => TASK_ALLOWED_FIELDS.has(k)));
+        const updateDoc: any = { $set: { ...safeRest } };
         if (entries.length > 0) updateDoc.$push = { activity: { $each: entries } };
         const updated = await TaskModel.findOneAndUpdate({ appId: id }, updateDoc, { returnDocument: 'after' });
         if (!updated) return null;
@@ -1051,8 +1086,8 @@ function registerDbHandlers() {
         }
         return safe(toTask(updatedObj));
     });
-    ipcMain.handle('db:tasks:delete', async (_e, id: string) => { await TaskModel.deleteOne({ appId: id }); return true; });
-    ipcMain.handle('db:tasks:move', async (_e, id: string, newStatus: string, actorId?: string, actorName?: string) => {
+    handle('db:tasks:delete', async (_e, id: string) => { await TaskModel.deleteOne({ appId: id }); return true; });
+    handle('db:tasks:move', async (_e, id: string, newStatus: string, actorId?: string, actorName?: string) => {
         const current = await TaskModel.findOne({ appId: id }).lean();
         if (!current) return null;
         const entry = {
@@ -1071,30 +1106,30 @@ function registerDbHandlers() {
         );
         return updated ? safe(toTask(updated.toObject())) : null;
     });
-    ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId: string) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
+    handle('db:tasks:scrubAssignee', async (_e, memberId: string) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
 
     // Comments
-    ipcMain.handle('db:comments:getByTask', async (_e, taskId: string) => {
+    handle('db:comments:getByTask', async (_e, taskId: string) => {
         const docs = await CommentModel.find({ taskId }).sort({ createdAt: 1 }).lean();
         return safe(docs.map((d: any) => ({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt })));
     });
-    ipcMain.handle('db:comments:add', async (_e, data: { taskId: string; authorId: string; authorName: string; text: string }) => {
+    handle('db:comments:add', async (_e, data: { taskId: string; authorId: string; authorName: string; text: string }) => {
         const doc = await CommentModel.create({ commentId: randomUUID(), ...data, createdAt: new Date().toISOString() });
         await TaskModel.updateOne({ appId: data.taskId }, { $inc: { comments: 1 } });
         return safe({ id: doc.commentId, taskId: doc.taskId, authorId: doc.authorId, authorName: doc.authorName, text: doc.text, createdAt: doc.createdAt });
     });
-    ipcMain.handle('db:comments:delete', async (_e, commentId: string) => {
+    handle('db:comments:delete', async (_e, commentId: string) => {
         const doc = await CommentModel.findOneAndDelete({ commentId }).lean();
         if (doc) await TaskModel.updateOne({ appId: (doc as any).taskId }, { $inc: { comments: -1 } });
         return true;
     });
 
     // Attachments
-    ipcMain.handle('db:attachments:getByTask', async (_e, taskId: string) => {
+    handle('db:attachments:getByTask', async (_e, taskId: string) => {
         const docs = await AttachmentModel.find({ taskId }).sort({ uploadedAt: 1 }).lean();
         return safe(docs.map((d: any) => ({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt })));
     });
-    ipcMain.handle('db:attachments:pick', async (_e, taskId: string) => {
+    handle('db:attachments:pick', async (_e, taskId: string) => {
         const { dialog, app: eApp } = await import('electron');
         const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
         if (result.canceled || !result.filePaths.length) return [];
@@ -1114,7 +1149,7 @@ function registerDbHandlers() {
         }
         return safe(saved);
     });
-    ipcMain.handle('db:attachments:delete', async (_e, attachId: string) => {
+    handle('db:attachments:delete', async (_e, attachId: string) => {
         const doc = await AttachmentModel.findOneAndDelete({ attachId }).lean();
         if (doc) {
             const fs = await import('fs');
@@ -1123,27 +1158,27 @@ function registerDbHandlers() {
         }
         return true;
     });
-    ipcMain.handle('db:attachments:open', async (_e, filePath: string) => {
+    handle('db:attachments:open', async (_e, filePath: string) => {
         await shell.openPath(filePath);
         return true;
     });
 
     // Task Templates
-    ipcMain.handle('db:templates:getAll', async () => {
+    handle('db:templates:getAll', async () => {
         const docs = await TaskTemplateModel.find().lean();
         return safe(docs.map((d: any) => ({ id: d.templateId, name: d.name, priority: d.priority, taskType: d.taskType, description: d.description, assignees: d.assignees, projectId: d.projectId })));
     });
-    ipcMain.handle('db:templates:create', async (_e, data: { name: string; priority: string; taskType: string; description: string; assignees: string[]; projectId: string }) => {
+    handle('db:templates:create', async (_e, data: { name: string; priority: string; taskType: string; description: string; assignees: string[]; projectId: string }) => {
         const doc = await TaskTemplateModel.create({ templateId: `tmpl${Date.now()}`, ...data });
         return safe({ id: doc.templateId, name: doc.name, priority: doc.priority, taskType: doc.taskType, description: doc.description, assignees: doc.assignees, projectId: doc.projectId });
     });
-    ipcMain.handle('db:templates:delete', async (_e, id: string) => {
+    handle('db:templates:delete', async (_e, id: string) => {
         await TaskTemplateModel.deleteOne({ templateId: id });
         return true;
     });
 
     // Avatar pick
-    ipcMain.handle('db:members:pickAvatar', async () => {
+    handle('db:members:pickAvatar', async () => {
         const { dialog } = await import('electron');
         const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
         if (result.canceled || !result.filePaths.length) return null;
@@ -1155,7 +1190,7 @@ function registerDbHandlers() {
     });
 
     // PDF export
-    ipcMain.handle('app:printToPDF', async () => {
+    handle('app:printToPDF', async () => {
         const { dialog } = await import('electron');
         if (!mainWindow) return false;
         const save = await dialog.showSaveDialog(mainWindow, { defaultPath: 'report.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] });
@@ -1168,40 +1203,46 @@ function registerDbHandlers() {
     });
 
     // Members
-    ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
-    ipcMain.handle('db:members:add', async (_e, member: object) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
-    ipcMain.handle('db:members:update', async (_e, id: string, changes: object) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toUser(d)) : null; });
-    ipcMain.handle('db:members:updateRole', async (_e, id: string, role: string) => {
+    handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
+    handle('db:members:add', async (_e, member: object) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
+    handle('db:members:update', async (_e, id: string, changes: object) => {
+        const MEMBER_ALLOWED_FIELDS = new Set(['name', 'avatar', 'email', 'location', 'role', 'designation', 'status']);
+        const safeChanges = Object.fromEntries(Object.entries(changes).filter(([k]) => MEMBER_ALLOWED_FIELDS.has(k)));
+        const d = await UserModel.findOneAndUpdate({ appId: id }, { $set: safeChanges }, { returnDocument: 'after' }).lean();
+        return d ? safe(toUser(d)) : null;
+    });
+    handle('db:members:updateRole', async (_e, id: string, role: string) => {
+        await requireAdmin();
         const d = await UserModel.findOneAndUpdate({ appId: id }, { role }, { returnDocument: 'after' }).lean();
         if (!d) throw new Error(`Member not found: ${id}`);
         await AuthUserModel.findOneAndUpdate({ appId: id }, { role });
         return safe(toUser(d));
     });
-    ipcMain.handle('db:members:remove', async (_e, id: string) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
-    ipcMain.handle('db:presence:heartbeat', async (_e, userId: string) => {
+    handle('db:members:remove', async (_e, id: string) => { await requireAdmin(); await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
+    handle('db:presence:heartbeat', async (_e, userId: string) => {
         await UserModel.updateOne({ appId: userId }, { lastSeen: new Date() });
         return true;
     });
 
     // Attendance
-    ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map((d: any) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
-    ipcMain.handle('db:attendance:set', async (_e, record: { userId: string; date: string; status: string; checkIn?: string; checkOut?: string; notes?: string }) => {
+    handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map((d: any) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
+    handle('db:attendance:set', async (_e, record: { userId: string; date: string; status: string; checkIn?: string; checkOut?: string; notes?: string }) => {
         const recordId = `${record.userId}-${record.date}`;
         const d = await AttendanceModel.findOneAndUpdate({ recordId }, { recordId, ...record }, { upsert: true, returnDocument: 'after' }).lean() as any;
         return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null });
     });
-    ipcMain.handle('db:attendance:delete', async (_e, userId: string, date: string) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
+    handle('db:attendance:delete', async (_e, userId: string, date: string) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
 
     // Messages
-    ipcMain.handle('db:messages:getBetween', async (_e, userId: string, peerId: string) => {
+    handle('db:messages:getBetween', async (_e, userId: string, peerId: string) => {
         const msgs = await MessageModel.find({ $or: [{ fromId: userId, toId: peerId }, { fromId: peerId, toId: userId }] }).sort({ timestamp: 1 }).lean();
         return safe(msgs.map(toMsgFrontend));
     });
-    ipcMain.handle('db:messages:send', async (_e, msg: object) => {
+    handle('db:messages:send', async (_e, msg: object) => {
         const d = await MessageModel.create({ msgId: `m${Date.now()}`, ...msg });
         return safe(toMsgFrontend(d.toObject()));
     });
-    ipcMain.handle('db:messages:react', async (_e, msgId: string, userId: string, emoji: string) => {
+    handle('db:messages:react', async (_e, msgId: string, userId: string, emoji: string) => {
         const msg = await MessageModel.findOne({ msgId }).lean() as any;
         if (!msg) return null;
         const reactions: Record<string, string[]> = msg.reactions ? Object.fromEntries(Object.entries(msg.reactions)) : {};
@@ -1211,20 +1252,20 @@ function registerDbHandlers() {
         const d = await MessageModel.findOneAndUpdate({ msgId }, { reactions }, { returnDocument: 'after' }).lean();
         return d ? safe(toMsgFrontend(d)) : null;
     });
-    ipcMain.handle('db:messages:delete', async (_e, msgId: string) => {
+    handle('db:messages:delete', async (_e, msgId: string) => {
         await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
         return true;
     });
-    ipcMain.handle('msg:edit', async (_: any, msgId: string, newText: string) => {
+    handle('msg:edit', async (_: any, msgId: string, newText: string) => {
         if (!newText.trim()) return { ok: false };
         await MessageModel.updateOne({ msgId }, { $set: { text: newText.trim(), edited: true } });
         return { ok: true };
     });
-    ipcMain.handle('db:messages:markRead', async (_e, userId: string, peerId: string) => {
+    handle('db:messages:markRead', async (_e, userId: string, peerId: string) => {
         await MessageModel.updateMany({ fromId: peerId, toId: userId, read: { $ne: true } }, { read: true });
         return true;
     });
-    ipcMain.handle('db:messages:unread-counts', async (_: any, userId: string) => {
+    handle('db:messages:unread-counts', async (_: any, userId: string) => {
         const counts: Record<string, number> = {};
         const convMetas = await ConvMetaModel.find({ userId });
         await Promise.all(convMetas.map(async (c: any) => {
@@ -1236,43 +1277,43 @@ function registerDbHandlers() {
     });
 
     // Conv meta (pin/star/archive)
-    ipcMain.handle('db:convmeta:getAll', async (_e, userId: string) => {
+    handle('db:convmeta:getAll', async (_e, userId: string) => {
         const docs = await ConvMetaModel.find({ userId }).lean();
         return safe(docs.map(toConvMeta));
     });
-    ipcMain.handle('db:convmeta:set', async (_e, meta: { userId: string; peerId: string; [k: string]: unknown }) => {
+    handle('db:convmeta:set', async (_e, meta: { userId: string; peerId: string; [k: string]: unknown }) => {
         const convId = `${meta.userId}-${meta.peerId}`;
         const d = await ConvMetaModel.findOneAndUpdate({ convId }, { convId, ...meta }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toConvMeta(d));
     });
 
     // Departments
-    ipcMain.handle('db:depts:getAll', async () => safe((await DeptModel.find().lean()).map(toDept)));
-    ipcMain.handle('db:depts:create', async (_e, dept: object) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return safe(toDept(d.toObject())); });
-    ipcMain.handle('db:depts:update', async (_e, id: string, changes: object) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toDept(d)) : null; });
-    ipcMain.handle('db:depts:delete', async (_e, id: string) => { await DeptModel.deleteOne({ deptId: id }); return true; });
+    handle('db:depts:getAll', async () => safe((await DeptModel.find().lean()).map(toDept)));
+    handle('db:depts:create', async (_e, dept: object) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return safe(toDept(d.toObject())); });
+    handle('db:depts:update', async (_e, id: string, changes: object) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toDept(d)) : null; });
+    handle('db:depts:delete', async (_e, id: string) => { await DeptModel.deleteOne({ deptId: id }); return true; });
 
     // Project rich data
-    ipcMain.handle('db:projectrich:getAll', async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
-    ipcMain.handle('db:projectrich:set', async (_e, data: { projectId: string; [k: string]: unknown }) => {
+    handle('db:projectrich:getAll', async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
+    handle('db:projectrich:set', async (_e, data: { projectId: string; [k: string]: unknown }) => {
         const { projectId, ...rest } = data;
         const d = await ProjectRichModel.findOneAndUpdate({ projectId }, { $set: rest }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toProjectRich(d));
     });
-    ipcMain.handle('db:projectrich:delete', async (_e, projectId: string) => {
+    handle('db:projectrich:delete', async (_e, projectId: string) => {
         await ProjectRichModel.deleteOne({ projectId });
         return true;
     });
 
     // Auth
-    ipcMain.handle('db:auth:login', async (_e, email: string, password: string) => {
+    handle('db:auth:login', async (_e, email: string, password: string) => {
         const found = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean() as any;
         if (!found) throw new Error('Invalid email or password.');
         const valid = await bcrypt.compare(password, found.password);
         if (!valid) throw new Error('Invalid email or password.');
         return safe(toAuthUser(found));
     });
-    ipcMain.handle('db:auth:register', async (_e, name: string, email: string, password: string, _role: string, orgId?: string) => {
+    handle('db:auth:register', async (_e, name: string, email: string, password: string, _role: string, orgId?: string) => {
         const existing = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (existing) throw new Error('An account with this email already exists.');
         const appId = `auth-${Date.now()}`;
@@ -1282,7 +1323,7 @@ function registerDbHandlers() {
         await UserModel.create({ appId, name, email: email.toLowerCase(), role: 'guest', status: 'active', ...(orgId ? { orgId } : {}) });
         return safe(toAuthUser(d.toObject()));
     });
-    ipcMain.handle('db:auth:updatePassword', async (_e, userId: string, currentPassword: string, newPassword: string) => {
+    handle('db:auth:updatePassword', async (_e, userId: string, currentPassword: string, newPassword: string) => {
         const found = await AuthUserModel.findOne({ appId: userId }).lean() as any;
         if (!found) throw new Error('Current password is incorrect.');
         const valid = await bcrypt.compare(currentPassword, found.password);
@@ -1291,23 +1332,28 @@ function registerDbHandlers() {
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { password: hashed });
         return true;
     });
-    ipcMain.handle('db:auth:updateName', async (_e, userId: string, newName: string) => {
+    handle('db:auth:updateName', async (_e, userId: string, newName: string) => {
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { name: newName });
         return true;
     });
-    ipcMain.handle('db:auth:getAll', async () => {
+    handle('db:auth:getAll', async () => {
         const docs = await AuthUserModel.find().lean() as any[];
         return safe(docs.map(d => ({ id: d.appId, name: d.name, email: d.email, role: d.role })));
     });
-    ipcMain.handle('db:auth:validate', async (_e, userId: string) => {
+    handle('db:auth:validate', async (_e, userId: string) => {
         const found = await AuthUserModel.findOne({ appId: userId }).lean() as any;
         return found ? safe(toAuthUser(found)) : null;
     });
-    ipcMain.handle('db:auth:updateRole', async (_e, userId: string, role: string) => {
+    handle('db:auth:updateRole', async (_e, userId: string, role: string) => {
+        await requireAdmin();
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { role });
         return true;
     });
-    ipcMain.handle('db:auth:seedDefault', async () => {
+    handle('db:auth:seedDefault', async () => {
+        if (app.isPackaged) return false; // dev-only: never run in production
+        // Only seed if no auth users exist yet (first-run bootstrap)
+        const count = await AuthUserModel.countDocuments();
+        if (count > 0) return false;
         const existing = await AuthUserModel.findOne({ email: 'admin@projectm.com' }).lean() as any;
         if (!existing) {
             const hashed = await bcrypt.hash('password123', 10);
@@ -1362,36 +1408,39 @@ function registerDbHandlers() {
     });
 
     // Organization
-    ipcMain.handle('db:org:get', async () => {
+    handle('db:org:get', async () => {
         const d = await OrgModel.findOne().lean();
         return d ? safe(toOrg(d)) : null;
     });
-    ipcMain.handle('db:org:list', async () => {
+    handle('db:org:list', async () => {
         const docs = await OrgModel.find().lean() as any[];
         return safe(docs.map(toOrg));
     });
-    ipcMain.handle('db:org:set', async (_e, data: { id?: string; [k: string]: unknown }) => {
+    handle('db:org:set', async (_e, data: { id?: string; [k: string]: unknown }) => {
+        await requireAdmin();
         const d = await OrgModel.findOneAndUpdate({ orgId: data.id ?? 'org-toursurv' }, { ...data, orgId: data.id ?? 'org-toursurv' }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toOrg(d));
     });
 
     // Role permissions
-    ipcMain.handle('db:roleperms:getAll', async () => {
+    handle('db:roleperms:getAll', async () => {
         const docs = await RolePermsModel.find().lean() as any[];
         return safe(docs.map(d => ({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] })));
     });
-    ipcMain.handle('db:roleperms:set', async (_e, data: { role: string; allowedRoutes: string[] }) => {
+    handle('db:roleperms:set', async (_e, data: { role: string; allowedRoutes: string[] }) => {
+        await requireAdmin();
         const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, returnDocument: 'after' }).lean() as any;
         return safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] });
     });
 
     // Roles (dynamic role management)
-    ipcMain.handle('db:roles:getAll', async () => {
+    handle('db:roles:getAll', async () => {
         const docs = await RoleModel.find().lean() as any[];
         return safe(docs.map(toRole));
     });
 
-    ipcMain.handle('db:roles:create', async (_e, data: { name: string; color: string }) => {
+    handle('db:roles:create', async (_e, data: { name: string; color: string }) => {
+        await requireAdmin();
         if (data.name === 'admin') throw new Error('Cannot create a role named admin.');
         const existing = await RoleModel.findOne({ name: data.name }).lean();
         if (existing) throw new Error(`Role "${data.name}" already exists.`);
@@ -1399,13 +1448,14 @@ function registerDbHandlers() {
         return safe(toRole(d.toObject()));
     });
 
-    ipcMain.handle('db:roles:updateColor', async (_e, data: { appId: string; color: string }) => {
+    handle('db:roles:updateColor', async (_e, data: { appId: string; color: string }) => {
         const d = await RoleModel.findOneAndUpdate({ appId: data.appId }, { color: data.color }, { returnDocument: 'after' }).lean();
         if (!d) throw new Error('Role not found.');
         return safe(toRole(d));
     });
 
-    ipcMain.handle('db:roles:rename', async (_e, data: { appId: string; newName: string }) => {
+    handle('db:roles:rename', async (_e, data: { appId: string; newName: string }) => {
+        await requireAdmin();
         const role = await RoleModel.findOne({ appId: data.appId }).lean() as any;
         if (!role) throw new Error('Role not found.');
         if (role.name === 'admin') throw new Error('Cannot rename the admin role.');
@@ -1424,7 +1474,8 @@ function registerDbHandlers() {
         return safe({ ok: true, oldName });
     });
 
-    ipcMain.handle('db:roles:delete', async (_e, data: { appId: string }) => {
+    handle('db:roles:delete', async (_e, data: { appId: string }) => {
+        await requireAdmin();
         const role = await RoleModel.findOne({ appId: data.appId }).lean() as any;
         if (!role) throw new Error('Role not found.');
         if (role.name === 'admin') throw new Error('Cannot delete the admin role.');
@@ -1432,47 +1483,48 @@ function registerDbHandlers() {
         return safe({ ok: true });
     });
 
-    ipcMain.handle('db:roleperms:delete', async (_e, data: { roleName: string }) => {
+    handle('db:roleperms:delete', async (_e, data: { roleName: string }) => {
+        await requireAdmin();
         await RolePermsModel.deleteOne({ role: data.roleName });
         return safe({ ok: true });
     });
 
     // User preferences
-    ipcMain.handle('db:userpref:get', async (_e, userId: string) => {
+    handle('db:userpref:get', async (_e, userId: string) => {
         const d = await UserPrefModel.findOne({ userId }).lean();
         return d ? safe(toUserPref(d)) : null;
     });
-    ipcMain.handle('db:userpref:set', async (_e, prefs: object) => {
+    handle('db:userpref:set', async (_e, prefs: object) => {
         const d = await UserPrefModel.findOneAndUpdate({ userId: (prefs as any).userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toUserPref(d));
     });
 
     // Notification preferences
-    ipcMain.handle('db:notifpref:get', async (_e, userId: string) => {
+    handle('db:notifpref:get', async (_e, userId: string) => {
         const d = await NotifPrefModel.findOne({ userId }).lean();
         return d ? safe(toNotifPref(d)) : null;
     });
-    ipcMain.handle('db:notifpref:set', async (_e, prefs: object) => {
+    handle('db:notifpref:set', async (_e, prefs: object) => {
         const d = await NotifPrefModel.findOneAndUpdate({ userId: (prefs as any).userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toNotifPref(d));
     });
 
     // Appearance preferences
-    ipcMain.handle('db:appearancepref:get', async (_e, userId: string) => {
+    handle('db:appearancepref:get', async (_e, userId: string) => {
         const d = await AppearancePrefModel.findOne({ userId }).lean();
         return d ? safe(toAppearancePref(d)) : null;
     });
-    ipcMain.handle('db:appearancepref:set', async (_e, prefs: object) => {
+    handle('db:appearancepref:set', async (_e, prefs: object) => {
         const d = await AppearancePrefModel.findOneAndUpdate({ userId: (prefs as any).userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toAppearancePref(d));
     });
 
     // Notifications
-    ipcMain.handle('db:notifs:getAll', async (_e, userId: string) => {
+    handle('db:notifs:getAll', async (_e, userId: string) => {
         const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(50).lean();
         return safe(docs.map(toNotif));
     });
-    ipcMain.handle('db:notifs:create', async (_e, notif: { userId: string; type: string; title: string; body?: string; refId?: string }) => {
+    handle('db:notifs:create', async (_e, notif: { userId: string; type: string; title: string; body?: string; refId?: string }) => {
         const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
         // Fire OS notification only for the user logged in on this machine
@@ -1481,15 +1533,15 @@ function registerDbHandlers() {
         }
         return safe(toNotif(d.toObject()));
     });
-    ipcMain.handle('db:notifs:markRead', async (_e, notifId: string) => {
+    handle('db:notifs:markRead', async (_e, notifId: string) => {
         await NotificationModel.updateOne({ notifId }, { read: true });
         return true;
     });
-    ipcMain.handle('db:notifs:markAllRead', async (_e, userId: string) => {
+    handle('db:notifs:markAllRead', async (_e, userId: string) => {
         await NotificationModel.updateMany({ userId, read: false }, { read: true });
         return true;
     });
-    ipcMain.handle('db:notifs:deleteOld', async (_e, userId: string) => {
+    handle('db:notifs:deleteOld', async (_e, userId: string) => {
         const all = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).lean() as any[];
         if (all.length > 100) {
             const toDelete = all.slice(100).map((d: any) => d.notifId);
@@ -1657,7 +1709,6 @@ function createWindow() {
         if (autoUpdater) setTimeout(() => checkForUpdates(), 3000);
         // Fix 1: set flag before starting streams so windowReady guard passes
         windowReady = true;
-        startMessageStream();
         startDataStreams();
     });
 
@@ -1684,25 +1735,25 @@ if (process.platform === 'win32') {
 
 app.whenReady().then(async () => {
     registerDbHandlers();
-    ipcMain.handle('update:check', () => checkForUpdates(true));
-    ipcMain.handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
-    ipcMain.handle('app:version', () => app.getVersion());
-    ipcMain.handle('app:openExternal', (_e, url: string) => shell.openExternal(url));
-    ipcMain.handle('app:setTitleBarColor', (_e, color: string, symbolColor: string) => {
+    handle('update:check', () => checkForUpdates(true));
+    handle('update:install', () => { if (autoUpdater) autoUpdater.quitAndInstall(false, true); });
+    handle('app:version', () => app.getVersion());
+    handle('app:openExternal', (_e, url: string) => shell.openExternal(url));
+    handle('app:setTitleBarColor', (_e, color: string, symbolColor: string) => {
         if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.setTitleBarOverlay({ color, symbolColor, height: 40 });
         }
         return true;
     });
-    ipcMain.handle('app:getLoginItemSettings', () => app.getLoginItemSettings());
-    ipcMain.handle('app:setOpenAtLogin', (_e, value: boolean) => { app.setLoginItemSettings({ openAtLogin: value }); return true; });
-    ipcMain.handle('app:getBackgroundMode', () => backgroundModeEnabled);
-    ipcMain.handle('app:setBackgroundMode', (_e, value: boolean) => {
+    handle('app:getLoginItemSettings', () => app.getLoginItemSettings());
+    handle('app:setOpenAtLogin', (_e, value: boolean) => { app.setLoginItemSettings({ openAtLogin: value }); return true; });
+    handle('app:getBackgroundMode', () => backgroundModeEnabled);
+    handle('app:setBackgroundMode', (_e, value: boolean) => {
         applyBackgroundMode(value);
         return true;
     });
-    ipcMain.handle('app:setActiveUser', (_e, userId: string) => { activeUserId = userId ?? ''; });
-    ipcMain.handle('app:getSystemNotifsEnabled', async (_e, userId: string) => {
+    handle('app:setActiveUser', (_e, userId: string) => { activeUserId = userId ?? ''; });
+    handle('app:getSystemNotifsEnabled', async (_e, userId: string) => {
         // Load from DB if not yet cached
         if (!systemNotifsEnabled.has(userId)) {
             try {
@@ -1712,12 +1763,12 @@ app.whenReady().then(async () => {
         }
         return systemNotifsEnabled.get(userId) ?? true;
     });
-    ipcMain.handle('app:setSystemNotifsEnabled', async (_e, userId: string, value: boolean) => {
+    handle('app:setSystemNotifsEnabled', async (_e, userId: string, value: boolean) => {
         systemNotifsEnabled.set(userId, value);
         await NotifPrefModel.findOneAndUpdate({ userId }, { systemNotifs: value }, { upsert: true });
         return true;
     });
-    ipcMain.handle('db:force-reconnect', async () => {
+    handle('db:force-reconnect', async () => {
         if (mongoose.connection.readyState !== 1) {
             try { await mongoose.disconnect(); } catch (_) {}
             connectDB();
