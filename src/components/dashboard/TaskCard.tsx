@@ -87,7 +87,12 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#22C55E20] text-[#22C55E]">Task</span>
           )}
         </div>
-        <div ref={menuRef} className="relative" onClick={e => e.stopPropagation()}>
+        <div ref={menuRef} className="relative flex items-center" onClick={e => e.stopPropagation()}>
+          {task.taskNumber != null && (
+              <span className="text-[10px] font-semibold text-gray-400 mr-1 select-none">
+                  #{String(task.taskNumber).padStart(3, '0')}
+              </span>
+          )}
           <motion.button
             className="text-gray-300 hover:text-gray-500 transition-colors"
             initial={{ opacity: 0 }}
