@@ -60,6 +60,7 @@ export interface Task {
     priority: Priority;
     status: TaskStatus;
     taskType?: TaskType;
+    taskNumber?: number | null;
     assignees: string[];
     comments: number;
     commentData?: TaskCommentItem[];
