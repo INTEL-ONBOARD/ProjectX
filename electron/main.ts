@@ -733,7 +733,7 @@ async function ensureDefaultData() {
     await AuthUserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
     await UserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
     // Backfill taskNumber on existing tasks that don't have one yet
-    const unnumbered = await TaskModel.find({ taskNumber: null }).sort({ _id: 1 }).lean();
+    const unnumbered = await TaskModel.find({ $or: [{ taskNumber: null }, { taskNumber: { $exists: false } }] }).sort({ _id: 1 }).lean();
     if (unnumbered.length > 0) {
         const counter = await CounterModel.findOne({ name: 'tasks' }).lean();
         let next = (counter?.value ?? 0) + 1;
