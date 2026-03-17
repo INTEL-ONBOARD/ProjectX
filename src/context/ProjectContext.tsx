@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Project, Task, TaskStatus } from '../types';
 import type { Milestone } from '../types';
 import { useAuth } from './AuthContext';
@@ -51,6 +51,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [projectRichData, setProjectRichData] = useState<Record<string, Partial<ProjectRichData>>>({});
   const [loading, setLoading] = useState(true);
   const { user: authUser } = useAuth() ?? { user: null };
+  const focusDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,21 +67,26 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .finally(() => setLoading(false));
 
     // Refetch whenever the window regains focus (catches changes from other windows)
+    // Debounced 1000ms to prevent multiple rapid focus events from triggering redundant refetches
     const onFocus = () => {
-      Promise.all([api().getProjects(), api().getTasks()])
-        .then(([prjs, tasks]) => {
-          if (!cancelled) {
-            setProjects(prjs as Project[]);
-            setAllTasks(tasks as Task[]);
-          }
-        })
-        .catch(() => {});
+      if (focusDebounceRef.current) clearTimeout(focusDebounceRef.current);
+      focusDebounceRef.current = setTimeout(() => {
+        Promise.all([api().getProjects(), api().getTasks()])
+          .then(([prjs, tasks]) => {
+            if (!cancelled) {
+              setProjects(prjs as Project[]);
+              setAllTasks(tasks as Task[]);
+            }
+          })
+          .catch(() => {});
+      }, 1000);
     };
     window.addEventListener('focus', onFocus);
 
     return () => {
       cancelled = true;
       window.removeEventListener('focus', onFocus);
+      if (focusDebounceRef.current) clearTimeout(focusDebounceRef.current);
     };
   }, []);
 
@@ -143,7 +149,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const toRichMap = (docs: any[]): Record<string, Partial<ProjectRichData>> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const m: Record<string, Partial<ProjectRichData>> = {};
-      docs.forEach((d: any) => { m[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category, milestones: d.milestones ?? [] }; });
+      docs.forEach((d: any) => { m[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, startDate: d.startDate, dueDate: d.dueDate, starred: d.starred, category: d.category, milestones: d.milestones ?? [] }; });
       return m;
     };
     let cancelledRich = false;
@@ -155,7 +161,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const unsub = electronAPI?.onProjectRichChanged?.((_: unknown, payload: { op: string; doc?: any }) => {
       const { op, doc } = payload;
       if (op === 'insert' || op === 'update' || op === 'replace') {
-        if (doc) setProjectRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, dueDate: doc.dueDate, starred: doc.starred, category: doc.category, milestones: doc.milestones ?? [] } }));
+        if (doc) setProjectRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, startDate: doc.startDate, dueDate: doc.dueDate, starred: doc.starred, category: doc.category, milestones: doc.milestones ?? [] } }));
       } else if (op === 'delete') {
         api().getProjectRich().then((docs: unknown[]) => setProjectRichData(toRichMap(docs as any[]))).catch(() => {});
       }
@@ -166,7 +172,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const createProject = async (name: string, color: string): Promise<Project> => {
     const newProject = await api().createProject(name, color) as Project;
-    setProjects(prev => [...prev, newProject]);
+    // Guard against duplicate: change stream insert handler may already have added it
+    setProjects(prev => prev.some(p => p.id === newProject.id) ? prev : [...prev, newProject]);
     return newProject;
   };
 
@@ -177,18 +184,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteProject = async (id: string) => {
     await api().deleteProject(id);
-    setProjects(prev => {
-      const remaining = prev.filter(p => p.id !== id);
-      setActiveProject(ap => ap === id ? (remaining[0]?.id ?? '') : ap);
-      return remaining;
-    });
+    const remaining = projects.filter(p => p.id !== id);
+    setProjects(remaining);
+    setActiveProject(ap => ap === id ? (remaining[0]?.id ?? '') : ap);
     setAllTasks(prev => prev.map(t => t.projectId === id ? { ...t, projectId: undefined } : t));
   };
 
   const createTask = async (taskData: Omit<Task, 'id'> & { projectId?: string }) => {
     const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
     const newTask = await api().createTask({ ...taskData, ...actorMeta }) as Task;
-    setAllTasks(prev => [...prev, newTask]);
+    setAllTasks(prev => prev.some(t => t.id === newTask.id) ? prev : [...prev, newTask]);
   };
 
   const updateTask = async (id: string, changes: Partial<Omit<Task, 'id'>>) => {
@@ -197,13 +202,23 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (updated) {
       setAllTasks(prev => prev.map(t => t.id === id ? updated : t));
     } else {
-      setAllTasks(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
+      console.warn('[ProjectContext] updateTask: API returned null for task', id, '— keeping existing state unchanged');
     }
   };
 
   const deleteTask = async (id: string) => {
     await api().deleteTask(id);
-    setAllTasks(prev => prev.filter(t => t.id !== id));
+    // Remove from task list and scrub the deleted task from all blockedBy arrays
+    const affected = allTasks.filter(t => t.id !== id && t.blockedBy?.includes(id));
+    setAllTasks(prev => prev
+      .filter(t => t.id !== id)
+      .map(t => t.blockedBy?.includes(id) ? { ...t, blockedBy: t.blockedBy.filter(b => b !== id) } : t)
+    );
+    // Persist the blockedBy removal for each affected task
+    for (const t of affected) {
+      const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
+      api().updateTask(t.id, { ...actorMeta, blockedBy: t.blockedBy?.filter(b => b !== id) ?? [] }).catch(() => {});
+    }
   };
 
   const moveTask = async (id: string, newStatus: TaskStatus) => {
@@ -218,7 +233,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const scrubAssignee = async (memberId: string) => {
     await api().scrubAssignee(memberId);
-    setAllTasks(prev => prev.map(t => ({ ...t, assignees: t.assignees.filter(a => a !== memberId) })));
+    setAllTasks(prev => prev.map(t => ({ ...t, assignees: t.assignees?.filter(a => a !== memberId) ?? [] })));
   };
 
   return (

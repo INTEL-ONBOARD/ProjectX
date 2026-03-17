@@ -154,7 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     const [editingProject, setEditingProject] = useState<{ id: string; name: string; color: string } & Partial<ProjectRichFields> | null>(null);
     const [confirmDeleteProjectId, setConfirmDeleteProjectId] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
-    const { projects, createProject, updateProject, deleteProject } = useProjects();
+    const { projects, createProject, updateProject, deleteProject, projectRichData } = useProjects();
     const { user } = useAuth();
     const { getAllowedRoutes } = useRolePerms();
     const [unreadMsgCount, setUnreadMsgCount] = useState(0);
@@ -186,10 +186,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         const oldIndex = orderedNavIds.indexOf(active.id as string);
         const newIndex = orderedNavIds.indexOf(over.id as string);
         const newOrder = arrayMove(orderedNavIds, oldIndex, newIndex);
+        const previousOrder = navOrder;
 
         setNavOrder(newOrder);
 
-        // Fire-and-forget save: read full prefs, merge navOrder, write back
+        // Save nav order; restore previous order if API call fails
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const api = (window as any).electronAPI;
@@ -197,6 +198,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             await api?.userPrefs?.set({ ...current, navOrder: newOrder });
         } catch (err) {
             console.error('[Sidebar] Failed to save navOrder:', err);
+            setNavOrder(previousOrder);
         }
     };
 
@@ -411,12 +413,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                                     style={{ background: 'var(--bg-dropdown)' }}
                                                 >
                                                     <button
-                                                        onClick={async () => {
+                                                        onClick={() => {
                                                             setMenuOpenId(null);
-                                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                                            const db = (window as any).electronAPI?.db;
-                                                            let rich: Partial<ProjectRichFields> = {};
-                                                            try { rich = await db?.getProjectRich?.(project.id) ?? {}; } catch { /* ignore */ }
+                                                            const rich = projectRichData[project.id] ?? {};
                                                             setEditingProject({ id: project.id, name: project.name, color: project.color, ...rich });
                                                         }}
                                                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-surface-50 transition-colors"

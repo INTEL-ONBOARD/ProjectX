@@ -90,7 +90,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
             authorName: authUser.name,
             text: comment.trim(),
         }) as Comment;
-        setComments(prev => [...prev, newComment]);
+        setComments(prev => prev.some(c => c.id === newComment.id) ? prev : [...prev, newComment]);
         setComment('');
     };
 
@@ -201,9 +201,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                               userId={authUser?.id ?? ''}
                               timeEntries={task.timeEntries ?? []}
                               estimatedMinutes={task.estimatedMinutes}
-                              onUpdate={(entries, est) => {
-                                const api = (window as any).electronAPI;
-                                api?.db?.updateTask?.(task.id, { timeEntries: entries, ...(est !== undefined ? { estimatedMinutes: est } : {}) });
+                              onUpdate={async (entries, est) => {
+                                try {
+                                  const api = (window as any).electronAPI;
+                                  await api?.db?.updateTask?.(task.id, { timeEntries: entries, ...(est !== undefined ? { estimatedMinutes: est } : {}) });
+                                } catch (err) {
+                                  console.error('[TaskModal] Failed to update task time entries:', err);
+                                }
                               }}
                             />
 
@@ -216,7 +220,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                     <button
                                         onClick={async () => {
                                             const added = await dbApi().pickAttachments(task!.id) as Attachment[];
-                                            setAttachments(prev => [...prev, ...added]);
+                                            setAttachments(prev => {
+                                                const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
+                                                return newOnes.length ? [...prev, ...newOnes] : prev;
+                                            });
                                         }}
                                         className="text-xs font-semibold text-primary-500 hover:text-primary-600 transition-colors"
                                     >

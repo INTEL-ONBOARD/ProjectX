@@ -37,7 +37,7 @@ const DashboardPage: React.FC = () => {
   const inProgressCount = inProgressTasks.length;
   const completionPctOverall = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
-  const weekEnd = (() => { const d = new Date(selectedWeekStart); d.setDate(d.getDate() + 4); return d.toISOString().split('T')[0]; })();
+  const weekEnd = (() => { const d = new Date(selectedWeekStart); d.setDate(d.getDate() + 6); return d.toISOString().split('T')[0]; })();
   const weekRecords = attendanceRecords.filter(r => r.date >= selectedWeekStart && r.date <= weekEnd);
   const weekTrackedDays = new Set(weekRecords.map(r => r.date)).size;
   const denominator = members.length * (weekTrackedDays > 0 ? weekTrackedDays : 5);

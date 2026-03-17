@@ -41,7 +41,8 @@ const Header: React.FC = () => {
     const userRef = useRef<HTMLDivElement>(null);
 
     // ── Search results ─────────────────────────────────────────────────────────
-    const q = searchQuery.toLowerCase().trim();
+    // Use searchRaw for instant display while the debounced searchQuery catches up
+    const q = (searchRaw.length >= searchQuery.length ? searchRaw : searchQuery).toLowerCase().trim();
     const matchedTasks = q.length >= 2
         ? allTasks.filter(t => t.title.toLowerCase().includes(q)).slice(0, 5)
         : [];

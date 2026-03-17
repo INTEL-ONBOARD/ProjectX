@@ -80,7 +80,7 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }, []);
 
     const addRole = useCallback((role: RoleDoc) => {
-        setRoles(prev => [...prev, role]);
+        setRoles(prev => prev.some(r => r.appId === role.appId) ? prev : [...prev, role]);
     }, []);
 
     const updateRoleLocal = useCallback((appId: string, changes: Partial<RoleDoc>) => {

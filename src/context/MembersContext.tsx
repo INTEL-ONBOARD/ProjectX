@@ -78,7 +78,7 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const addMember = async (member: Omit<User, 'id'>) => {
     const newMember = await api().addMember(member) as User;
-    setMembers(prev => [...prev, newMember]);
+    setMembers(prev => prev.some(m => m.id === newMember.id) ? prev : [...prev, newMember]);
   };
 
   const updateMember = async (id: string, changes: Partial<Omit<User, 'id'>>) => {

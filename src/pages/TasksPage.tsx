@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, Layers, AlignLeft } from 'lucide-react';
+import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, AlignLeft, Check, Circle } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AvatarGroup } from '../components/ui/Avatar';
@@ -186,7 +186,7 @@ const TasksPage: React.FC = () => {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (assigneeDropRef.current && !assigneeDropRef.current.contains(e.target as Node)) {
-        setShowAssigneeDrop(false);
+        setShowAssigneePicker(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -196,17 +196,15 @@ const TasksPage: React.FC = () => {
   const detailFileRef = useRef<HTMLInputElement>(null);
   const [detailImage, setDetailImage] = useState<string | null>(null);
 
-  // Edit mode state
-  const [editMode, setEditMode] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high'>('low');
-  const [editTaskType, setEditTaskType] = useState<'task' | 'issue'>('task');
-  const [editAssignees, setEditAssignees] = useState<string[]>([]);
-  const [editDueDate, setEditDueDate] = useState('');
-  const [editProjectId, setEditProjectId] = useState('');
+  // Inline edit state
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState('');
+  const [editingDueDate, setEditingDueDate] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState('');
-  const [showAssigneeDrop, setShowAssigneeDrop] = useState(false);
   const assigneeDropRef = useRef<HTMLDivElement>(null);
 
   // View mode (list vs deps graph)
@@ -284,46 +282,23 @@ const TasksPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const startEdit = (task: Task) => {
-    setEditTitle(task.title);
-    setEditDesc(task.description);
-    setEditPriority(task.priority === 'high' ? 'high' : task.priority === 'medium' ? 'medium' : 'low');
-    setEditTaskType(task.taskType === 'issue' ? 'issue' : 'task');
-    setEditAssignees([...task.assignees]);
-    setEditDueDate(task.dueDate ?? '');
-    setEditProjectId(task.projectId ?? '');
-    setAssigneeSearch('');
-    setShowAssigneeDrop(false);
-    setEditMode(true);
-  };
-
-  const saveEdit = () => {
+  const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
-    if (!editTitle.trim()) return; // silently ignore — field is required
-    const changes = {
-      title: editTitle.trim(),
-      description: editDesc,
-      priority: editPriority as Task['priority'],
-      taskType: editTaskType,
-      assignees: editAssignees,
-      dueDate: editDueDate || undefined,
-      projectId: editProjectId || undefined,
-    };
-    updateTask(selectedTask.id, changes).catch(console.error);
-    setSelectedTask(prev => prev ? { ...prev, ...changes } : prev);
-    setEditMode(false);
+    updateTask(selectedTask.id, patch).catch(console.error);
+    setSelectedTask(prev => prev ? { ...prev, ...patch } : prev);
   };
 
   const handleOpenTask = (task: Task) => {
     setSelectedTask(task);
     setDetailImage(null);
     setShowStatusDrop(false);
-    setEditMode(false);
+    setShowPriorityPicker(false);
+    setShowAssigneePicker(false);
+    setEditingTitle(false);
+    setEditingDesc(false);
+    setEditingDueDate(false);
     setConfirmDelete(false);
   };
-
-  const selectedStatus = selectedTask ? selectedTask.status : 'todo';
-  const selectedStatusStyle = statusStyles[selectedStatus];
 
   return (
     <motion.div
@@ -478,7 +453,7 @@ const TasksPage: React.FC = () => {
                       className="border-b border-surface-100 hover:bg-surface-50 transition-colors cursor-pointer"
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.35, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
-                      onClick={() => { setSelectedTask(task); setDetailImage(null); setShowStatusDrop(false); setEditMode(false); setConfirmDelete(false); }}
+                      onClick={() => { setSelectedTask(task); setDetailImage(null); setShowStatusDrop(false); setConfirmDelete(false); }}
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <input type="checkbox"
@@ -541,408 +516,383 @@ const TasksPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Task Detail Panel ── */}
+      {/* ── Task Detail Panel — ClickUp style ── */}
       <AnimatePresence>
-        {selectedTask && (
-          <motion.div
-            className="fixed inset-0 top-16 z-50 flex"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          >
-            <div className="flex-1 bg-black/30" onClick={() => { setSelectedTask(null); setEditMode(false); setConfirmDelete(false); setShowAssigneeDrop(false); }} />
+        {selectedTask && (() => {
+          const proj = contextProjects.find(p => p.id === selectedTask.projectId);
+          const selStatus = selectedTask.status as TaskStatus;
+          const selStatusStyle = statusStyles[selStatus] ?? statusStyles['todo'];
+          const TODAY_VAL = new Date().toISOString().split('T')[0];
+          return (
             <motion.div
-              className="w-[400px] bg-white h-full flex flex-col border-l border-gray-200"
-              initial={{ x: 400 }} animate={{ x: 0 }} exit={{ x: 400 }}
-              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              className="fixed inset-0 top-16 z-50 flex"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => { setShowStatusDrop(false); setShowPriorityPicker(false); setShowAssigneePicker(false); }}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 shrink-0">
-                <div className="flex items-center gap-2">
-                  <CheckSquare size={14} className="text-primary-500" />
-                  <span className="text-xs font-semibold text-gray-500">{editMode ? 'Edit Task' : 'Task Detail'}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  {!editMode && (
-                    <button onClick={() => startEdit(selectedTask)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-primary-600 bg-primary-50 hover:bg-primary-100 transition-colors">
-                      <Pencil size={11} /> Edit
+              <div className="flex-1" onClick={() => { setSelectedTask(null); setConfirmDelete(false); }} />
+              <motion.div
+                className="w-[420px] h-full overflow-y-auto flex flex-col border-l shrink-0"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border-default)' }}
+                initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Top toolbar */}
+                <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => patchTask({ taskType: selectedTask.taskType === 'issue' ? 'task' : 'issue' })}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
+                      style={{
+                        background: selectedTask.taskType === 'issue' ? 'rgba(216,114,125,0.12)' : 'rgba(34,197,94,0.10)',
+                        color: selectedTask.taskType === 'issue' ? '#D8727D' : '#22C55E',
+                        border: `1px solid ${selectedTask.taskType === 'issue' ? 'rgba(216,114,125,0.25)' : 'rgba(34,197,94,0.2)'}`,
+                      }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
+                      {selectedTask.taskType === 'issue' ? 'Issue' : 'Task'}
+                      <ChevronDown size={10} />
                     </button>
-                  )}
-                  <button onClick={() => { setSelectedTask(null); setEditMode(false); setConfirmDelete(false); setShowAssigneeDrop(false); }}
-                    className="ml-1 w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
-                    <X size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Tab bar */}
-              <div className="flex border-b border-gray-100 shrink-0">
-                {(['details', 'activity'] as const).map(tab => (
-                  <button key={tab} onClick={() => setDetailTab(tab)}
-                    className={`flex-1 py-2.5 text-xs font-semibold capitalize transition-all relative ${
-                      detailTab === tab ? 'text-primary-600' : 'text-gray-400 hover:text-gray-500'
-                    }`}>
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    {detailTab === tab && (
-                      <motion.div layoutId="detail-tab-indicator"
-                        className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary-500"
-                        transition={{ duration: 0.2 }} />
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {detailTab === 'details' && (
-                <div className="flex-1 overflow-y-auto">
-
-                  {/* Title + project */}
-                  <div className="px-5 py-4 border-b border-gray-100">
-                    {editMode ? (
-                      <input
-                        value={editTitle} onChange={e => setEditTitle(e.target.value)}
-                        className="w-full font-semibold text-gray-900 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
-                        placeholder="Task title"
-                      />
-                    ) : (
-                      <>
-                        <h2 className="font-semibold text-gray-900 text-sm leading-snug">{selectedTask.title}</h2>
-                        {(() => {
-                          const proj = contextProjects.find(p => p.id === selectedTask.projectId);
-                          return proj ? (
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
-                              <span className="text-xs text-gray-400">{proj.name}</span>
-                            </div>
-                          ) : null;
-                        })()}
-                      </>
+                    {proj && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{proj.name}</span>
+                      </div>
                     )}
                   </div>
+                  <div className="flex items-center gap-1">
+                    {(['details', 'activity'] as const).map(tab => (
+                      <button key={tab} onClick={() => setDetailTab(tab)}
+                        className="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                        style={{ background: detailTab === tab ? 'var(--bg-active)' : 'transparent', color: detailTab === tab ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      </button>
+                    ))}
+                    <button onClick={() => { setSelectedTask(null); setConfirmDelete(false); }}
+                      className="w-7 h-7 rounded-md flex items-center justify-center ml-1 transition-colors"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
 
-                  {/* Metadata rows */}
-                  <div className="px-5 py-3 border-b border-gray-100 flex flex-col gap-3">
+                {detailTab === 'details' && (
+                  <div className="flex-1 px-5 py-5 flex flex-col">
 
-                    {/* Priority */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Flag size={10} /> Priority</span>
-                      {editMode ? (
-                        <div className="flex gap-1.5">
-                          {([
-                            { value: 'low',    color: '#D58D49', activeCls: 'bg-[#DFA87415] text-[#D58D49] border-[#D58D4940]' },
-                            { value: 'medium', color: '#A78BFA', activeCls: 'bg-[#A78BFA15] text-[#A78BFA] border-[#A78BFA40]' },
-                            { value: 'high',   color: '#D8727D', activeCls: 'bg-[#D8727D15] text-[#D8727D] border-[#D8727D40]' },
-                          ] as const).map(p => {
-                            const active = editPriority === p.value;
-                            return (
-                              <button key={p.value} type="button" onClick={() => setEditPriority(p.value)}
-                                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all border ${active ? p.activeCls : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? p.color : 'var(--border-strong)' }} />
-                                {p.value.charAt(0).toUpperCase() + p.value.slice(1)}
-                              </button>
-                            );
-                          })}
-                        </div>
+                    {/* Title */}
+                    <div className="mb-5">
+                      {editingTitle ? (
+                        <input autoFocus value={titleDraft} onChange={e => setTitleDraft(e.target.value)}
+                          onBlur={() => { if (titleDraft.trim()) patchTask({ title: titleDraft.trim() }); setEditingTitle(false); }}
+                          onKeyDown={e => { if (e.key === 'Enter') { if (titleDraft.trim()) patchTask({ title: titleDraft.trim() }); setEditingTitle(false); } if (e.key === 'Escape') setEditingTitle(false); }}
+                          className="w-full text-xl font-bold leading-snug bg-transparent focus:outline-none"
+                          style={{ color: 'var(--text-primary)', borderBottom: '2px solid var(--color-primary-400)' }} />
                       ) : (
-                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).bg} ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).text}`}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
-                          {(priorityStyles[selectedTask.priority] ?? priorityStyles.low).label}
-                        </span>
+                        <h2 className="text-xl font-bold leading-snug cursor-text hover:opacity-80 transition-opacity"
+                          style={{ color: 'var(--text-primary)' }}
+                          onClick={() => { setTitleDraft(selectedTask.title); setEditingTitle(true); }}>
+                          {selectedTask.title}
+                        </h2>
+                      )}
+                      {selectedTask.taskNumber != null && (
+                        <span className="text-xs mt-1 block" style={{ color: 'var(--text-subtle)' }}>#{String(selectedTask.taskNumber).padStart(3, '0')}</span>
                       )}
                     </div>
 
-                    {/* Type */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Tag size={10} /> Type</span>
-                      {editMode ? (
-                        <div className="flex gap-1.5">
-                          {([
-                            { value: 'task',  label: 'Task',  activeCls: 'bg-[#22C55E15] text-[#22C55E] border-[#22C55E40]', color: '#22C55E' },
-                            { value: 'issue', label: 'Issue', activeCls: 'bg-[#EF444415] text-[#EF4444] border-[#EF444440]', color: '#EF4444' },
-                          ] as const).map(t => {
-                            const active = editTaskType === t.value;
-                            return (
-                              <button key={t.value} type="button" onClick={() => setEditTaskType(t.value)}
-                                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all border ${active ? t.activeCls : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? t.color : 'var(--border-strong)' }} />
-                                {t.label}
-                              </button>
-                            );
-                          })}
+                    {/* Metadata rows */}
+                    <div className="flex flex-col mb-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+
+                      {/* Priority */}
+                      <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <div className="flex items-center gap-2 w-[110px] shrink-0">
+                          <Flag size={13} style={{ color: 'var(--text-subtle)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Priority</span>
                         </div>
-                      ) : (
-                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${selectedTask.taskType === 'issue' ? 'bg-[#EF444420] text-[#EF4444]' : 'bg-[#22C55E20] text-[#22C55E]'}`}>
+                        <div className="relative">
+                          <button onClick={() => { setShowPriorityPicker(v => !v); setShowStatusDrop(false); setShowAssigneePicker(false); }}
+                            className="flex items-center gap-1.5 text-xs font-medium transition-opacity hover:opacity-70">
+                            {(() => {
+                              const colors: Record<string, string> = { low: '#D58D49', medium: '#A78BFA', high: '#D8727D' };
+                              const labels: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High' };
+                              const p = selectedTask.priority;
+                              return (<><Flag size={13} style={{ color: colors[p] ?? 'var(--text-subtle)' }} /><span style={{ color: colors[p] ?? 'var(--text-secondary)' }}>{labels[p] ?? 'Normal'}</span></>);
+                            })()}
+                            <ChevronDown size={11} style={{ color: 'var(--text-subtle)' }} className={`transition-transform ${showPriorityPicker ? 'rotate-180' : ''}`} />
+                          </button>
+                          <AnimatePresence>
+                            {showPriorityPicker && (
+                              <motion.div className="absolute left-0 top-full mt-1 rounded-xl shadow-xl overflow-hidden z-20 w-40"
+                                style={{ background: 'var(--bg-dropdown)', border: '1px solid var(--border-default)' }}
+                                initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.13 }}>
+                                {([{ value: 'low', label: 'Low', color: '#D58D49' }, { value: 'medium', label: 'Medium', color: '#A78BFA' }, { value: 'high', label: 'High', color: '#D8727D' }] as const).map(p => (
+                                  <button key={p.value} onClick={() => { patchTask({ priority: p.value }); setShowPriorityPicker(false); }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors"
+                                    style={{ color: p.color, background: selectedTask.priority === p.value ? 'var(--bg-active)' : 'transparent' }}
+                                    onMouseEnter={e => { if (selectedTask.priority !== p.value) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = selectedTask.priority === p.value ? 'var(--bg-active)' : 'transparent'; }}>
+                                    <Flag size={12} style={{ color: p.color }} />{p.label}
+                                    {selectedTask.priority === p.value && <Check size={11} className="ml-auto" />}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+
+                      {/* Type */}
+                      <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <div className="flex items-center gap-2 w-[110px] shrink-0">
+                          <Tag size={13} style={{ color: 'var(--text-subtle)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Type</span>
+                        </div>
+                        <button onClick={() => patchTask({ taskType: selectedTask.taskType === 'issue' ? 'task' : 'issue' })}
+                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold transition-opacity hover:opacity-70"
+                          style={{ background: selectedTask.taskType === 'issue' ? 'rgba(216,114,125,0.12)' : 'rgba(34,197,94,0.10)', color: selectedTask.taskType === 'issue' ? '#D8727D' : '#22C55E' }}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
                           {selectedTask.taskType === 'issue' ? 'Issue' : 'Task'}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Status */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Tag size={10} /> Status</span>
-                      <div className="relative">
-                        <button onClick={() => setShowStatusDrop(v => !v)}
-                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold transition-all hover:opacity-80 ${selectedStatusStyle.bg} ${selectedStatusStyle.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusStyles[selectedStatus]?.dot}`} />
-                          {selectedStatusStyle.label}
-                          <ChevronDown size={10} className={`ml-0.5 transition-transform ${showStatusDrop ? 'rotate-180' : ''}`} />
                         </button>
-                        <AnimatePresence>
-                          {showStatusDrop && (
-                            <motion.div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden z-20 w-44"
-                              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}>
-                              <div className="py-1">
+                      </div>
+
+                      {/* Status */}
+                      <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <div className="flex items-center gap-2 w-[110px] shrink-0">
+                          <Circle size={13} style={{ color: 'var(--text-subtle)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Status</span>
+                        </div>
+                        <div className="relative">
+                          <button onClick={() => { setShowStatusDrop(v => !v); setShowPriorityPicker(false); setShowAssigneePicker(false); }}
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md hover:opacity-80 transition-opacity ${selStatusStyle.bg} ${selStatusStyle.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${selStatusStyle.dot}`} />
+                            {selStatusStyle.label}
+                            <ChevronDown size={11} className={`transition-transform ${showStatusDrop ? 'rotate-180' : ''}`} />
+                          </button>
+                          <AnimatePresence>
+                            {showStatusDrop && (
+                              <motion.div className="absolute left-0 top-full mt-1 rounded-xl shadow-xl overflow-hidden z-20 w-52"
+                                style={{ background: 'var(--bg-dropdown)', border: '1px solid var(--border-default)' }}
+                                initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.13 }}>
                                 {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
                                   const st = statusStyles[s];
-                                  const isSelected = selectedTask.status === s;
+                                  const isActive = selectedTask.status === s;
                                   return (
                                     <button key={s}
-                                      onClick={() => { updateTask(selectedTask.id, { status: s }).catch(console.error); setSelectedTask(prev => prev ? { ...prev, status: s } : prev); setShowStatusDrop(false); }}
-                                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-semibold transition-colors ${isSelected ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${st.dot}`} />
-                                      <span className={st.text}>{st.label}</span>
-                                      {isSelected && <span className="ml-auto text-primary-500 text-[10px]">✓</span>}
+                                      onClick={() => { patchTask({ status: s }); setShowStatusDrop(false); }}
+                                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold transition-colors ${st.text}`}
+                                      style={{ background: isActive ? 'var(--bg-active)' : 'transparent' }}
+                                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                      onMouseLeave={e => { e.currentTarget.style.background = isActive ? 'var(--bg-active)' : 'transparent'; }}>
+                                      <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
+                                      {st.label}
+                                      {isActive && <Check size={11} className="ml-auto text-primary-500" />}
                                     </button>
                                   );
                                 })}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-
-                    {/* Due Date */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Calendar size={10} /> Due Date</span>
-                      {editMode ? (
-                        <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)}
-                          className="border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-primary-400 bg-white font-medium text-gray-700" />
-                      ) : (
-                        <span className={`text-xs font-medium ${selectedTask.dueDate ? 'text-gray-700' : 'text-gray-400'}`}>
-                          {selectedTask.dueDate ?? '—'}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Project (edit mode) */}
-                    {editMode && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Layers size={10} /> Project</span>
-                        <div className="relative">
-                          <select value={editProjectId} onChange={e => setEditProjectId(e.target.value)}
-                            className="appearance-none border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-primary-400 bg-white pr-5 font-medium text-gray-700">
-                            <option value="">No project</option>
-                            {contextProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                          </select>
-                          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Assignees */}
-                  <div className="px-5 py-3 border-b border-gray-100">
-                    <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-2.5"><User size={10} /> Assignees</span>
-                    {editMode ? (
-                      <div ref={assigneeDropRef} className="relative">
-                        {editAssignees.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {editAssignees.map(id => {
-                              const m = members.find(x => x.id === id);
-                              if (!m) return null;
+                      {/* Due Date */}
+                      <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <div className="flex items-center gap-2 w-[110px] shrink-0">
+                          <Calendar size={13} style={{ color: 'var(--text-subtle)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Due Date</span>
+                        </div>
+                        {editingDueDate ? (
+                          <input autoFocus type="date" defaultValue={selectedTask.dueDate ?? ''}
+                            onBlur={e => { patchTask({ dueDate: e.target.value || undefined }); setEditingDueDate(false); }}
+                            onKeyDown={e => { if (e.key === 'Escape') setEditingDueDate(false); }}
+                            className="text-xs rounded-md px-2 py-1 focus:outline-none"
+                            style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--color-primary-400)' }} />
+                        ) : (
+                          <button onClick={() => setEditingDueDate(true)}
+                            className="text-xs transition-opacity hover:opacity-70"
+                            style={{ color: selectedTask.dueDate && selectedTask.dueDate < TODAY_VAL && selectedTask.status !== 'done' ? '#D8727D' : selectedTask.dueDate ? 'var(--text-secondary)' : 'var(--text-subtle)' }}>
+                            {selectedTask.dueDate ?? 'Set due date'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Assignees */}
+                      <div className="flex items-start py-2.5">
+                        <div className="flex items-center gap-2 w-[110px] shrink-0 mt-0.5">
+                          <User size={13} style={{ color: 'var(--text-subtle)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Assignees</span>
+                        </div>
+                        <div className="relative flex-1" ref={assigneeDropRef}>
+                          <button onClick={() => { setShowAssigneePicker(v => !v); setShowStatusDrop(false); setShowPriorityPicker(false); }}
+                            className="flex items-center gap-2 flex-wrap">
+                            {selectedTask.assignees.length === 0 ? (
+                              <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>+ Add assignee</span>
+                            ) : selectedTask.assignees.map(id => {
+                              const member = members.find(m => m.id === id);
+                              if (!member) return null;
                               return (
-                                <div key={id} className="flex items-center gap-1 bg-gray-100 rounded-md pl-1 pr-1.5 py-0.5">
-                                  <Avatar name={m.name} color={getMemberColor(id)} size="sm" />
-                                  <span className="text-xs font-medium text-gray-700">{m.name.split(' ')[0]}</span>
-                                  <button onClick={() => setEditAssignees(prev => prev.filter(a => a !== id))}
-                                    className="ml-0.5 text-gray-400 hover:text-gray-600 transition-colors">
-                                    <X size={9} />
-                                  </button>
+                                <div key={id} className="flex items-center gap-1.5">
+                                  <Avatar name={member.name} color={getMemberColor(id)} size="sm" />
+                                  <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{member.name.split(' ')[0]}</span>
                                 </div>
                               );
                             })}
-                          </div>
-                        )}
-                        <button onClick={() => setShowAssigneeDrop(v => !v)}
-                          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-                            showAssigneeDrop ? 'border-primary-400 bg-white ring-1 ring-primary-100 text-gray-700' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
-                          }`}>
-                          <Search size={12} className="text-gray-400 shrink-0" />
-                          <span className="flex-1 text-left">{editAssignees.length > 0 ? `${editAssignees.length} assigned` : 'Assign members…'}</span>
-                          <ChevronDown size={11} className={`text-gray-400 transition-transform ${showAssigneeDrop ? 'rotate-180' : ''}`} />
-                        </button>
-                        <AnimatePresence>
-                          {showAssigneeDrop && (
-                            <motion.div className="absolute left-0 top-full mt-1 w-full bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 z-30 overflow-hidden"
-                              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.12 }}>
-                              <div className="px-2.5 pt-2.5 pb-1.5">
-                                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus-within:border-primary-400 transition-all">
-                                  <Search size={11} className="text-gray-400 shrink-0" />
-                                  <input type="text" value={assigneeSearch} onChange={e => setAssigneeSearch(e.target.value)}
-                                    placeholder="Search…" autoFocus
-                                    className="flex-1 bg-transparent text-xs text-gray-700 placeholder-gray-400 focus:outline-none" />
-                                  {assigneeSearch && <button onClick={() => setAssigneeSearch('')}><X size={10} className="text-gray-400" /></button>}
+                          </button>
+                          <AnimatePresence>
+                            {showAssigneePicker && (
+                              <motion.div className="absolute left-0 top-full mt-1 rounded-xl shadow-xl z-20 w-56 overflow-hidden"
+                                style={{ background: 'var(--bg-dropdown)', border: '1px solid var(--border-default)' }}
+                                initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }} transition={{ duration: 0.13 }}>
+                                <div className="px-2.5 pt-2.5 pb-1.5">
+                                  <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5"
+                                    style={{ background: 'var(--bg-input)', border: '1px solid var(--border-default)' }}>
+                                    <Search size={11} style={{ color: 'var(--text-subtle)' }} className="shrink-0" />
+                                    <input type="text" value={assigneeSearch} onChange={e => setAssigneeSearch(e.target.value)}
+                                      placeholder="Search…" autoFocus
+                                      className="flex-1 bg-transparent text-xs focus:outline-none"
+                                      style={{ color: 'var(--text-primary)' }} />
+                                    {assigneeSearch && <button onClick={() => setAssigneeSearch('')}><X size={10} style={{ color: 'var(--text-subtle)' }} /></button>}
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="max-h-40 overflow-y-auto pb-1.5">
-                                {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).map(m => {
-                                  const selected = editAssignees.includes(m.id);
-                                  return (
-                                    <button key={m.id}
-                                      onClick={() => setEditAssignees(prev => selected ? prev.filter(a => a !== m.id) : [...prev, m.id])}
-                                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${selected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
-                                      <Avatar name={m.name} color={getMemberColor(m.id)} size="sm" />
-                                      <span className="flex-1 text-xs font-medium text-gray-800 truncate">{m.name}</span>
-                                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all shrink-0 ${selected ? 'bg-primary-500 border-primary-500' : 'border-gray-300'}`}>
-                                        {selected && (
-                                          <svg width="8" height="6" viewBox="0 0 10 8" fill="none">
-                                            <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                          </svg>
-                                        )}
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                                {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).length === 0 && (
-                                  <p className="px-3 py-4 text-center text-xs text-gray-400">No members found</p>
-                                )}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                                <div className="max-h-48 overflow-y-auto pb-1.5">
+                                  {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).map(m => {
+                                    const isAssigned = selectedTask.assignees.includes(m.id);
+                                    return (
+                                      <button key={m.id}
+                                        onClick={() => patchTask({ assignees: isAssigned ? selectedTask.assignees.filter(a => a !== m.id) : [...selectedTask.assignees, m.id] })}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors"
+                                        style={{ background: isAssigned ? 'var(--bg-active)' : 'transparent', color: 'var(--text-secondary)' }}
+                                        onMouseEnter={e => { if (!isAssigned) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.background = isAssigned ? 'var(--bg-active)' : 'transparent'; }}>
+                                        <Avatar name={m.name} color={getMemberColor(m.id)} size="sm" />
+                                        <span className="flex-1 text-xs font-medium truncate">{m.name}</span>
+                                        {isAssigned && <Check size={11} style={{ color: 'var(--color-primary-500)' }} />}
+                                      </button>
+                                    );
+                                  })}
+                                  {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).length === 0 && (
+                                    <p className="px-3 py-4 text-center text-xs" style={{ color: 'var(--text-subtle)' }}>No members found</p>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedTask.assignees.length === 0 && <span className="text-xs text-gray-400">—</span>}
-                        {selectedTask.assignees.map(id => {
-                          const member = members.find(m => m.id === id);
-                          if (!member) return null;
-                          return (
-                            <div key={id} className="flex items-center gap-1.5 bg-gray-100 rounded-md px-2 py-1">
-                              <Avatar name={member.name} color={getMemberColor(id)} size="sm" />
-                              <span className="text-xs font-medium text-gray-700">{member.name}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  <div className="px-5 py-3 border-b border-gray-100">
-                    <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-2"><AlignLeft size={10} /> Description</span>
-                    {editMode ? (
-                      <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 resize-none transition-all leading-relaxed"
-                        placeholder="Add notes or context…" />
-                    ) : (
-                      <p className="text-xs text-gray-600 leading-relaxed">
-                        {selectedTask.description || <span className="text-gray-400 italic">No description.</span>}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Edit save/cancel */}
-                  {editMode && (
-                    <div className="px-5 py-3 border-b border-gray-100 flex gap-2">
-                      <button onClick={() => { setEditMode(false); setShowAssigneeDrop(false); }}
-                        className="flex-1 py-2 rounded-lg text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
-                        Cancel
-                      </button>
-                      <button onClick={saveEdit}
-                        className="flex-[2] py-2 rounded-lg text-xs font-semibold text-white bg-primary-500 hover:bg-primary-600 transition-colors">
-                        Save Changes
-                      </button>
                     </div>
-                  )}
 
-                  {/* Attachment */}
-                  {!editMode && (
-                    <div className="px-5 py-3 border-b border-gray-100">
-                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-2"><ImagePlus size={10} /> Attachment</span>
+                    {/* Description */}
+                    <div className="mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
+                      {editingDesc ? (
+                        <textarea autoFocus value={descDraft} onChange={e => setDescDraft(e.target.value)}
+                          onBlur={() => { patchTask({ description: descDraft }); setEditingDesc(false); }}
+                          rows={5} placeholder="Add description…"
+                          className="w-full text-sm leading-relaxed bg-transparent focus:outline-none resize-none"
+                          style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-default)' }} />
+                      ) : (
+                        <div onClick={() => { setDescDraft(selectedTask.description ?? ''); setEditingDesc(true); }}
+                          className="cursor-text min-h-[40px]">
+                          {selectedTask.description ? (
+                            <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{selectedTask.description}</p>
+                          ) : (
+                            <p className="text-sm flex items-center gap-2" style={{ color: 'var(--text-subtle)' }}>
+                              <AlignLeft size={14} /> Add description…
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Image upload */}
+                    <div className="mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
                       {detailImage ? (
-                        <div className="relative rounded-lg overflow-hidden">
+                        <div className="relative rounded-xl overflow-hidden mb-2">
                           <img src={detailImage} alt="attachment" className="w-full h-36 object-cover" />
-                          <button onClick={() => setDetailImage(null)}
-                            className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors">
+                          <button onClick={() => setDetailImage(null)} className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white">
                             <X size={11} />
                           </button>
                         </div>
                       ) : (
                         <button onClick={() => detailFileRef.current?.click()}
-                          className="w-full h-16 border border-dashed border-gray-200 rounded-lg flex items-center justify-center gap-2 text-gray-400 hover:border-primary-300 hover:text-primary-400 hover:bg-primary-50/20 transition-all text-xs font-medium">
+                          className="flex items-center gap-3 px-1 py-2.5 text-sm w-full text-left transition-colors"
+                          style={{ color: 'var(--text-muted)' }}
+                          onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
                           <ImagePlus size={14} /> Upload image
                         </button>
                       )}
-                      <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, (url) => {
+                      <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, url => {
                         setDetailImage(url);
                         if (selectedTask) updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
                       })} />
                     </div>
-                  )}
 
-                  {/* Stats */}
-                  {!editMode && (
-                    <div className="px-5 py-3 border-b border-gray-100 flex gap-4">
+                    {/* Stats row */}
+                    <div className="flex gap-5 mb-5" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '14px' }}>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-gray-800">{selectedTask.comments}</span>
-                        <span className="text-[11px] text-gray-400">Comments</span>
+                        <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{selectedTask.comments ?? 0}</span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Comments</span>
                       </div>
-                      <div className="w-px bg-gray-100" />
+                      <div style={{ width: '1px', background: 'var(--border-subtle)' }} />
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-bold text-gray-800">{selectedTask.files}</span>
-                        <span className="text-[11px] text-gray-400">Files</span>
+                        <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{selectedTask.files ?? 0}</span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Files</span>
                       </div>
                     </div>
-                  )}
 
-                  {/* Delete */}
-                  {!editMode && (
-                    <div className="px-5 py-3">
+                    {/* Delete */}
+                    <div className="mt-auto pt-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                       {confirmDelete ? (
-                        <div className="bg-red-50 border border-red-100 rounded-lg p-3 flex flex-col gap-2.5">
-                          <p className="text-xs font-semibold text-gray-700 text-center">Delete this task?</p>
-                          <div className="flex gap-2">
-                            <button onClick={() => setConfirmDelete(false)}
-                              className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors">
-                              Keep it
-                            </button>
-                            <button onClick={() => { deleteTask(selectedTask.id).catch(console.error); setSelectedTask(null); setConfirmDelete(false); }}
-                              className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#D8727D] hover:bg-[#c4636d] transition-colors">
-                              Delete
-                            </button>
-                          </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { deleteTask(selectedTask.id).catch(console.error); setSelectedTask(null); setConfirmDelete(false); }}
+                            className="flex-1 text-xs font-semibold py-2.5 rounded-xl text-white transition-colors"
+                            style={{ background: '#D8727D' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#c5616b'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#D8727D'}>
+                            Confirm delete
+                          </button>
+                          <button onClick={() => setConfirmDelete(false)}
+                            className="flex-1 text-xs font-semibold py-2.5 rounded-xl transition-colors"
+                            style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-active)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-hover)'}>
+                            Cancel
+                          </button>
                         </div>
                       ) : (
                         <button onClick={() => setConfirmDelete(true)}
-                          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold text-[#D8727D] border border-[#D8727D20] hover:bg-red-50 transition-all">
-                          <Trash2 size={12} /> Delete Task
+                          className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2.5 rounded-xl transition-colors"
+                          style={{ color: '#D8727D', background: 'rgba(216,114,125,0.06)', border: '1px solid rgba(216,114,125,0.2)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(216,114,125,0.12)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(216,114,125,0.06)'}>
+                          <Trash2 size={13} /> Delete Task
                         </button>
                       )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
-              {detailTab === 'activity' && (
-                <div className="flex-1 overflow-y-auto px-5 py-4">
-                  {(selectedTask.activity ?? []).length === 0 ? (
-                    <div className="flex flex-col items-center justify-center gap-2 mt-12 text-gray-400">
-                      <Clock size={18} className="opacity-30" />
-                      <p className="text-xs font-medium text-gray-400">No activity yet</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-3">
-                      {[...(selectedTask.activity ?? [])].reverse().map(entry => (
-                        <ActivityEntryRow key={entry.id} entry={entry} currentUserId={authUser?.id ?? ''} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                {detailTab === 'activity' && (
+                  <div className="flex-1 overflow-y-auto px-5 py-5">
+                    {(selectedTask.activity ?? []).length === 0 ? (
+                      <div className="flex flex-col items-center justify-center gap-2 mt-12">
+                        <Clock size={18} style={{ color: 'var(--text-subtle)', opacity: 0.4 }} />
+                        <p className="text-xs font-medium" style={{ color: 'var(--text-subtle)' }}>No activity yet</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {[...(selectedTask.activity ?? [])].reverse().map(entry => (
+                          <ActivityEntryRow key={entry.id} entry={entry} currentUserId={authUser?.id ?? ''} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          );
+        })()}
       </AnimatePresence>
 
       {/* ── Task Form Modal ── */}

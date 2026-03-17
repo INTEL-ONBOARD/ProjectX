@@ -188,7 +188,7 @@ const TodaySessionCard: React.FC = () => {
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-[#D58D49] text-[#D58D49] flex items-center justify-center gap-2 hover:bg-[#DFA87415] transition-colors disabled:opacity-60"
           >
-            <Coffee size={15} /> Break In
+            <Coffee size={15} /> Take Break
           </button>
           <button
             onClick={handlePunchOut}
@@ -261,8 +261,11 @@ const AttendancePage: React.FC = () => {
         sum + WEEK_DATES.filter(d => isPresent(getMemberStatus(m.id, d))).length, 0);
     const totalAbsent = members.reduce((sum, m) =>
         sum + WEEK_DATES.filter(d => getMemberStatus(m.id, d) === 'absent').length, 0);
-    const perfectCount = members.filter(m =>
-        WEEK_DATES.every(d => isPresent(getMemberStatus(m.id, d)))).length;
+    const perfectCount = members.filter(m => {
+        const statuses = WEEK_DATES.map(d => getMemberStatus(m.id, d));
+        const hasAnyRecord = statuses.some(s => s !== undefined);
+        return hasAnyRecord && statuses.every(s => isPresent(s));
+    }).length;
     const dailyPresent = WEEK_DATES.map(date =>
         members.filter(m => isPresent(getMemberStatus(m.id, date))).length
     );
@@ -380,7 +383,7 @@ const AttendancePage: React.FC = () => {
                 const color = getMemberColor(member.id);
                 const dayStatuses = WEEK_DATES.map(date => getMemberStatus(member.id, date));
                 const presentCount = dayStatuses.filter(isPresent).length;
-                const rate = `${Math.round((presentCount / 5) * 100)}%`;
+                const rate = `${Math.round((presentCount / Math.max(daysWithData, 1)) * 100)}%`;
                 const rateStyle = rateStyles[rate];
                 return (
                   <motion.tr

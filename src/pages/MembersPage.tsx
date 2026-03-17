@@ -253,7 +253,8 @@ const MembersPage: React.FC = () => {
                                   if (saving) return;
                                   setSaving(true);
                                   try {
-                                    await Promise.all([removeMember(member.id), scrubAssignee(member.id)]);
+                                    await removeMember(member.id);
+                                    await scrubAssignee(member.id);
                                     setConfirmRemoveId(null);
                                   } catch {
                                     showToast('Failed to remove member. Please try again.', 'error');

@@ -638,7 +638,7 @@ const OrganizationPage: React.FC = () => {
                                     const deptColor = newDeptColor;
                                     dbApi().createDept({ name: deptName, color: deptColor, memberIds: [] })
                                         .then((d: { id: string; name: string; color: string; memberIds: string[] }) => {
-                                            setDeptRoster(prev => [...prev, { id: d.id, icon: FolderKanban, name: d.name, color: d.color, memberIds: [] }]);
+                                            setDeptRoster(prev => prev.some(x => x.id === d.id) ? prev : [...prev, { id: d.id, icon: FolderKanban, name: d.name, color: d.color, memberIds: [] }]);
                                             setNewDeptName(''); setNewDeptColor(PROJECT_COLORS[0]); setShowAddDept(false);
                                         })
                                         .catch((err: unknown) => { console.error('[OrganizationPage] Failed to create department:', err); showToast('Failed to create department.', 'error'); });

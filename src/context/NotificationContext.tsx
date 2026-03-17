@@ -47,20 +47,20 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const { members } = useMembersContext();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const seenRefIds = useRef<Set<string>>(new Set());
-    // Fix 4: guard so generate() never runs before loadNotifs() has populated seenRefIds
-    const notifsLoaded = useRef(false);
+    // Fix 4: gate generate() behind a state variable so the useEffect dep array can track it
+    const [notifsReady, setNotifsReady] = useState(false);
 
     // Load persisted notifications for current user on login
     const loadNotifs = useCallback(async () => {
         if (!user) return;
-        notifsLoaded.current = false;
+        setNotifsReady(false);
         try {
             const all = await notifsApi().getAll(user.id);
             setNotifications(all);
             seenRefIds.current = new Set(all.map(n => n.refId).filter(Boolean));
             await notifsApi().deleteOld(user.id);
         } catch { /* ignore */ }
-        notifsLoaded.current = true;
+        setNotifsReady(true);
     }, [user?.id]);
 
     useEffect(() => {
@@ -68,9 +68,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, [loadNotifs]);
 
     // Generate task_overdue and task_assigned notifications from allTasks
-    // Fix 4: only run after loadNotifs has resolved (notifsLoaded.current === true)
+    // Fix 4: only run after loadNotifs has resolved (notifsReady === true)
     useEffect(() => {
-        if (!user || allTasks.length === 0 || !notifsLoaded.current) return;
+        if (!user || allTasks.length === 0 || !notifsReady) return;
         const todayStr = new Date().toISOString().slice(0, 10);
 
         const generate = async () => {
@@ -92,7 +92,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                             body: `Due ${task.dueDate}`,
                             refId: `overdue-${task.id}`,
                         });
-                        setNotifications(prev => [n, ...prev]);
+                        setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
                     } catch { /* ignore */ }
                 }
 
@@ -107,13 +107,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                             body: 'You were assigned to this task',
                             refId: `assigned-${task.id}`,
                         });
-                        setNotifications(prev => [n, ...prev]);
+                        setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
                     } catch { /* ignore */ }
                 }
             }
         };
         generate();
-    }, [allTasks, user?.id]);
+    }, [allTasks, user?.id, notifsReady]);
 
     // Real-time new_message notifications via change stream
     useEffect(() => {

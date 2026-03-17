@@ -80,7 +80,7 @@ const ReportsPage: React.FC = () => {
       widthPct: total > 0 ? (tasks.filter(t => t.status === s.key).length / total) * 100 : 0,
     }));
     return { project, statuses, total, summaryBar };
-  }), [ctxProjects, ctxAllTasks]);
+  }), [ctxProjects, ctxAllTasks, snapshotLoaded]);
 
   const saveSnapshotRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {

@@ -4,9 +4,9 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Tag, User, Calendar, ChevronDown, ImagePlus,
-  Check, Edit3, Trash2, MessageSquare, Send,
+  Check, Trash2, MessageSquare, Send,
   ArrowRight, Flag, UserPlus, UserMinus, FileText, Plus, Pencil, FolderPlus,
-  Download, Paperclip, Lock,
+  Download, Paperclip, Lock, Clock, Play, MoreHorizontal, AlignLeft,
 } from 'lucide-react';
 import { Task, TaskStatus, TaskActivityEntry, Comment, Attachment } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
@@ -117,8 +117,16 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [detailTab, setDetailTab] = useState<'details' | 'activity'>('details');
-  const [editMode, setEditMode] = useState(false);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState('');
+  const [editingDueDate, setEditingDueDate] = useState(false);
+  const [editingTimeEst, setEditingTimeEst] = useState(false);
+  const [timeEstDraft, setTimeEstDraft] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [formDefaultStatus, setFormDefaultStatus] = useState<TaskStatus>('todo');
@@ -128,14 +136,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [detailImage, setDetailImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-
-  // Edit state
-  const [editTitle, setEditTitle] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high'>('low');
-  const [editTaskType, setEditTaskType] = useState<'task' | 'issue'>('task');
-  const [editAssignees, setEditAssignees] = useState<string[]>([]);
-  const [editDueDate, setEditDueDate] = useState('');
 
   const [showNewProject, setShowNewProject] = useState(false);
 
@@ -246,38 +246,24 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const openTask = (task: Task) => {
     setSelectedTask(task);
-    setEditMode(false);
     setConfirmDelete(false);
     setShowStatusDrop(false);
+    setShowPriorityPicker(false);
+    setShowAssigneePicker(false);
+    setEditingTitle(false);
+    setEditingDesc(false);
+    setEditingDueDate(false);
+    setEditingTimeEst(false);
     setComments([]);
     setCommentInput('');
     setDetailImage(null);
     setDetailTab('details');
   };
 
-  const startEdit = (task: Task) => {
-    setEditTitle(task.title);
-    setEditDesc(task.description ?? '');
-    setEditPriority(task.priority === 'high' ? 'high' : task.priority === 'medium' ? 'medium' : 'low');
-    setEditTaskType(task.taskType === 'issue' ? 'issue' : 'task');
-    setEditAssignees([...task.assignees]);
-    setEditDueDate(task.dueDate ?? '');
-    setEditMode(true);
-  };
-
-  const saveEdit = () => {
+  const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
-    if (!editTitle.trim()) return; // silently ignore — field is required
-    updateTask(selectedTask.id, {
-      title: editTitle,
-      description: editDesc,
-      priority: editPriority,
-      taskType: editTaskType,
-      assignees: editAssignees,
-      dueDate: editDueDate || undefined,
-    }).catch(console.error);
-    setSelectedTask(prev => prev ? { ...prev, title: editTitle, description: editDesc, priority: editPriority, taskType: editTaskType, assignees: editAssignees, dueDate: editDueDate || undefined } : prev);
-    setEditMode(false);
+    updateTask(selectedTask.id, patch).catch(console.error);
+    setSelectedTask(prev => prev ? { ...prev, ...patch } : prev);
   };
 
   const handleDelete = () => {
@@ -295,7 +281,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
       authorName: authUser.name,
       text: commentInput.trim(),
     }) as Comment;
-    setComments(prev => [...prev, newComment]);
+    setComments(prev => prev.some(c => c.id === newComment.id) ? prev : [...prev, newComment]);
     setCommentInput('');
   };
 
@@ -486,336 +472,560 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
         )}
       </AnimatePresence>
 
-      {/* Task Detail Slide-over */}
+      {/* Task Detail Slide-over — ClickUp Style */}
       <AnimatePresence>
         {selectedTask && (
           <motion.div
             className="fixed inset-0 top-16 z-50 flex"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => {
+              setShowStatusDrop(false);
+              setShowPriorityPicker(false);
+              setShowAssigneePicker(false);
+            }}
           >
-            <div className="flex-1 bg-black/30" onClick={() => setSelectedTask(null)} />
+            <div className="flex-1" onClick={() => setSelectedTask(null)} />
             <motion.div
-              className="w-[420px] bg-white h-full overflow-y-auto border-l border-surface-200 flex flex-col"
-              initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              className="w-[460px] h-full overflow-y-auto flex flex-col border-l shrink-0"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border-default)' }}
+              initial={{ x: 460 }} animate={{ x: 0 }} exit={{ x: 460 }}
+              transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+              onClick={e => e.stopPropagation()}
             >
-              {/* Panel header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100 shrink-0">
-                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Task Detail</span>
+              {/* ── Top toolbar ── */}
+              <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <div className="flex items-center gap-2">
-                  {!editMode && (
-                    <button
-                      onClick={() => startEdit(selectedTask)}
-                      className="flex items-center gap-1 text-xs font-semibold text-primary-500 hover:text-primary-700 bg-primary-50 px-2.5 py-1.5 rounded-lg transition-colors"
-                    >
-                      <Edit3 size={12} /> Edit
-                    </button>
+                  {/* Task type badge */}
+                  <button
+                    onClick={() => patchTask({ taskType: selectedTask.taskType === 'issue' ? 'task' : 'issue' })}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
+                    style={{
+                      background: selectedTask.taskType === 'issue' ? 'rgba(216,114,125,0.12)' : 'rgba(34,197,94,0.10)',
+                      color: selectedTask.taskType === 'issue' ? '#D8727D' : '#22C55E',
+                      border: `1px solid ${selectedTask.taskType === 'issue' ? 'rgba(216,114,125,0.25)' : 'rgba(34,197,94,0.2)'}`,
+                    }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
+                    {selectedTask.taskType === 'issue' ? 'Issue' : 'Task'}
+                    <ChevronDown size={10} />
+                  </button>
+                  {/* Project */}
+                  {proj && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: proj.color }} />
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{proj.name}</span>
+                    </div>
                   )}
-                  <button onClick={() => setSelectedTask(null)} className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:bg-surface-100 hover:text-gray-600 transition-colors">
-                    <X size={16} />
+                </div>
+                <div className="flex items-center gap-1">
+                  {/* Tabs inline in header */}
+                  {(['details', 'activity'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setDetailTab(tab)}
+                      className="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                      style={{
+                        background: detailTab === tab ? 'var(--bg-active)' : 'transparent',
+                        color: detailTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setSelectedTask(null)}
+                    className="w-7 h-7 rounded-md flex items-center justify-center transition-colors ml-1"
+                    style={{ color: 'var(--text-muted)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <X size={15} />
                   </button>
                 </div>
-              </div>
-
-              {/* Tab bar */}
-              <div className="flex border-b border-surface-100 shrink-0">
-                {(['details', 'activity'] as const).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setDetailTab(tab)}
-                    className={`flex-1 py-2.5 text-xs font-semibold capitalize transition-colors ${
-                      detailTab === tab
-                        ? 'text-primary-600 border-b-2 border-primary-500'
-                        : 'text-gray-400 hover:text-gray-600'
-                    }`}
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </button>
-                ))}
               </div>
 
               {detailTab === 'details' && (
-              <div className="flex-1 px-5 py-4 flex flex-col gap-4">
-                {/* Title */}
-                <div>
-                  {editMode ? (
-                    <input
-                      value={editTitle}
-                      onChange={e => setEditTitle(e.target.value)}
-                      className="w-full text-base font-bold text-gray-900 border-b-2 border-primary-400 focus:outline-none bg-transparent pb-1"
-                    />
-                  ) : (
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h2 className="font-bold text-gray-900 text-base leading-snug">{selectedTask.title}</h2>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-md shrink-0 ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).bg} ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).text}`}>
-                        {(priorityStyles[selectedTask.priority] ?? priorityStyles.low).label}
-                      </span>
-                    </div>
-                  )}
-                  {proj && !editMode && (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: proj.color }} />
-                      <span className="text-xs text-gray-400">{proj.name}</span>
-                    </div>
-                  )}
-                </div>
+                <div className="flex-1 px-5 py-5 flex flex-col">
 
-                {/* Status */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1.5 flex items-center gap-1"><Tag size={11} /> Status</div>
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowStatusDrop(v => !v)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold hover:opacity-80 transition-opacity"
-                      style={{ background: currentStatusStyle.bgColor, color: currentStatusStyle.color }}
-                    >
-                      {currentStatusStyle.label}
-                      <ChevronDown size={12} className={`transition-transform ${showStatusDrop ? 'rotate-180' : ''}`} />
-                    </button>
-                    <AnimatePresence>
-                      {showStatusDrop && (
-                        <motion.div
-                          className="absolute left-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-surface-100 overflow-hidden z-10 w-52"
-                          initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
-                            const st = statusStyles[s];
-                            const isActive = selectedTask.status === s;
-                            return (
-                              <button key={s}
-                                onClick={() => {
-                                  moveTask(selectedTask.id, s).catch(console.error);
-                                  setSelectedTask(prev => prev ? { ...prev, status: s } : prev);
-                                  setShowStatusDrop(false);
-                                }}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold transition-colors"
-                                style={{ color: st.color, background: isActive ? st.bgColor : undefined }}
-                              >
-                                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: st.color }} />
-                                <span>{st.label}</span>
-                                {isActive && <Check size={11} className="ml-auto" />}
-                              </button>
-                            );
-                          })}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                {/* Priority edit */}
-                {editMode && (
-                  <div>
-                    <div className="text-xs font-semibold text-gray-400 mb-1.5">Priority</div>
-                    <div className="flex gap-2">
-                      {([
-                        { value: 'low',    color: '#D58D49', bg: 'bg-[#DFA87433]', ring: 'ring-[#D58D49]', text: 'text-[#D58D49]' },
-                        { value: 'medium', color: '#A78BFA', bg: 'bg-[#A78BFA22]', ring: 'ring-[#A78BFA]', text: 'text-[#A78BFA]' },
-                        { value: 'high',   color: '#D8727D', bg: 'bg-[#D8727D22]', ring: 'ring-[#D8727D]', text: 'text-[#D8727D]' },
-                      ] as const).map(p => (
-                        <button key={p.value} onClick={() => setEditPriority(p.value)}
-                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editPriority === p.value ? `${p.bg} ${p.text} ring-1 ${p.ring}` : 'bg-surface-100 text-gray-500'}`}
-                        >
-                          {p.value.charAt(0).toUpperCase() + p.value.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Type edit */}
-                {editMode && (
-                  <div>
-                    <div className="text-xs font-semibold text-gray-400 mb-1.5">Type</div>
-                    <div className="flex gap-2">
-                      {([
-                        { value: 'task',  label: 'Task',  bg: 'bg-[#22C55E20]', ring: 'ring-[#22C55E]', text: 'text-[#22C55E]' },
-                        { value: 'issue', label: 'Issue', bg: 'bg-[#EF444420]', ring: 'ring-[#EF4444]', text: 'text-[#EF4444]' },
-                      ] as const).map(t => (
-                        <button key={t.value} onClick={() => setEditTaskType(t.value)}
-                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editTaskType === t.value ? `${t.bg} ${t.text} ring-1 ${t.ring}` : 'bg-surface-100 text-gray-500'}`}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Assignees */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1"><User size={11} /> Assignees</div>
-                  {editMode ? (
-                    <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
-                      {members.map(m => (
-                        <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-50 cursor-pointer">
-                          <input type="checkbox" checked={editAssignees.includes(m.id)}
-                            onChange={() => setEditAssignees(prev => prev.includes(m.id) ? prev.filter(a => a !== m.id) : [...prev, m.id])}
-                            className="rounded text-primary-500" />
-                          <Avatar name={m.name} color={getMemberColor(m.id)} size="sm" />
-                          <span className="text-xs text-gray-700">{m.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedTask.assignees.map(id => {
-                        const member = members.find(m => m.id === id);
-                        if (!member) return null;
-                        return (
-                          <div key={id} className="flex items-center gap-1.5 bg-surface-100 rounded-full px-2.5 py-1">
-                            <Avatar name={member.name} color={getMemberColor(id)} size="sm" />
-                            <span className="text-xs font-semibold text-gray-700">{member.name.split(' ')[0]}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Due Date */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1 flex items-center gap-1"><Calendar size={11} /> Due Date</div>
-                  {editMode ? (
-                    <input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)}
-                      className="border border-surface-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary-400" />
-                  ) : (
-                    <span className="text-sm font-semibold text-gray-700">{selectedTask.dueDate ?? '—'}</span>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-1.5">Description</div>
-                  {editMode ? (
-                    <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3}
-                      className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 resize-none" />
-                  ) : (
-                    <p className="text-sm text-gray-600 leading-relaxed">{selectedTask.description || 'No description.'}</p>
-                  )}
-                </div>
-
-                {/* Image attachment */}
-                {!editMode && (
-                  <div>
-                    <div className="text-xs font-semibold text-gray-400 mb-1.5">Attachment</div>
-                    {detailImage ? (
-                      <div className="relative rounded-xl overflow-hidden">
-                        <img src={detailImage} alt="attachment" className="w-full h-40 object-cover rounded-xl" />
-                        <button onClick={() => setDetailImage(null)} className="absolute top-2 right-2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white">
-                          <X size={12} />
-                        </button>
-                      </div>
+                  {/* ── Title ── */}
+                  <div className="mb-5">
+                    {editingTitle ? (
+                      <input
+                        autoFocus
+                        value={titleDraft}
+                        onChange={e => setTitleDraft(e.target.value)}
+                        onBlur={() => {
+                          if (titleDraft.trim()) patchTask({ title: titleDraft.trim() });
+                          setEditingTitle(false);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') { if (titleDraft.trim()) patchTask({ title: titleDraft.trim() }); setEditingTitle(false); }
+                          if (e.key === 'Escape') setEditingTitle(false);
+                        }}
+                        className="w-full text-xl font-bold leading-snug bg-transparent focus:outline-none"
+                        style={{ color: 'var(--text-primary)', borderBottom: '2px solid var(--color-primary-400)' }}
+                      />
                     ) : (
-                      <button onClick={() => fileRef.current?.click()}
-                        className="w-full h-24 border-2 border-dashed border-surface-300 rounded-xl flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-primary-300 hover:text-primary-400 transition-colors">
-                        <ImagePlus size={20} /><span className="text-xs font-medium">Upload image</span>
-                      </button>
+                      <h2
+                        className="text-xl font-bold leading-snug cursor-text hover:opacity-80 transition-opacity"
+                        style={{ color: 'var(--text-primary)' }}
+                        onClick={() => { setTitleDraft(selectedTask.title); setEditingTitle(true); }}
+                      >
+                        {selectedTask.title}
+                      </h2>
                     )}
+                    {selectedTask.taskNumber && (
+                      <span className="text-xs mt-1 block" style={{ color: 'var(--text-subtle)' }}>#{selectedTask.taskNumber}</span>
+                    )}
+                  </div>
+
+                  {/* ── Metadata rows ── */}
+                  <div className="flex flex-col mb-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+
+                    {/* Status */}
+                    <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div className="flex items-center gap-2 w-[130px] shrink-0">
+                        <Tag size={13} style={{ color: 'var(--text-subtle)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Status</span>
+                      </div>
+                      <div className="relative">
+                        <button
+                          onClick={() => { setShowStatusDrop(v => !v); setShowPriorityPicker(false); setShowAssigneePicker(false); }}
+                          className="flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold hover:opacity-80 transition-opacity"
+                          style={{ background: currentStatusStyle.bgColor, color: currentStatusStyle.color }}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: currentStatusStyle.color }} />
+                          {currentStatusStyle.label}
+                          <ChevronDown size={11} className={`transition-transform ${showStatusDrop ? 'rotate-180' : ''}`} />
+                        </button>
+                        <AnimatePresence>
+                          {showStatusDrop && (
+                            <motion.div
+                              className="absolute left-0 top-full mt-1 rounded-xl shadow-xl overflow-hidden z-20 w-52"
+                              style={{ background: 'var(--bg-dropdown)', border: '1px solid var(--border-default)' }}
+                              initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                              transition={{ duration: 0.13 }}
+                            >
+                              {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
+                                const st = statusStyles[s];
+                                const isActive = selectedTask.status === s;
+                                return (
+                                  <button key={s}
+                                    onClick={() => {
+                                      moveTask(selectedTask.id, s).catch(console.error);
+                                      setSelectedTask(prev => prev ? { ...prev, status: s } : prev);
+                                      setShowStatusDrop(false);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold transition-colors"
+                                    style={{ color: st.color, background: isActive ? st.bgColor : 'transparent' }}
+                                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = isActive ? st.bgColor : 'transparent'; }}
+                                  >
+                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: st.color }} />
+                                    <span>{st.label}</span>
+                                    {isActive && <Check size={11} className="ml-auto" />}
+                                  </button>
+                                );
+                              })}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    {/* Assignees */}
+                    <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div className="flex items-center gap-2 w-[130px] shrink-0">
+                        <User size={13} style={{ color: 'var(--text-subtle)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Assignees</span>
+                      </div>
+                      <div className="relative flex-1">
+                        <button
+                          onClick={() => { setShowAssigneePicker(v => !v); setShowStatusDrop(false); setShowPriorityPicker(false); }}
+                          className="flex items-center gap-2 flex-wrap"
+                        >
+                          {selectedTask.assignees.length === 0 ? (
+                            <span className="text-xs" style={{ color: 'var(--text-subtle)' }}>+ Add assignee</span>
+                          ) : (
+                            selectedTask.assignees.map(id => {
+                              const member = members.find(m => m.id === id);
+                              if (!member) return null;
+                              return (
+                                <div key={id} className="flex items-center gap-1.5">
+                                  <Avatar name={member.name} color={getMemberColor(id)} size="sm" />
+                                  <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{member.name.split(' ')[0]}</span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </button>
+                        <AnimatePresence>
+                          {showAssigneePicker && (
+                            <motion.div
+                              className="absolute left-0 top-full mt-1 rounded-xl shadow-xl overflow-hidden z-20 w-52"
+                              style={{ background: 'var(--bg-dropdown)', border: '1px solid var(--border-default)' }}
+                              initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                              transition={{ duration: 0.13 }}
+                            >
+                              {members.map(m => {
+                                const isAssigned = selectedTask.assignees.includes(m.id);
+                                return (
+                                  <button key={m.id}
+                                    onClick={() => {
+                                      const newAssignees = isAssigned
+                                        ? selectedTask.assignees.filter(a => a !== m.id)
+                                        : [...selectedTask.assignees, m.id];
+                                      patchTask({ assignees: newAssignees });
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors"
+                                    style={{ color: 'var(--text-secondary)', background: isAssigned ? 'var(--bg-active)' : 'transparent' }}
+                                    onMouseEnter={e => { if (!isAssigned) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = isAssigned ? 'var(--bg-active)' : 'transparent'; }}
+                                  >
+                                    <Avatar name={m.name} color={getMemberColor(m.id)} size="sm" />
+                                    <span className="flex-1 text-left font-medium">{m.name}</span>
+                                    {isAssigned && <Check size={11} style={{ color: 'var(--color-primary-500)' }} />}
+                                  </button>
+                                );
+                              })}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    {/* Due Date */}
+                    <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div className="flex items-center gap-2 w-[130px] shrink-0">
+                        <Calendar size={13} style={{ color: 'var(--text-subtle)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Due date</span>
+                      </div>
+                      {editingDueDate ? (
+                        <input
+                          autoFocus
+                          type="date"
+                          defaultValue={selectedTask.dueDate ?? ''}
+                          onBlur={e => { patchTask({ dueDate: e.target.value || undefined }); setEditingDueDate(false); }}
+                          onKeyDown={e => { if (e.key === 'Escape') setEditingDueDate(false); }}
+                          className="text-xs rounded-md px-2 py-1 focus:outline-none"
+                          style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--color-primary-400)' }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setEditingDueDate(true)}
+                          className="flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70"
+                          style={{ color: selectedTask.dueDate && selectedTask.dueDate < TODAY && selectedTask.status !== 'done' ? '#D8727D' : 'var(--text-secondary)' }}
+                        >
+                          <Calendar size={12} style={{ color: 'var(--text-subtle)' }} />
+                          {selectedTask.dueDate ?? <span style={{ color: 'var(--text-subtle)' }}>Set due date</span>}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Priority */}
+                    <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div className="flex items-center gap-2 w-[130px] shrink-0">
+                        <Flag size={13} style={{ color: 'var(--text-subtle)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Priority</span>
+                      </div>
+                      <div className="relative">
+                        <button
+                          onClick={() => { setShowPriorityPicker(v => !v); setShowStatusDrop(false); setShowAssigneePicker(false); }}
+                          className="flex items-center gap-2 text-xs font-medium transition-opacity hover:opacity-70"
+                        >
+                          {(() => {
+                            const p = selectedTask.priority;
+                            const colors: Record<string, string> = { low: '#D58D49', medium: '#A78BFA', high: '#D8727D' };
+                            const labels: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High' };
+                            return (
+                              <>
+                                <Flag size={13} style={{ color: colors[p] ?? 'var(--text-subtle)' }} />
+                                <span style={{ color: colors[p] ?? 'var(--text-secondary)' }}>{labels[p] ?? 'Normal'}</span>
+                              </>
+                            );
+                          })()}
+                          <ChevronDown size={11} style={{ color: 'var(--text-subtle)' }} className={`transition-transform ${showPriorityPicker ? 'rotate-180' : ''}`} />
+                        </button>
+                        <AnimatePresence>
+                          {showPriorityPicker && (
+                            <motion.div
+                              className="absolute left-0 top-full mt-1 rounded-xl shadow-xl overflow-hidden z-20 w-44"
+                              style={{ background: 'var(--bg-dropdown)', border: '1px solid var(--border-default)' }}
+                              initial={{ opacity: 0, y: -4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.97 }}
+                              transition={{ duration: 0.13 }}
+                            >
+                              {([
+                                { value: 'low', label: 'Low', color: '#D58D49' },
+                                { value: 'medium', label: 'Medium', color: '#A78BFA' },
+                                { value: 'high', label: 'High', color: '#D8727D' },
+                              ] as const).map(p => (
+                                <button key={p.value}
+                                  onClick={() => { patchTask({ priority: p.value }); setShowPriorityPicker(false); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors"
+                                  style={{ color: p.color, background: selectedTask.priority === p.value ? 'var(--bg-active)' : 'transparent' }}
+                                  onMouseEnter={e => { if (selectedTask.priority !== p.value) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.background = selectedTask.priority === p.value ? 'var(--bg-active)' : 'transparent'; }}
+                                >
+                                  <Flag size={12} style={{ color: p.color }} />
+                                  {p.label}
+                                  {selectedTask.priority === p.value && <Check size={11} className="ml-auto" />}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    {/* Time estimate */}
+                    <div className="flex items-center py-2.5" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div className="flex items-center gap-2 w-[130px] shrink-0">
+                        <Clock size={13} style={{ color: 'var(--text-subtle)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Time estimate</span>
+                      </div>
+                      {editingTimeEst ? (
+                        <input
+                          autoFocus
+                          value={timeEstDraft}
+                          onChange={e => setTimeEstDraft(e.target.value)}
+                          onBlur={() => {
+                            const mins = parseInt(timeEstDraft, 10);
+                            if (!isNaN(mins) && mins > 0) patchTask({ estimatedMinutes: mins });
+                            setEditingTimeEst(false);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { const mins = parseInt(timeEstDraft, 10); if (!isNaN(mins) && mins > 0) patchTask({ estimatedMinutes: mins }); setEditingTimeEst(false); }
+                            if (e.key === 'Escape') setEditingTimeEst(false);
+                          }}
+                          placeholder="minutes"
+                          className="text-xs rounded-md px-2 py-1 w-24 focus:outline-none"
+                          style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--color-primary-400)' }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => { setTimeEstDraft(selectedTask.estimatedMinutes ? String(selectedTask.estimatedMinutes) : ''); setEditingTimeEst(true); }}
+                          className="text-xs transition-opacity hover:opacity-70"
+                          style={{ color: selectedTask.estimatedMinutes ? 'var(--text-secondary)' : 'var(--text-subtle)' }}
+                        >
+                          {selectedTask.estimatedMinutes
+                            ? selectedTask.estimatedMinutes >= 60
+                              ? `${Math.floor(selectedTask.estimatedMinutes / 60)}h${selectedTask.estimatedMinutes % 60 ? ` ${selectedTask.estimatedMinutes % 60}m` : ''}`
+                              : `${selectedTask.estimatedMinutes}m`
+                            : 'Set estimate'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Track time */}
+                    <div className="flex items-center py-2.5">
+                      <div className="flex items-center gap-2 w-[130px] shrink-0">
+                        <Clock size={13} style={{ color: 'var(--text-subtle)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Track time</span>
+                      </div>
+                      <button
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+                        style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-active)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                      >
+                        <Play size={11} style={{ color: 'var(--text-muted)' }} />
+                        Start
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Description ── */}
+                  <div className="mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
+                    {editingDesc ? (
+                      <textarea
+                        autoFocus
+                        value={descDraft}
+                        onChange={e => setDescDraft(e.target.value)}
+                        onBlur={() => { patchTask({ description: descDraft }); setEditingDesc(false); }}
+                        rows={5}
+                        placeholder="Add description…"
+                        className="w-full text-sm leading-relaxed bg-transparent focus:outline-none resize-none"
+                        style={{ color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-default)' }}
+                      />
+                    ) : (
+                      <div
+                        onClick={() => { setDescDraft(selectedTask.description ?? ''); setEditingDesc(true); }}
+                        className="cursor-text min-h-[40px]"
+                      >
+                        {selectedTask.description ? (
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{selectedTask.description}</p>
+                        ) : (
+                          <p className="text-sm flex items-center gap-2" style={{ color: 'var(--text-subtle)' }}>
+                            <AlignLeft size={14} />
+                            Add description…
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Action rows ── */}
+                  <div className="flex flex-col gap-0 mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '8px' }}>
+                    {/* Attach file action */}
+                    <button
+                      onClick={async () => {
+                        const added = await dbApi().pickAttachments(selectedTask!.id) as Attachment[];
+                        setAttachments(prev => {
+                          const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
+                          return newOnes.length ? [...prev, ...newOnes] : prev;
+                        });
+                      }}
+                      className="flex items-center gap-3 px-1 py-2.5 rounded-lg text-sm transition-colors w-full text-left"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                    >
+                      <Paperclip size={14} />
+                      Attach file
+                    </button>
+
+                    {/* Image upload action */}
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      className="flex items-center gap-3 px-1 py-2.5 rounded-lg text-sm transition-colors w-full text-left"
+                      style={{ color: 'var(--text-muted)' }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                    >
+                      <ImagePlus size={14} />
+                      Upload image
+                    </button>
                     <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   </div>
-                )}
 
-                {/* Edit mode save/cancel */}
-                {editMode && (
-                  <div className="flex gap-2">
-                    <motion.button onClick={saveEdit} className="flex-1 bg-primary-500 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                      Save
-                    </motion.button>
-                    <button onClick={() => setEditMode(false)} className="flex-1 bg-surface-100 text-gray-600 text-sm font-semibold py-2.5 rounded-xl hover:bg-surface-200 transition-colors">
-                      Cancel
-                    </button>
-                  </div>
-                )}
-
-                {/* File Attachments */}
-                {!editMode && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs font-semibold text-gray-400 flex items-center gap-1"><Paperclip size={11} /> Attachments ({attachments.length})</div>
-                      <button
-                        onClick={async () => {
-                          const added = await dbApi().pickAttachments(selectedTask!.id) as Attachment[];
-                          setAttachments(prev => [...prev, ...added]);
-                        }}
-                        className="text-xs font-semibold text-primary-500 hover:text-primary-600 transition-colors"
-                      >
-                        + Attach File
+                  {/* Image preview */}
+                  {detailImage && (
+                    <div className="relative rounded-xl overflow-hidden mb-4">
+                      <img src={detailImage} alt="attachment" className="w-full h-40 object-cover rounded-xl" />
+                      <button onClick={() => setDetailImage(null)} className="absolute top-2 right-2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white">
+                        <X size={12} />
                       </button>
                     </div>
-                    <div className="space-y-1.5">
-                      {attachments.map(a => (
-                        <div key={a.id} className="flex items-center gap-2 p-2 bg-surface-50 rounded-lg border border-surface-200">
-                          <Paperclip size={13} className="text-gray-400 shrink-0" />
-                          <span className="flex-1 text-xs text-gray-700 truncate font-medium">{a.name}</span>
-                          <span className="text-[10px] text-gray-400">{fmtSize(a.size)}</span>
-                          <button onClick={() => dbApi().openAttachment(a.filePath)} className="text-gray-400 hover:text-primary-500 transition-colors">
-                            <Download size={13} />
-                          </button>
-                          <button onClick={async () => { await dbApi().deleteAttachment(a.id); setAttachments(prev => prev.filter(x => x.id !== a.id)); }} className="text-gray-400 hover:text-red-500 transition-colors">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Comments */}
-                {!editMode && (
-                  <div>
-                    <div className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1"><MessageSquare size={11} /> Comments ({comments.length})</div>
-                    <div className="flex flex-col gap-3 mb-3 max-h-40 overflow-y-auto">
+                  {/* ── File attachments list ── */}
+                  {attachments.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                        Attachments ({attachments.length})
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {attachments.map(a => (
+                          <div key={a.id} className="flex items-center gap-2 p-2 rounded-lg" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-subtle)' }}>
+                            <Paperclip size={13} style={{ color: 'var(--text-subtle)' }} className="shrink-0" />
+                            <span className="flex-1 text-xs truncate font-medium" style={{ color: 'var(--text-secondary)' }}>{a.name}</span>
+                            <span className="text-[10px]" style={{ color: 'var(--text-subtle)' }}>{fmtSize(a.size)}</span>
+                            <button onClick={() => dbApi().openAttachment(a.filePath)} style={{ color: 'var(--text-subtle)' }} className="hover:text-primary-500 transition-colors">
+                              <Download size={13} />
+                            </button>
+                            <button onClick={async () => { await dbApi().deleteAttachment(a.id); setAttachments(prev => prev.filter(x => x.id !== a.id)); }} style={{ color: 'var(--text-subtle)' }} className="hover:text-red-500 transition-colors">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Comments ── */}
+                  <div className="mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <MessageSquare size={13} style={{ color: 'var(--text-subtle)' }} />
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Comments {comments.length > 0 && `(${comments.length})`}</span>
+                    </div>
+                    <div className="flex flex-col gap-3 mb-3">
                       {loadingComments ? (
-                        <p className="text-xs text-gray-400">Loading...</p>
+                        <p className="text-xs" style={{ color: 'var(--text-subtle)' }}>Loading...</p>
                       ) : comments.map(c => (
                         <div key={c.id} className="flex gap-2.5">
                           <Avatar name={c.authorName} color="#5030E5" size="sm" />
-                          <div>
-                            <div className="text-[11px] font-semibold text-gray-900">{c.authorName} <span className="text-gray-400 font-normal">{new Date(c.createdAt).toLocaleString()}</span></div>
-                            <div className="text-xs text-gray-600 mt-0.5">{c.text}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                              {c.authorName}
+                              <span className="font-normal ml-1.5" style={{ color: 'var(--text-subtle)' }}>{new Date(c.createdAt).toLocaleString()}</span>
+                            </div>
+                            <div className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{c.text}</div>
                           </div>
                         </div>
                       ))}
                     </div>
                     <div className="flex gap-2">
-                      <input value={commentInput} onChange={e => setCommentInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleAddComment()}
-                        placeholder="Add a comment..." className="flex-1 border border-surface-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary-400" />
-                      <button onClick={handleAddComment} className="w-8 h-8 bg-primary-500 rounded-xl flex items-center justify-center text-white hover:bg-primary-600 transition-colors shrink-0">
-                        <Send size={14} />
-                      </button>
+                      {authUser && <Avatar name={authUser.name} color="#5030E5" size="sm" />}
+                      <div className="flex-1 flex gap-2">
+                        <input
+                          value={commentInput}
+                          onChange={e => setCommentInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleAddComment()}
+                          placeholder="Write a comment…"
+                          className="flex-1 text-xs px-3 py-2 rounded-xl focus:outline-none transition-colors"
+                          style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-default)' }}
+                          onFocus={e => e.target.style.borderColor = 'var(--color-primary-400)'}
+                          onBlur={e => e.target.style.borderColor = 'var(--border-default)'}
+                        />
+                        <button
+                          onClick={handleAddComment}
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-colors bg-primary-500 hover:bg-primary-600 shrink-0"
+                        >
+                          <Send size={13} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                )}
 
-                {/* Delete */}
-                {!editMode && (
-                  <div className="mt-auto pt-4 border-t border-surface-100">
+                  {/* ── Delete ── */}
+                  <div className="pt-4 mt-auto" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     {!confirmDelete ? (
-                      <button onClick={() => setConfirmDelete(true)} className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-[#D8727D] bg-[#D8727D0A] border border-[#D8727D33] py-2.5 rounded-xl hover:bg-[#D8727D15] transition-colors">
+                      <button
+                        onClick={() => setConfirmDelete(true)}
+                        className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2.5 rounded-xl transition-colors"
+                        style={{ color: '#D8727D', background: 'rgba(216,114,125,0.06)', border: '1px solid rgba(216,114,125,0.2)' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(216,114,125,0.12)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(216,114,125,0.06)'}
+                      >
                         <Trash2 size={13} /> Delete task
                       </button>
                     ) : (
                       <div className="flex gap-2">
-                        <button onClick={handleDelete} className="flex-1 text-xs font-semibold bg-[#D8727D] text-white py-2.5 rounded-xl hover:bg-[#c5616b] transition-colors">
+                        <button
+                          onClick={handleDelete}
+                          className="flex-1 text-xs font-semibold py-2.5 rounded-xl text-white transition-colors"
+                          style={{ background: '#D8727D' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#c5616b'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#D8727D'}
+                        >
                           Confirm delete
                         </button>
-                        <button onClick={() => setConfirmDelete(false)} className="flex-1 text-xs font-semibold bg-surface-100 text-gray-600 py-2.5 rounded-xl hover:bg-surface-200 transition-colors">
+                        <button
+                          onClick={() => setConfirmDelete(false)}
+                          className="flex-1 text-xs font-semibold py-2.5 rounded-xl transition-colors"
+                          style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-active)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                        >
                           Cancel
                         </button>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
+
+                </div>
               )}
 
+              {/* ── Activity tab ── */}
               {detailTab === 'activity' && (
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-y-auto px-5 py-5">
                   {(selectedTask.activity ?? []).length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center mt-8">No activity yet.</p>
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--bg-hover)' }}>
+                        <MoreHorizontal size={18} style={{ color: 'var(--text-subtle)' }} />
+                      </div>
+                      <p className="text-xs" style={{ color: 'var(--text-subtle)' }}>No activity yet</p>
+                    </div>
                   ) : (
                     <div className="flex flex-col gap-3">
                       {[...(selectedTask.activity ?? [])].reverse().map(entry => (

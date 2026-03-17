@@ -117,7 +117,7 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
     }, []);
 
     const addRolePerms = useCallback((entry: RolePerms) => {
-        setPerms(prev => [...prev, entry]);
+        setPerms(prev => prev.some(p => p.role === entry.role) ? prev : [...prev, entry]);
     }, []);
 
     const renameRolePerms = useCallback((oldName: string, newName: string) => {
