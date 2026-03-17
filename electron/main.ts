@@ -317,6 +317,9 @@ let convMetaStream: any = null;
 let deptStream: any = null;
 let authUserStream: any = null;
 let notificationStream: any = null;
+let commentStream: any = null;
+let attachmentStream: any = null;
+let sprintStream: any = null;
 
 // Per-user system notification setting (userId → enabled). Loaded lazily from DB.
 const systemNotifsEnabled = new Map<string, boolean>();
@@ -749,6 +752,87 @@ function startNotificationStream(): void {
     }
 }
 
+function startCommentStream(): void {
+    if (!windowReady) return;
+    if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
+    try {
+        commentStream = (CommentModel as any).watch([], { fullDocument: 'updateLookup' });
+        commentStream.on('change', (change: any) => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d) mainWindow.webContents.send('data:comment:changed', { op, doc: safe({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt }) });
+            } else if (op === 'delete') {
+                mainWindow.webContents.send('data:comment:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        commentStream.on('error', (err: any) => {
+            console.error('[changeStream:comment] error:', err.message);
+            try { commentStream.close(); } catch (_) {}
+            commentStream = null;
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startCommentStream(); }, 5000);
+        });
+        console.log('[changeStream] comment stream started');
+    } catch (err: any) {
+        console.error('[changeStream:comment] failed to start:', err.message);
+    }
+}
+
+function startAttachmentStream(): void {
+    if (!windowReady) return;
+    if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
+    try {
+        attachmentStream = (AttachmentModel as any).watch([], { fullDocument: 'updateLookup' });
+        attachmentStream.on('change', (change: any) => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d) mainWindow.webContents.send('data:attachment:changed', { op, doc: safe({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt }) });
+            } else if (op === 'delete') {
+                mainWindow.webContents.send('data:attachment:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        attachmentStream.on('error', (err: any) => {
+            console.error('[changeStream:attachment] error:', err.message);
+            try { attachmentStream.close(); } catch (_) {}
+            attachmentStream = null;
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAttachmentStream(); }, 5000);
+        });
+        console.log('[changeStream] attachment stream started');
+    } catch (err: any) {
+        console.error('[changeStream:attachment] failed to start:', err.message);
+    }
+}
+
+function startSprintStream(): void {
+    if (!windowReady) return;
+    if (sprintStream) { try { sprintStream.close(); } catch (_) {} sprintStream = null; }
+    try {
+        sprintStream = (SprintModel as any).watch([], { fullDocument: 'updateLookup' });
+        sprintStream.on('change', (change: any) => {
+            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d) mainWindow.webContents.send('data:sprint:changed', { op, doc: safe({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status }) });
+            } else if (op === 'delete') {
+                mainWindow.webContents.send('data:sprint:changed', { op, id: change.documentKey?._id?.toString() });
+            }
+        });
+        sprintStream.on('error', (err: any) => {
+            console.error('[changeStream:sprint] error:', err.message);
+            try { sprintStream.close(); } catch (_) {}
+            sprintStream = null;
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startSprintStream(); }, 5000);
+        });
+        console.log('[changeStream] sprint stream started');
+    } catch (err: any) {
+        console.error('[changeStream:sprint] failed to start:', err.message);
+    }
+}
+
 // Coordinator — starts all data streams (each restarts itself on error independently)
 function startDataStreams(): void {
     startProjectStream();
@@ -765,6 +849,9 @@ function startDataStreams(): void {
     startDeptStream();
     startAuthUserStream();
     startNotificationStream();
+    startCommentStream();
+    startAttachmentStream();
+    startSprintStream();
 }
 
 async function ensureDefaultData() {
@@ -1638,6 +1725,9 @@ app.on('before-quit', () => {
     if (deptStream) { try { deptStream.close(); } catch (_) {} deptStream = null; }
     if (authUserStream) { try { authUserStream.close(); } catch (_) {} authUserStream = null; }
     if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
+    if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
+    if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
+    if (sprintStream) { try { sprintStream.close(); } catch (_) {} sprintStream = null; }
 });
 
 app.on('window-all-closed', () => {

@@ -41,6 +41,28 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
         dbApi().getAttachments(task.id).then((data: any) => setAttachments(data as Attachment[]));
     }, [task?.id]);
 
+    useEffect(() => {
+        if (!task) return;
+        const eApi = (window as any).electronAPI;
+        const unsubComment = eApi.onCommentChanged((_: unknown, payload: { op: string; doc?: any; id?: string }) => {
+            const { op, doc, id } = payload;
+            if (op === 'insert' && doc?.taskId === task.id) {
+                setComments(prev => prev.some(c => c.id === doc.id) ? prev : [...prev, doc as Comment]);
+            } else if (op === 'delete' && id) {
+                setComments(prev => prev.filter(c => c.id !== id));
+            }
+        });
+        const unsubAttachment = eApi.onAttachmentChanged((_: unknown, payload: { op: string; doc?: any; id?: string }) => {
+            const { op, doc, id } = payload;
+            if (op === 'insert' && doc?.taskId === task.id) {
+                setAttachments(prev => prev.some(a => a.id === doc.id) ? prev : [...prev, doc as Attachment]);
+            } else if (op === 'delete' && id) {
+                setAttachments(prev => prev.filter(a => a.id !== id));
+            }
+        });
+        return () => { unsubComment(); unsubAttachment(); };
+    }, [task?.id]);
+
     const assigneeNames = task?.assignees.map(
         (id) => members.find((m) => m.id === id)?.name ?? 'Unknown'
     ) ?? [];

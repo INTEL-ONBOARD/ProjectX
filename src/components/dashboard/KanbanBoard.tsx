@@ -175,6 +175,28 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     dbApi().getAttachments(selectedTask.id).then((data: any) => setAttachments(data as Attachment[]));
   }, [selectedTask?.id]);
 
+  useEffect(() => {
+    if (!selectedTask) return;
+    const eApi = (window as any).electronAPI;
+    const unsubComment = eApi.onCommentChanged((_: unknown, payload: { op: string; doc?: any; id?: string }) => {
+      const { op, doc, id } = payload;
+      if (op === 'insert' && doc?.taskId === selectedTask.id) {
+        setComments(prev => prev.some(c => c.id === doc.id) ? prev : [...prev, doc as Comment]);
+      } else if (op === 'delete' && id) {
+        setComments(prev => prev.filter(c => c.id !== id));
+      }
+    });
+    const unsubAttachment = eApi.onAttachmentChanged((_: unknown, payload: { op: string; doc?: any; id?: string }) => {
+      const { op, doc, id } = payload;
+      if (op === 'insert' && doc?.taskId === selectedTask.id) {
+        setAttachments(prev => prev.some(a => a.id === doc.id) ? prev : [...prev, doc as Attachment]);
+      } else if (op === 'delete' && id) {
+        setAttachments(prev => prev.filter(a => a.id !== id));
+      }
+    });
+    return () => { unsubComment(); unsubAttachment(); };
+  }, [selectedTask?.id]);
+
   const openTask = (task: Task) => {
     setSelectedTask(task);
     setEditMode(false);

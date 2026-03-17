@@ -13,7 +13,6 @@ import {
     ChevronLeft,
     Plus,
     MoreHorizontal,
-    Bug,
     Pencil,
     Trash2,
     GripVertical,
@@ -461,28 +460,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </AnimatePresence>
             </nav>
 
-            {/* Report Issue Button */}
-            <AnimatePresence>
-                {!collapsed && (
-                    <motion.div
-                        className="mx-4 mb-5"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        transition={{ duration: 0.3 }}
-                    >
-                        <motion.button
-                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-surface-100 hover:bg-surface-200 rounded-xl text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => window.dispatchEvent(new Event('open-bug-report'))}
-                        >
-                            <Bug size={15} />
-                            Report an Issue
-                        </motion.button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* Report Issue Button - hidden */}
         </motion.aside>
 
         {/* New Project Modal */}

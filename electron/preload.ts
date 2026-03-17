@@ -116,6 +116,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('data:notification:changed', cb);
         return () => ipcRenderer.removeListener('data:notification:changed', cb);
     },
+    onCommentChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:comment:changed', cb);
+        return () => ipcRenderer.removeListener('data:comment:changed', cb);
+    },
+    onAttachmentChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:attachment:changed', cb);
+        return () => ipcRenderer.removeListener('data:attachment:changed', cb);
+    },
+    onSprintChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:sprint:changed', cb);
+        return () => ipcRenderer.removeListener('data:sprint:changed', cb);
+    },
 
     // Update event listeners
     onUpdateChecking: (cb: () => void) => {

@@ -9,8 +9,8 @@ export interface RolePerms {
 }
 
 const DEFAULT_PERMS: RolePerms[] = [
-    { role: 'admin', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/members', '/attendance', '/reports', '/users', '/settings'] },
-    { role: 'member', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/teams', '/attendance', '/settings'] },
+    { role: 'admin', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/sprints', '/teams', '/members', '/attendance', '/reports', '/users', '/settings'] },
+    { role: 'member', allowedRoutes: ['/', '/dashboard', '/messages', '/tasks', '/sprints', '/teams', '/attendance', '/settings'] },
     { role: 'guest', allowedRoutes: ['/settings'] },
 ];
 
@@ -59,7 +59,13 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
             })
             .catch((err: unknown) => console.error('[RolePermsContext] Failed to load role perms:', err));
 
-        const onFocus = () => { dbApi().getRolePerms().then((data: RolePerms[]) => { if (!cancelled && data?.length) setPerms(data); }).catch(() => {}); };
+        const mergeWithDefaults = (data: RolePerms[]) => data.map((p: RolePerms) => {
+            const def = DEFAULT_PERMS.find(d => d.role === p.role);
+            if (!def) return p;
+            const missing = def.allowedRoutes.filter(r => !p.allowedRoutes.includes(r));
+            return missing.length === 0 ? p : { ...p, allowedRoutes: [...p.allowedRoutes, ...missing] };
+        });
+        const onFocus = () => { dbApi().getRolePerms().then((data: RolePerms[]) => { if (!cancelled && data?.length) setPerms(mergeWithDefaults(data)); }).catch(() => {}); };
         window.addEventListener('focus', onFocus);
 
         return () => {
@@ -73,22 +79,30 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
+        const mergeDoc = (doc: RolePerms): RolePerms => {
+            const def = DEFAULT_PERMS.find(d => d.role === doc.role);
+            if (!def) return doc;
+            const missing = def.allowedRoutes.filter(r => !doc.allowedRoutes.includes(r));
+            return missing.length === 0 ? doc : { ...doc, allowedRoutes: [...doc.allowedRoutes, ...missing] };
+        };
         const unsub = electronAPI.onRolePermsChanged?.((_: unknown, payload: { op: string; doc?: RolePerms; id?: string }) => {
             const { op, doc } = payload;
             if (op === 'insert') {
-                setPerms(prev => prev.some(p => p.role === doc!.role) ? prev : [...prev, doc!]);
+                const merged = mergeDoc(doc!);
+                setPerms(prev => prev.some(p => p.role === merged.role) ? prev : [...prev, merged]);
             } else if (op === 'update' || op === 'replace') {
+                const merged = mergeDoc(doc!);
                 setPerms(prev => {
-                    const exists = prev.some(p => p.role === doc!.role);
-                    return exists ? prev.map(p => p.role === doc!.role ? doc! : p) : [...prev, doc!];
+                    const exists = prev.some(p => p.role === merged.role);
+                    return exists ? prev.map(p => p.role === merged.role ? merged : p) : [...prev, merged];
                 });
             } else if (op === 'delete') {
-                dbApi().getRolePerms().then((data: RolePerms[]) => { if (data?.length) setPerms(data); }).catch(() => {});
+                dbApi().getRolePerms().then((data: RolePerms[]) => { if (data?.length) setPerms(data.map(mergeDoc)); }).catch(() => {});
             }
         });
         // Fix 7: refetch after DB reconnect
         const unsubReconnect = electronAPI.onDbReconnected?.(() => {
-            dbApi().getRolePerms().then((data: RolePerms[]) => { if (data?.length) setPerms(data); }).catch(() => {});
+            dbApi().getRolePerms().then((data: RolePerms[]) => { if (data?.length) setPerms(data.map(mergeDoc)); }).catch(() => {});
         });
         return () => { unsub?.(); unsubReconnect?.(); };
     }, []);

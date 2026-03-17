@@ -101,6 +101,18 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         electron_1.ipcRenderer.on('data:notification:changed', cb);
         return () => electron_1.ipcRenderer.removeListener('data:notification:changed', cb);
     },
+    onCommentChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:comment:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:comment:changed', cb);
+    },
+    onAttachmentChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:attachment:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:attachment:changed', cb);
+    },
+    onSprintChanged: (cb) => {
+        electron_1.ipcRenderer.on('data:sprint:changed', cb);
+        return () => electron_1.ipcRenderer.removeListener('data:sprint:changed', cb);
+    },
     // Update event listeners
     onUpdateChecking: (cb) => {
         electron_1.ipcRenderer.on('update:checking', cb);

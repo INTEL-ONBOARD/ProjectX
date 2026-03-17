@@ -9,6 +9,7 @@ const ALL_ROUTES = [
     { id: '/dashboard',  label: 'Dashboard'   },
     { id: '/messages',   label: 'Messages'    },
     { id: '/tasks',      label: 'Tasks'       },
+    { id: '/sprints',    label: 'Sprints'     },
     { id: '/teams',      label: 'Projects'    },
     { id: '/members',    label: 'Members'     },
     { id: '/attendance', label: 'Attendance'  },
