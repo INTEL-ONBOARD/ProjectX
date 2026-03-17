@@ -69,6 +69,7 @@ const TaskSchema = new mongoose_1.Schema({
     startDate: String,
     dueDate: String,
     projectId: String,
+    taskNumber:  { type: Number, default: null },
     activity: { type: Array, default: [] },
 });
 const ProjectSchema = new mongoose_1.Schema({
@@ -180,6 +181,11 @@ const RolePermsSchema = new mongoose_1.Schema({
     role: { type: String, required: true, unique: true },
     allowedRoutes: { type: [String], default: [] },
 });
+const CounterSchema = new mongoose_1.Schema({
+    name:  { type: String, required: true, unique: true },
+    value: { type: Number, default: 0 },
+});
+const CounterModel = mongoose_1.default.model('Counter', CounterSchema);
 const UserModel = mongoose_1.default.model('User', UserSchema);
 const TaskModel = mongoose_1.default.model('Task', TaskSchema);
 const ProjectModel = mongoose_1.default.model('Project', ProjectSchema);
@@ -209,7 +215,7 @@ const toUser = (d) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', emai
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject = (d) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask = (d) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask = (d) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser = (d) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1005,7 +1011,19 @@ function registerDbHandlers() {
             actorName: actorName ?? 'System',
             timestamp: new Date().toISOString(),
         };
-        const doc = await TaskModel.create({ appId: 't' + Date.now(), ...rest, activity: [entry] });
+        // Atomically get the next task number
+        const counter = await CounterModel.findOneAndUpdate(
+            { name: 'tasks' },
+            { $inc: { value: 1 } },
+            { new: true, upsert: true }
+        );
+        const taskNumber = counter.value;
+        const doc = await TaskModel.create({
+            appId: 't' + Date.now(),
+            ...rest,
+            taskNumber,
+            activity: [entry],
+        });
         return safe(toTask(doc.toObject()));
     });
     electron_1.ipcMain.handle('db:tasks:update', async (_e, id, changes) => {
