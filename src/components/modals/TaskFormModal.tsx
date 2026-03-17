@@ -130,7 +130,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2">
             <CheckSquare size={14} className="text-primary-500" />
-            <span className="text-xs font-semibold text-gray-500">{isEdit ? 'Edit Task' : 'New Task'}</span>
+            <span className="text-xs font-semibold text-gray-500">{isEdit ? `Edit ${taskType === 'issue' ? 'Issue' : 'Task'}` : `New ${taskType === 'issue' ? 'Issue' : 'Task'}`}</span>
             {isEdit && initial?.taskNumber != null && (
               <span className="text-[11px] font-semibold text-gray-400">
                 #{String(initial.taskNumber).padStart(3, '0')}
@@ -512,7 +512,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
               whileHover={{ scale: (loading || !title.trim() || !!errors.title) ? 1 : 1.01 }}
               whileTap={{ scale: (loading || !title.trim() || !!errors.title) ? 1 : 0.99 }}
             >
-              {loading ? 'Saving…' : (isEdit ? 'Save Changes' : 'Create Task')}
+              {loading ? 'Saving…' : (isEdit ? 'Save Changes' : taskType === 'issue' ? 'Create Issue' : 'Create Task')}
             </motion.button>
             </div>
           </div>

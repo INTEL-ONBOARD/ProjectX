@@ -76,7 +76,7 @@ const priorityStyles: Record<string, { bg: string; text: string; label: string }
   completed: { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]', label: 'Done' },
 };
 const statusStyles: Record<string, { bg: string; text: string; label: string; dot: string }> = {
-  'todo':               { bg: 'bg-primary-50',     text: 'text-primary-600',  label: 'To Do',              dot: 'bg-primary-500' },
+  'todo':               { bg: 'bg-[#94A3B820]',    text: 'text-[#94A3B8]',   label: 'To Do',              dot: 'bg-[#94A3B8]' },
   'in-progress':        { bg: 'bg-[#FFA50020]',    text: 'text-[#FFA500]',   label: 'In Progress',        dot: 'bg-[#FFA500]' },
   'ready-for-qa':       { bg: 'bg-[#30C5E520]',    text: 'text-[#30C5E5]',   label: 'Ready for QA',       dot: 'bg-[#30C5E5]' },
   'deployment-pending': { bg: 'bg-[#9C27B020]',    text: 'text-[#9C27B0]',   label: 'Deployment Pending', dot: 'bg-[#9C27B0]' },

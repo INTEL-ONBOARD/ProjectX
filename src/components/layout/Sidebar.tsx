@@ -95,13 +95,6 @@ const SortableNavItem: React.FC<SortableNavItemProps> = ({
 
     return (
         <li ref={setNodeRef} style={style} className="relative">
-            {isActive && (
-                <motion.div
-                    className="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-500 rounded-r-full"
-                    layoutId="nav-indicator"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                />
-            )}
             <div className="flex items-center group">
                 {!collapsed && (
                     <span

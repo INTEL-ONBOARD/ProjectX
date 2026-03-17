@@ -206,10 +206,10 @@ const KanbanRoute: React.FC = () => {
     const [todayMode, setTodayMode] = React.useState(false);
     const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
     return (
-        <>
+        <div className="flex-1 flex flex-col overflow-hidden bg-white">
             <ProjectHeader onFilterChange={setFilters} onTodayToggle={setTodayMode} onViewChange={setViewMode} />
             <KanbanBoard filters={filters} todayMode={todayMode} viewMode={viewMode} />
-        </>
+        </div>
     );
 };
 

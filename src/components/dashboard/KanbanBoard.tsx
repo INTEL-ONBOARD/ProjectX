@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, rectIntersection, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -75,14 +75,14 @@ const ActivityEntryRow: React.FC<{ entry: TaskActivityEntry; currentUserId: stri
 };
 // ── End Activity Log helpers ────────────────────────────────────────────────
 
-const statusStyles: Record<TaskStatus, { bg: string; text: string; label: string; dot: string }> = {
-  'todo':               { bg: 'bg-primary-50',     text: 'text-primary-600',  label: 'To Do',              dot: 'bg-primary-500' },
-  'in-progress':        { bg: 'bg-[#FFA50020]',    text: 'text-[#FFA500]',   label: 'In Progress',        dot: 'bg-[#FFA500]' },
-  'ready-for-qa':       { bg: 'bg-[#30C5E520]',    text: 'text-[#30C5E5]',   label: 'Ready for QA',       dot: 'bg-[#30C5E5]' },
-  'deployment-pending': { bg: 'bg-[#9C27B020]',    text: 'text-[#9C27B0]',   label: 'Deployment Pending', dot: 'bg-[#9C27B0]' },
-  'blocker':            { bg: 'bg-[#D8727D22]',    text: 'text-[#D8727D]',   label: 'Blocker',            dot: 'bg-[#D8727D]' },
-  'on-hold':            { bg: 'bg-[#EAB30820]',    text: 'text-[#EAB308]',   label: 'On Hold',            dot: 'bg-[#EAB308]' },
-  'done':               { bg: 'bg-[#83C29D33]',    text: 'text-[#68B266]',   label: 'Done',               dot: 'bg-[#68B266]' },
+const statusStyles: Record<TaskStatus, { bgColor: string; color: string; label: string }> = {
+  'todo':               { bgColor: 'rgba(148,163,184,0.15)', color: '#94A3B8', label: 'To Do'              },
+  'in-progress':        { bgColor: 'rgba(255,165,0,0.12)',  color: '#FFA500', label: 'In Progress'        },
+  'ready-for-qa':       { bgColor: 'rgba(48,197,229,0.12)', color: '#30C5E5', label: 'Ready for QA'       },
+  'deployment-pending': { bgColor: 'rgba(156,39,176,0.12)', color: '#9C27B0', label: 'Deployment Pending' },
+  'blocker':            { bgColor: 'rgba(216,114,125,0.13)',color: '#D8727D', label: 'Blocker'            },
+  'on-hold':            { bgColor: 'rgba(234,179,8,0.12)',  color: '#EAB308', label: 'On Hold'            },
+  'done':               { bgColor: 'rgba(104,178,102,0.15)',color: '#68B266', label: 'Done'               },
 };
 const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
   low:       { bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]', label: 'Low' },
@@ -149,16 +149,22 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over) return;
 
     const activeTask = allTasks.find(t => t.id === active.id);
     if (!activeTask) return;
 
-    // Determine the target column: over.id may be a column status id or another task's id
-    const targetCol = columns.find(c => c.status === over.id)
-      ?? columns.find(c => allTasks.some(t => t.id === over.id && t.status === c.status));
+    // over.id can be:
+    //   "col-{status}"  — dropped on the column droppable (empty column or column bg)
+    //   a task id       — dropped on top of another task
+    const overId = String(over.id);
+    const targetCol =
+      overId.startsWith('col-')
+        ? columns.find(c => `col-${c.status}` === overId)
+        : columns.find(c => allTasks.some(t => t.id === overId && t.status === c.status));
 
     if (!targetCol) return;
+    if (active.id === over.id) return;
 
     const targetStatus = targetCol.status;
 
@@ -318,7 +324,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   };
 
   const columns: { title: string; status: TaskStatus; dotColor: string; lineColor: string }[] = [
-    { title: 'To Do',               status: 'todo',               dotColor: '#5030E5', lineColor: '#5030E5' },
+    { title: 'To Do',               status: 'todo',               dotColor: '#94A3B8', lineColor: '#94A3B8' },
     { title: 'In Progress',         status: 'in-progress',        dotColor: '#FFA500', lineColor: '#FFA500' },
     { title: 'Ready for QA',        status: 'ready-for-qa',       dotColor: '#30C5E5', lineColor: '#30C5E5' },
     { title: 'Deployment Pending',  status: 'deployment-pending', dotColor: '#9C27B0', lineColor: '#9C27B0' },
@@ -442,7 +448,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 0.3 }}
       >
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragEnd={handleDragEnd}>
           <div className="flex gap-6 h-full">
             {columns.map((col, index) => {
               const colTasks = applyFilters(allTasks.filter(t => t.status === col.status && t.projectId === activeProject));
@@ -457,7 +463,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   lineColor={col.lineColor}
                   index={index}
                   onTaskClick={openTask}
-                  onAddTask={(status) => { if (!activeProject) return; setFormDefaultStatus(status); setShowTaskForm(true); }}
                   onMoveTask={(taskId, newStatus) => moveTask(taskId, newStatus).catch(console.error)}
                   onDeleteTask={(taskId) => deleteTask(taskId).catch(console.error)}
                 />
@@ -561,7 +566,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   <div className="relative">
                     <button
                       onClick={() => setShowStatusDrop(v => !v)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold ${currentStatusStyle.bg} ${currentStatusStyle.text} hover:opacity-80 transition-opacity`}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold hover:opacity-80 transition-opacity"
+                      style={{ background: currentStatusStyle.bgColor, color: currentStatusStyle.color }}
                     >
                       {currentStatusStyle.label}
                       <ChevronDown size={12} className={`transition-transform ${showStatusDrop ? 'rotate-180' : ''}`} />
@@ -575,6 +581,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                         >
                           {(Object.keys(statusStyles) as TaskStatus[]).map(s => {
                             const st = statusStyles[s];
+                            const isActive = selectedTask.status === s;
                             return (
                               <button key={s}
                                 onClick={() => {
@@ -582,11 +589,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                                   setSelectedTask(prev => prev ? { ...prev, status: s } : prev);
                                   setShowStatusDrop(false);
                                 }}
-                                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold hover:bg-surface-50 transition-colors"
+                                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold transition-colors"
+                                style={{ color: st.color, background: isActive ? st.bgColor : undefined }}
                               >
-                                <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
-                                <span className={st.text}>{st.label}</span>
-                                {selectedTask.status === s && <Check size={11} className="ml-auto text-primary-500" />}
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: st.color }} />
+                                <span>{st.label}</span>
+                                {isActive && <Check size={11} className="ml-auto" />}
                               </button>
                             );
                           })}

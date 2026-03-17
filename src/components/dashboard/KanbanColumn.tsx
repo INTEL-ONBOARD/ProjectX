@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import React from 'react';
+import { motion } from 'framer-motion';
 import { Task, TaskStatus } from '../../types';
 import TaskCard from './TaskCard';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 
 function SortableTaskCard({ task, ...props }: { task: Task } & Omit<React.ComponentProps<typeof TaskCard>, 'task'>) {
@@ -24,28 +24,16 @@ interface KanbanColumnProps {
   lineColor: string;
   index: number;
   onTaskClick: (task: Task) => void;
-  onAddTask: (status: TaskStatus) => void;
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onDeleteTask?: (taskId: string) => void;
 }
 
 const KanbanColumn: React.FC<KanbanColumnProps> = ({
   title, status, tasks, dotColor, lineColor, index,
-  onTaskClick, onAddTask, onMoveTask, onDeleteTask,
+  onTaskClick, onMoveTask, onDeleteTask,
 }) => {
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-  const handleDragLeave = () => setIsDragOver(false);
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData('taskId');
-    if (taskId) onMoveTask(taskId, status);
-    setIsDragOver(false);
-  };
+  // Register this column as a droppable target so empty columns accept drops
+  const { setNodeRef, isOver } = useDroppable({ id: `col-${status}` });
 
   return (
     <motion.div
@@ -67,14 +55,6 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
             {tasks.length}
           </span>
         </div>
-        <motion.button
-          onClick={() => onAddTask(status)}
-          className="w-6 h-6 rounded-md bg-primary-50 flex items-center justify-center text-primary-500 hover:bg-primary-100 transition-colors"
-          whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.9 }}
-          transition={{ duration: 0.2 }}
-        >
-          <Plus size={14} strokeWidth={2.5} />
-        </motion.button>
       </div>
 
       {/* Color line */}
@@ -85,12 +65,10 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
         transition={{ duration: 0.5, delay: index * 0.12 + 0.2, ease: [0.4, 0, 0.2, 1] }}
       />
 
-      {/* Drop zone */}
+      {/* Drop zone — registered with dnd-kit */}
       <div
-        className={`flex-1 overflow-y-auto space-y-4 pr-1 rounded-xl transition-all ${isDragOver ? 'bg-primary-50/50 ring-2 ring-dashed ring-primary-300' : ''}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        ref={setNodeRef}
+        className={`flex-1 overflow-y-auto space-y-4 pr-1 rounded-xl transition-all ${isOver ? 'bg-primary-50/50 ring-2 ring-dashed ring-primary-300' : ''}`}
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task, i) => (
@@ -104,7 +82,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
             />
           ))}
         </SortableContext>
-        {tasks.length === 0 && isDragOver && (
+        {tasks.length === 0 && isOver && (
           <div className="h-20 rounded-xl border-2 border-dashed border-primary-300 flex items-center justify-center">
             <span className="text-xs text-primary-400 font-medium">Drop here</span>
           </div>

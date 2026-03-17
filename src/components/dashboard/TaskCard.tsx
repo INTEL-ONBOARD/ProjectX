@@ -75,17 +75,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
       {/* Priority badge, type tag & menu */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <motion.span
-            className={`text-xs font-semibold px-2.5 py-1 rounded-md ${priority.bg} ${priority.text}`}
-            whileHover={{ scale: 1.05 }}
-          >
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${priority.bg} ${priority.text}`}>
             {priority.label}
-          </motion.span>
+          </span>
           {task.taskType === 'issue' && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#EF444420] text-[#EF4444]">Issue</span>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-[#EF444420] text-[#EF4444]">Issue</span>
           )}
           {(!task.taskType || task.taskType === 'task') && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#22C55E20] text-[#22C55E]">Task</span>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-[#22C55E20] text-[#22C55E]">Task</span>
           )}
           {isOverdue && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-50 text-red-500">Overdue</span>
