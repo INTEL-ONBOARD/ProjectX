@@ -331,7 +331,12 @@ const TasksPage: React.FC = () => {
                       onClick={() => { setSelectedTask(task); setDetailImage(null); setShowStatusDrop(false); setEditMode(false); setConfirmDelete(false); }}
                     >
                       <td className="px-4 py-3 w-[35%]">
-                        <div className="font-semibold text-gray-900 text-xs line-clamp-2">{task.title}</div>
+                        <div className="flex items-center">
+                          <span className="text-[11px] font-semibold text-gray-400 mr-1.5 shrink-0">
+                            {task.taskNumber != null ? `#${String(task.taskNumber).padStart(3, '0')}` : '—'}
+                          </span>
+                          <div className="font-semibold text-gray-900 text-xs line-clamp-2">{task.title}</div>
+                        </div>
                         <div className="text-[10px] text-gray-400">{task.comments} comments · {task.files} files</div>
                       </td>
                       <td className="px-4 py-3">
