@@ -379,7 +379,7 @@ function startMessageStream(): void {
                 mainWindow.webContents.send('msg:new', toMsgFrontend(d));
                 // System notification — only fire on the machine where the recipient is logged in
                 const recipientId: string = d.toId;
-                if (recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
+                if (activeUserId && recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
                     // Look up sender name async (best-effort)
                     UserModel.findOne({ appId: d.fromId }).lean().then((sender: any) => {
                         const name = sender?.name ?? 'New message';
@@ -1476,7 +1476,7 @@ function registerDbHandlers() {
         const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
         // Fire OS notification only for the user logged in on this machine
-        if (notif.type !== 'new_message' && notif.userId === activeUserId && systemNotifsEnabled.get(notif.userId) !== false) {
+        if (activeUserId && notif.type !== 'new_message' && notif.userId === activeUserId && systemNotifsEnabled.get(notif.userId) !== false) {
             fireSystemNotif(notif.title, notif.body ?? '');
         }
         return safe(toNotif(d.toObject()));
