@@ -103,6 +103,11 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
           <div className="flex items-center gap-2">
             <CheckSquare size={14} className="text-primary-500" />
             <span className="text-xs font-semibold text-gray-500">{isEdit ? 'Edit Task' : 'New Task'}</span>
+            {isEdit && initial?.taskNumber != null && (
+              <span className="text-[11px] font-semibold text-gray-400">
+                #{String(initial.taskNumber).padStart(3, '0')}
+              </span>
+            )}
           </div>
           <button
             onClick={onClose}
