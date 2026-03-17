@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
-import { useMembersContext } from './MembersContext';
 
 const HEARTBEAT_MS = 2000;
 const ONLINE_MS    = 8_000;
@@ -15,39 +14,51 @@ export function getPresenceStatus(lastSeen?: string | null): 'online' | 'away' |
     return 'offline';
 }
 
+// tick is exposed so consumers re-render every 2 s and time-deltas stay fresh
 interface PresenceContextValue {
-    getStatus: (userId: string) => 'online' | 'away' | 'offline';
+    lastSeenMap: Record<string, string | null>;
+    tick: number;
 }
 
-const PresenceContext = createContext<PresenceContextValue>({ getStatus: () => 'offline' });
+const PresenceContext = createContext<PresenceContextValue>({ lastSeenMap: {}, tick: 0 });
 
-export const usePresence = () => useContext(PresenceContext);
+export const usePresence = () => {
+    const { lastSeenMap, tick: _tick } = useContext(PresenceContext);
+    // getStatus reads fresh lastSeenMap on every render (tick forces re-render every 2 s)
+    const getStatus = (userId: string): 'online' | 'away' | 'offline' =>
+        getPresenceStatus(lastSeenMap[userId]);
+    return { getStatus };
+};
 
 export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { user: authUser } = useAuth();
-    const { members } = useMembersContext();
-    // lastSeenMap: userId → ISO string, updated from members array + live stream events
     const [lastSeenMap, setLastSeenMap] = useState<Record<string, string | null>>({});
-    const [, setTick] = useState(0);
-    const mapRef = useRef(lastSeenMap);
-    mapRef.current = lastSeenMap;
+    const [tick, setTick] = useState(0);
+    const refreshRef = useRef<() => void>(() => {});
 
-    // Sync lastSeen from the members array whenever it changes (covers initial load + refetch)
+    const refresh = () => {
+        dbApi().getMembers().then((docs: any[]) => {
+            setLastSeenMap(prev => {
+                const next = { ...prev };
+                let changed = false;
+                for (const d of docs) {
+                    const ls = d.lastSeen ?? null;
+                    if (next[d.id] !== ls) { next[d.id] = ls; changed = true; }
+                }
+                return changed ? next : prev;
+            });
+        }).catch(() => {});
+    };
+    refreshRef.current = refresh;
+
+    // Poll every 3 s — guaranteed accurate regardless of change stream delivery
     useEffect(() => {
-        if (members.length === 0) return;
-        setLastSeenMap(prev => {
-            const next = { ...prev };
-            let changed = false;
-            for (const m of members) {
-                const ls = (m as any).lastSeen ?? null;
-                if (next[m.id] !== ls) { next[m.id] = ls; changed = true; }
-            }
-            return changed ? next : prev;
-        });
-    }, [members]);
+        refreshRef.current(); // seed immediately on mount
+        const id = setInterval(() => refreshRef.current(), 3_000);
+        return () => clearInterval(id);
+    }, []);
 
-    // Also listen to the member change stream directly for sub-2s lastSeen updates
-    // (the members array in MembersContext only updates for non-lastSeen changes now)
+    // Change stream listener for instant updates
     useEffect(() => {
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI?.onMemberChanged) return;
@@ -72,17 +83,14 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return () => clearInterval(id);
     }, [authUser?.id]);
 
-    // Tick every 2 s so time-deltas stay fresh
+    // Tick every 2 s — propagates to consumers so time-deltas are re-evaluated
     useEffect(() => {
         const id = setInterval(() => setTick(t => t + 1), 2_000);
         return () => clearInterval(id);
     }, []);
 
-    const getStatus = (userId: string): 'online' | 'away' | 'offline' =>
-        getPresenceStatus(mapRef.current[userId]);
-
     return (
-        <PresenceContext.Provider value={{ getStatus }}>
+        <PresenceContext.Provider value={{ lastSeenMap, tick }}>
             {children}
         </PresenceContext.Provider>
     );
