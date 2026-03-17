@@ -68,7 +68,7 @@ const TodaySessionCard: React.FC = () => {
     .filter(b => b.end)
     .reduce((sum, b) => sum + (new Date(b.end!).getTime() - new Date(b.start).getTime()), 0));
   const openBreakSession = state === 'ON_BREAK'
-    ? (todayRecord?.breakSessions ?? []).at(-1) ?? null
+    ? (() => { const s = todayRecord?.breakSessions ?? []; return s.length ? s[s.length - 1] : null; })() ?? null
     : null;
   const openBreakMs = openBreakSession
     ? Math.max(0, now - new Date(openBreakSession.start).getTime())

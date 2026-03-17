@@ -16,6 +16,7 @@ import {
     Pencil,
     Trash2,
     GripVertical,
+    FolderKanban,
 } from 'lucide-react';
 import {
     DndContext,
@@ -50,7 +51,7 @@ const ALL_NAV_ITEMS = [
     { id: '/', label: 'Task Board', icon: LayoutGrid },
     { id: '/messages', label: 'Messages', icon: MessageSquare },
     { id: '/tasks', label: 'Tasks', icon: CheckSquare },
-    { id: '/teams', label: 'Projects', icon: Users },
+    { id: '/teams', label: 'Projects', icon: FolderKanban },
     { id: '/members', label: 'Members', icon: Users },
     { id: '/attendance', label: 'Attendance', icon: Clock3 },
     { id: '/reports', label: 'Reports', icon: BarChart3 },

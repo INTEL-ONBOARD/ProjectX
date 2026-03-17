@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const win = () => window as any;
-const appApi = () => win().electronAPI.app as { setActiveUser: (userId: string) => Promise<void> };
+const appApi = () => win().electronAPI as { setActiveUser: (userId: string) => Promise<void> };
 const prefsApi = () => win().electronAPI.userPrefs as {
   get: (userId: string) => Promise<{ hasSeenWalkthrough?: boolean } | null>;
   set: (prefs: { userId: string; hasSeenWalkthrough?: boolean }) => Promise<void>;
@@ -107,6 +107,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const authUser = await authApi().login(email, password);
     if (remember) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(authUser));
+    } else {
+      localStorage.removeItem(SESSION_KEY);
     }
     try {
       const prefs = await prefsApi().get(authUser.id);

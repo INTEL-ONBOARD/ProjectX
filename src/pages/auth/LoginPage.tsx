@@ -132,9 +132,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateRegister, onNavigateFor
 
           {/* Remember me */}
           <motion.div {...fi(3)}>
-            <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit" onClick={() => setRemember(r => !r)}>
               <div
-                onClick={() => setRemember(!remember)}
                 className="w-4.5 h-4.5 w-[18px] h-[18px] rounded-[5px] flex items-center justify-center transition-all cursor-pointer border-2 shrink-0"
                 style={{
                   background: remember ? '#5030E5' : 'var(--bg-input)',

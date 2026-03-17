@@ -1274,7 +1274,7 @@ const SettingsPage: React.FC = () => {
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="text-xs text-gray-500">Downloading…</span>
-                            <span className="text-xs font-semibold text-gray-700">{Math.round(updateState.progress)}%</span>
+                            <span className="text-xs font-semibold text-gray-700">{Math.round(updateState.progress!)}%</span>
                           </div>
                           <div className="h-2 rounded-full bg-surface-100 overflow-hidden">
                             <motion.div className="h-full rounded-full bg-[#2563EB]"
