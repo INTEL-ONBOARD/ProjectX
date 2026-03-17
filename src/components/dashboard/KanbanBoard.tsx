@@ -6,7 +6,7 @@ import {
   X, Tag, User, Calendar, ChevronDown, ImagePlus,
   Check, Edit3, Trash2, MessageSquare, Send,
   ArrowRight, Flag, UserPlus, UserMinus, FileText, Plus, Pencil, FolderPlus,
-  Download, Paperclip,
+  Download, Paperclip, Lock,
 } from 'lucide-react';
 import { Task, TaskStatus, TaskActivityEntry, Comment, Attachment } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
@@ -141,38 +141,79 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
+  useEffect(() => {
+    const handler = () => setShowTaskForm(true);
+    window.addEventListener('open-new-task', handler);
+    return () => window.removeEventListener('open-new-task', handler);
+  }, []);
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    for (const col of columns) {
-      const colTasks = applyFilters(allTasks.filter(t => t.status === col.status && t.projectId === activeProject));
-      const oldIndex = colTasks.findIndex(t => t.id === active.id);
-      const newIndex = colTasks.findIndex(t => t.id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const reordered = arrayMove(colTasks, oldIndex, newIndex);
-        for (let i = 0; i < reordered.length; i++) {
-          if (reordered[i].order !== i) {
-            await updateTask(reordered[i].id, { order: i });
-          }
+    const activeTask = allTasks.find(t => t.id === active.id);
+    if (!activeTask) return;
+
+    // Determine the target column: over.id may be a column status id or another task's id
+    const targetCol = columns.find(c => c.status === over.id)
+      ?? columns.find(c => allTasks.some(t => t.id === over.id && t.status === c.status));
+
+    if (!targetCol) return;
+
+    const targetStatus = targetCol.status;
+
+    // If the task is moving to a different column, update its status first
+    if (activeTask.status !== targetStatus) {
+      await moveTask(activeTask.id, targetStatus).catch(console.error);
+    }
+
+    // Reorder within the target column (use updated status for the dropped task)
+    const targetColTasks = applyFilters(
+      allTasks
+        .map(t => t.id === activeTask.id ? { ...t, status: targetStatus } : t)
+        .filter(t => t.status === targetStatus && t.projectId === activeProject)
+    );
+    const oldIndex = targetColTasks.findIndex(t => t.id === active.id);
+    const overIndex = targetColTasks.findIndex(t => t.id === over.id);
+
+    if (oldIndex !== -1 && overIndex !== -1 && oldIndex !== overIndex) {
+      const reordered = arrayMove(targetColTasks, oldIndex, overIndex);
+      for (let i = 0; i < reordered.length; i++) {
+        if (reordered[i].order !== i) {
+          await updateTask(reordered[i].id, { order: i });
         }
-        break;
+      }
+    } else if (oldIndex !== -1 && overIndex === -1) {
+      // Dropped onto the column droppable itself — place at end
+      const newOrder = targetColTasks.length - 1;
+      if (activeTask.order !== newOrder) {
+        await updateTask(activeTask.id, { order: newOrder });
       }
     }
   };
 
   useEffect(() => {
     if (!selectedTask) return;
+    const taskId = selectedTask.id;
+    let cancelled = false;
     setLoadingComments(true);
-    dbApi().getComments(selectedTask.id).then((data: any) => {
-      setComments(data as Comment[]);
-      setLoadingComments(false);
+    dbApi().getComments(taskId).then((data: any) => {
+      if (!cancelled) {
+        setComments(data as Comment[]);
+        setLoadingComments(false);
+      }
     });
+    return () => { cancelled = true; };
   }, [selectedTask?.id]);
 
   useEffect(() => {
     if (!selectedTask) return;
-    dbApi().getAttachments(selectedTask.id).then((data: any) => setAttachments(data as Attachment[]));
+    const taskId = selectedTask.id;
+    let cancelled = false;
+    dbApi().getAttachments(taskId).then((data: any) => {
+      if (!cancelled) setAttachments(data as Attachment[]);
+    });
+    return () => { cancelled = true; };
   }, [selectedTask?.id]);
 
   useEffect(() => {
@@ -220,6 +261,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const saveEdit = () => {
     if (!selectedTask) return;
+    if (!editTitle.trim()) return; // silently ignore — field is required
     updateTask(selectedTask.id, {
       title: editTitle,
       description: editDesc,
@@ -365,6 +407,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                       >
                         <div className="flex-1 min-w-0">
                           <span className="text-sm font-medium text-gray-800 truncate block">{task.title}</span>
+                          {task.blockedBy && task.blockedBy.length > 0 && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full mt-0.5">
+                              <Lock size={10} /> Blocked
+                            </span>
+                          )}
                         </div>
                         {task.priority && (
                           <span className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${priorityStyles[task.priority]?.bg ?? ''} ${priorityStyles[task.priority]?.text ?? ''}`}>

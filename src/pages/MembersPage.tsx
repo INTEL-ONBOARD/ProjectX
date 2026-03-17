@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send, Eye, UserCog, Trash2, Camera } from 'lucide-react';
+import { EmptyState } from '../components/ui/EmptyState';
 
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
@@ -32,12 +33,17 @@ const MembersPage: React.FC = () => {
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
 
-  const totalTasks = allTasks.length;
-  const memberTaskCounts: Record<string, { assigned: number; total: number }> = {};
-  members.forEach(m => {
-    const assigned = allTasks.filter(t => t.assignees.includes(m.id)).length;
-    memberTaskCounts[m.id] = { assigned, total: totalTasks };
-  });
+  const memberTaskCounts = useMemo(() => {
+    const counts: Record<string, { assigned: number; done: number }> = {};
+    for (const task of allTasks) {
+      for (const assigneeId of (task.assignees ?? [])) {
+        if (!counts[assigneeId]) counts[assigneeId] = { assigned: 0, done: 0 };
+        counts[assigneeId].assigned++;
+        if (task.status === 'done') counts[assigneeId].done++;
+      }
+    }
+    return counts;
+  }, [allTasks]);
   const navigate = useNavigate();
 
   const [selectedMember, setSelectedMember] = useState<User | null>(null);
@@ -168,10 +174,21 @@ const MembersPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
+                {members.length === 0 && (
+                  <tr>
+                    <td colSpan={7}>
+                      <EmptyState
+                        icon={<Users size={48} />}
+                        title="No team members"
+                        description="Invite people to collaborate on your projects."
+                      />
+                    </td>
+                  </tr>
+                )}
                 {members.map((member, i) => {
                   const color = getMemberColor(member.id);
                   const role = getRoleStyle(member.role);
-                  const tc = memberTaskCounts[member.id] ?? { assigned: 0, total: 5 };
+                  const tc = memberTaskCounts[member.id] ?? { assigned: 0, done: 0 };
                   const status: 'online' | 'away' | 'offline' = getPresenceStatus(member.lastSeen);
                   return (
                     <motion.tr

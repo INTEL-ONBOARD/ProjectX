@@ -124,11 +124,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('data:attachment:changed', cb);
         return () => ipcRenderer.removeListener('data:attachment:changed', cb);
     },
-    onSprintChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
-        ipcRenderer.on('data:sprint:changed', cb);
-        return () => ipcRenderer.removeListener('data:sprint:changed', cb);
-    },
-
     // Update event listeners
     onUpdateChecking: (cb: () => void) => {
         ipcRenderer.on('update:checking', cb);
@@ -227,7 +222,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         sendMessage:        (msg: object): Promise<unknown>                       => ipcRenderer.invoke('db:messages:send', msg),
         reactToMessage:     (msgId: string, userId: string, emoji: string): Promise<unknown> => ipcRenderer.invoke('db:messages:react', msgId, userId, emoji),
         deleteMessage:      (msgId: string): Promise<boolean>                     => ipcRenderer.invoke('db:messages:delete', msgId),
+        editMessage:        (msgId: string, newText: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('msg:edit', msgId, newText),
         markMessagesRead:   (userId: string, peerId: string): Promise<boolean>    => ipcRenderer.invoke('db:messages:markRead', userId, peerId),
+        getUnreadCounts:    (userId: string): Promise<Record<string, number>>     => ipcRenderer.invoke('db:messages:unread-counts', userId),
 
         // Conv meta
         getConvMeta: (userId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:convmeta:getAll', userId),
@@ -274,12 +271,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         pickAttachments:  (taskId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:attachments:pick', taskId),
         deleteAttachment: (attachId: string): Promise<boolean>                      => ipcRenderer.invoke('db:attachments:delete', attachId),
         openAttachment:   (filePath: string): Promise<boolean>                      => ipcRenderer.invoke('db:attachments:open', filePath),
-
-        // Sprints
-        getSprints:    (): Promise<unknown[]>                                        => ipcRenderer.invoke('db:sprints:getAll'),
-        createSprint:  (data: object): Promise<unknown>                              => ipcRenderer.invoke('db:sprints:create', data),
-        updateSprint:  (id: string, changes: object): Promise<unknown>               => ipcRenderer.invoke('db:sprints:update', id, changes),
-        deleteSprint:  (id: string): Promise<boolean>                                => ipcRenderer.invoke('db:sprints:delete', id),
 
         // Task Templates
         getTemplates:   (): Promise<unknown[]>                                       => ipcRenderer.invoke('db:templates:getAll'),

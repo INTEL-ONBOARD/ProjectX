@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare, Tag, RefreshCw, Link, Zap } from 'lucide-react';
-import { Task, TaskStatus, TaskType, Sprint, TaskTemplate } from '../../types';
+import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare, Tag, RefreshCw, Link } from 'lucide-react';
+import { Task, TaskStatus, TaskType, TaskTemplate } from '../../types';
 
 const dbApi = () => (window as any).electronAPI.db;
 import { useProjects } from '../../context/ProjectContext';
@@ -37,10 +37,11 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [dueDate, setDueDate]       = useState(initial?.dueDate ?? '');
   const [recurrence, setRecurrence] = useState<'none'|'daily'|'weekly'|'monthly'>(initial?.recurrence ?? 'none');
   const [blockedBy, setBlockedBy]   = useState<string[]>(initial?.blockedBy ?? []);
-  const [sprintId, setSprintId]     = useState(initial?.sprintId ?? '');
-  const [sprints, setSprints]       = useState<Sprint[]>([]);
   const [templates, setTemplates]   = useState<TaskTemplate[]>([]);
   const [loading, setLoading]       = useState(false);
+  const [errors, setErrors]         = useState<Record<string, string>>({});
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState('');
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [showAssigneeDrop, setShowAssigneeDrop] = useState(false);
   const assigneeDropRef = useRef<HTMLDivElement>(null);
@@ -56,15 +57,22 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => { dbApi().getSprints().then((data: any) => setSprints(data as Sprint[])); }, []);
   useEffect(() => { dbApi().getTemplates().then((data: any) => setTemplates(data as TaskTemplate[])); }, []);
 
   const toggleAssignee = (id: string) =>
     setAssignees(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
 
+  function validate(): boolean {
+    const e: Record<string, string> = {};
+    if (!title.trim()) e.title = 'Title is required';
+    if (title.trim().length > 200) e.title = 'Title must be under 200 characters';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!validate()) return;
     setLoading(true);
     try {
       await onSubmit({
@@ -75,7 +83,6 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
         taskType,
         assignees,
         projectId: projectId || undefined,
-        sprintId: sprintId || null,
         startDate: startDate || undefined,
         dueDate: dueDate || undefined,
         recurrence,
@@ -96,6 +103,14 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   );
 
   const isEdit = !!initial?.id;
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) return;
+    const tmpl = await dbApi().createTemplate({ name: templateName.trim(), priority, taskType, description, assignees, projectId: projectId || '' }) as TaskTemplate;
+    setTemplates(prev => [...prev, tmpl]);
+    setShowSaveTemplate(false);
+    setTemplateName('');
+  };
 
   return (
     <motion.div
@@ -164,12 +179,12 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
               </label>
               <input
                 value={title}
-                onChange={e => setTitle(e.target.value)}
+                onChange={e => { setTitle(e.target.value); if (errors.title) setErrors(prev => ({ ...prev, title: '' })); }}
                 placeholder="What needs to be done?"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-medium"
-                required
                 autoFocus
               />
+              {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
             </div>
 
             {/* Priority */}
@@ -245,21 +260,6 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
-                </select>
-                <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-
-            {/* Sprint */}
-            <div>
-              <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">
-                <Zap size={10} /> Sprint
-              </label>
-              <div className="relative">
-                <select value={sprintId} onChange={e => setSprintId(e.target.value)}
-                  className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 bg-surface-50 text-gray-700 pr-7 font-medium">
-                  <option value="">No sprint</option>
-                  {sprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
                 <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
@@ -469,7 +469,26 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
           </div>
 
           {/* Footer */}
-          <div className="px-5 pb-5 pt-1 flex gap-2 shrink-0">
+          <div className="px-5 pb-5 pt-1 flex flex-col gap-2 shrink-0">
+            {showSaveTemplate && (
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-surface-100">
+                <input
+                  autoFocus
+                  value={templateName}
+                  onChange={e => setTemplateName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && templateName.trim()) handleSaveTemplate(); if (e.key === 'Escape') setShowSaveTemplate(false); }}
+                  placeholder="Template name..."
+                  className="flex-1 text-sm bg-transparent outline-none"
+                />
+                <button
+                  onClick={handleSaveTemplate}
+                  disabled={!templateName.trim()}
+                  className="text-xs px-2 py-1 rounded-lg bg-primary-500 text-white disabled:opacity-40"
+                >Save</button>
+                <button onClick={() => { setShowSaveTemplate(false); setTemplateName(''); }} className="text-xs text-gray-400">✕</button>
+              </div>
+            )}
+            <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -480,12 +499,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
             {!isEdit && title.trim() && (
               <button
                 type="button"
-                onClick={async () => {
-                  const name = prompt('Template name:', title.trim());
-                  if (!name) return;
-                  const tmpl = await dbApi().createTemplate({ name, priority, taskType, description, assignees, projectId: projectId || '' }) as TaskTemplate;
-                  setTemplates(prev => [...prev, tmpl]);
-                }}
+                onClick={() => setShowSaveTemplate(true)}
                 className="px-3 py-2 rounded-lg text-xs font-semibold text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors"
               >
                 Save as template
@@ -493,13 +507,14 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
             )}
             <motion.button
               type="submit"
-              disabled={loading || !title.trim()}
+              disabled={loading || !title.trim() || !!errors.title}
               className="flex-[2] py-2 rounded-lg text-xs font-semibold text-white bg-primary-500 hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              whileHover={{ scale: (loading || !title.trim()) ? 1 : 1.01 }}
-              whileTap={{ scale: (loading || !title.trim()) ? 1 : 0.99 }}
+              whileHover={{ scale: (loading || !title.trim() || !!errors.title) ? 1 : 1.01 }}
+              whileTap={{ scale: (loading || !title.trim() || !!errors.title) ? 1 : 0.99 }}
             >
               {loading ? 'Saving…' : (isEdit ? 'Save Changes' : 'Create Task')}
             </motion.button>
+            </div>
           </div>
         </form>
       </motion.div>

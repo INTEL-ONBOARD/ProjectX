@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users2, Shield, UserCheck, KeyRound, MoreVertical, Eye, UserCog, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, Briefcase as BriefcaseIcon } from 'lucide-react';
+import { Users2, Shield, UserCheck, KeyRound, MoreVertical, Eye, UserCog, Trash2, ChevronLeft, ChevronRight as ChevronRightIcon, Clock, Briefcase as BriefcaseIcon, ChevronRight } from 'lucide-react';
+import { format, startOfWeek, addDays as dateFnsAddDays } from 'date-fns';
 import { useRoles } from '../context/RolesContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useRolePerms } from '../context/RolePermsContext';
@@ -121,31 +122,19 @@ const AttendanceTab: React.FC = () => {
             {/* Controls */}
             <div className="flex items-center justify-between mb-4 shrink-0">
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={prevWeek}
-                        className="p-1.5 rounded-lg border border-surface-200 hover:bg-surface-100 text-gray-500 transition-colors"
-                    >
-                        <ChevronLeft size={14} />
+                    <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors">
+                        <ChevronLeft size={16} />
                     </button>
-                    <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">
-                        {weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        {' — '}
-                        {addDays(weekStart, 6).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <span className="text-sm font-medium w-44 text-center">
+                        {format(weekStart, 'MMM d')} – {format(dateFnsAddDays(weekStart, 6), 'MMM d, yyyy')}
                     </span>
                     <button
                         onClick={nextWeek}
-                        className="p-1.5 rounded-lg border border-surface-200 hover:bg-surface-100 text-gray-500 transition-colors"
+                        disabled={isCurrentWeek}
+                        className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                        <ChevronRightIcon size={14} />
+                        <ChevronRight size={16} />
                     </button>
-                    {!isCurrentWeek && (
-                        <button
-                            onClick={goToday}
-                            className="ml-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-primary-200 text-primary-600 hover:bg-primary-50 transition-colors"
-                        >
-                            Today
-                        </button>
-                    )}
                 </div>
 
                 <select

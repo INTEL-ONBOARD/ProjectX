@@ -75,6 +75,20 @@ const TaskSchema = new mongoose_1.Schema({
     recurrence: { type: String, enum: ['none', 'daily', 'weekly', 'monthly'], default: 'none' },
     order:      { type: Number, default: 0 },
     activity: { type: Array, default: [] },
+    storyPoints: { type: Number, default: 0 },
+    subtasks: [{
+        id: String,
+        title: String,
+        completed: { type: Boolean, default: false }
+    }],
+    estimatedMinutes: { type: Number, default: 0 },
+    timeEntries: [{
+        id: String,
+        userId: String,
+        startedAt: String,
+        endedAt: String,
+        note: String,
+    }],
 });
 const ProjectSchema = new mongoose_1.Schema({
     appId: { type: String, required: true, unique: true },
@@ -215,6 +229,7 @@ const SprintSchema = new mongoose_1.Schema({
     startDate: { type: String, default: '' },
     endDate:   { type: String, default: '' },
     status:    { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
+    goal:      { type: String, default: '' },
 });
 const SprintModel = mongoose_1.default.model('Sprint', SprintSchema);
 const TaskTemplateSchema = new mongoose_1.Schema({
@@ -1016,7 +1031,7 @@ function startSprintStream() {
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:sprint:changed', { op, doc: safe({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status }) });
+                if (d) mainWindow.webContents.send('data:sprint:changed', { op, doc: safe({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status, goal: d.goal ?? '' }) });
             } else if (op === 'delete') {
                 mainWindow.webContents.send('data:sprint:changed', { op, id: change.documentKey?._id?.toString() });
             }
@@ -1304,15 +1319,15 @@ function registerDbHandlers() {
     // Sprints
     electron_1.ipcMain.handle('db:sprints:getAll', async () => {
         const docs = await SprintModel.find().lean();
-        return safe(docs.map((d) => ({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status })));
+        return safe(docs.map((d) => ({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status, goal: d.goal ?? '' })));
     });
     electron_1.ipcMain.handle('db:sprints:create', async (_e, data) => {
         const doc = await SprintModel.create({ sprintId: `sp${Date.now()}`, ...data });
-        return safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status });
+        return safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status, goal: doc.goal ?? '' });
     });
     electron_1.ipcMain.handle('db:sprints:update', async (_e, id, changes) => {
         const doc = await SprintModel.findOneAndUpdate({ sprintId: id }, changes, { returnDocument: 'after' }).lean();
-        return doc ? safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status }) : null;
+        return doc ? safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status, goal: doc.goal ?? '' }) : null;
     });
     electron_1.ipcMain.handle('db:sprints:delete', async (_e, id) => {
         await SprintModel.deleteOne({ sprintId: id });
@@ -1408,6 +1423,16 @@ function registerDbHandlers() {
     electron_1.ipcMain.handle('db:messages:markRead', async (_e, userId, peerId) => {
         await MessageModel.updateMany({ fromId: peerId, toId: userId, read: { $ne: true } }, { read: true });
         return true;
+    });
+    electron_1.ipcMain.handle('db:messages:unread-counts', async (_, userId) => {
+        const counts = {};
+        const convMetas = await ConvMetaModel.find({ userId });
+        await Promise.all(convMetas.map(async (c) => {
+            counts[c.peerId] = await MessageModel.countDocuments({
+                fromId: c.peerId, toId: userId, read: false, deleted: { $ne: true }
+            });
+        }));
+        return counts;
     });
     // Conv meta (pin/star/archive)
     electron_1.ipcMain.handle('db:convmeta:getAll', async (_e, userId) => {

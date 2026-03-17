@@ -1,23 +1,30 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, BarChart3, TrendingUp, Users, AlertCircle, ChevronDown, FileDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useAuth } from '../context/AuthContext';
+import { AppContext } from '../context/AppContext';
 import { downloadCsv } from '../utils/exportCsv';
+import { STATUS_META as STATUS_META_LOOKUP } from '../constants/taskMeta';
+import { AttendanceChart } from '../components/charts/AttendanceChart';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
-const STATUS_META = [
-  { key: 'todo',               label: 'To Do',               color: '#5030E5' },
-  { key: 'in-progress',        label: 'In Progress',         color: '#FFA500' },
-  { key: 'ready-for-qa',       label: 'Ready for QA',        color: '#30C5E5' },
-  { key: 'deployment-pending', label: 'Deployment Pending',  color: '#9C27B0' },
-  { key: 'blocker',            label: 'Blocker',             color: '#D8727D' },
-  { key: 'on-hold',            label: 'On Hold',             color: '#EAB308' },
-  { key: 'done',               label: 'Done',                color: '#68B266' },
-] as const;
+const STATUS_COLOR_MAP: Record<string, string> = {
+  'todo': '#5030E5',
+  'in-progress': '#FFA500',
+  'ready-for-qa': '#30C5E5',
+  'deployment-pending': '#9C27B0',
+  'blocker': '#D8727D',
+  'on-hold': '#EAB308',
+  'done': '#68B266',
+};
+
+const STATUS_META = (Object.entries(STATUS_META_LOOKUP) as [string, { label: string; bg: string; text: string; dot: string }][]).map(
+  ([key, val]) => ({ key, label: val.label, color: STATUS_COLOR_MAP[key] ?? '#9CA3AF' })
+) as readonly { key: string; label: string; color: string }[];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const userPrefsApi = () => (window as any).electronAPI.userPrefs as {
@@ -29,6 +36,7 @@ const ReportsPage: React.FC = () => {
   const { projects: ctxProjects, allTasks: ctxAllTasks } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const { user } = useAuth();
+  const { attendanceRecords } = useContext(AppContext);
 
   const previousCounts = useRef<Record<string, number>>({});
   const [snapshotLoaded, setSnapshotLoaded] = useState(false);
@@ -348,9 +356,9 @@ const ReportsPage: React.FC = () => {
             transition={{ duration: 0.35, delay: 0.08, ease: [0.4, 0, 0.2, 1] }}>
             <h3 className="font-bold text-gray-900 text-sm mb-3">Team Velocity</h3>
             {(() => {
-              const sprintStart = new Date(TODAY.slice(0, 8) + '01');
+              const monthStart = new Date(TODAY.slice(0, 8) + '01');
               const todayDate = new Date(TODAY);
-              const daysElapsed = Math.max(1, Math.round((todayDate.getTime() - sprintStart.getTime()) / 86400000) + 1);
+              const daysElapsed = Math.max(1, Math.round((todayDate.getTime() - monthStart.getTime()) / 86400000) + 1);
               const velocity = doneTasks.length / daysElapsed;
               const lastDay = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
               const daysLeft = Math.max(0, Math.round((lastDay.getTime() - todayDate.getTime()) / 86400000));
@@ -361,7 +369,7 @@ const ReportsPage: React.FC = () => {
                 : '—';
               return [
                 ['Tasks / day', velocity.toFixed(1)],
-                ['Sprint days left', String(daysLeft)],
+                ['Days left this month', String(daysLeft)],
                 ['Projected done', projectedDate],
               ].map(([label, val]) => (
                 <div key={String(label)} className="flex justify-between py-2 border-b border-surface-100 last:border-0 text-xs">
@@ -390,6 +398,38 @@ const ReportsPage: React.FC = () => {
                 </div>
               );
             })}
+          </motion.div>
+
+          {/* Attendance Trends */}
+          <motion.div className="rounded-2xl p-5 bg-white border border-surface-200"
+            initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.35, delay: 0.24, ease: [0.4, 0, 0.2, 1] }}>
+            <h3 className="font-semibold text-base mb-1">Attendance Trends</h3>
+            <p className="text-sm mb-4 text-gray-400">Monthly attendance rate over the last 6 months</p>
+            <AttendanceChart records={attendanceRecords ?? []} memberCount={members.length} />
+
+            {/* Top absentees */}
+            {members.length > 0 && (() => {
+              const absences = members.map(m => ({
+                member: m,
+                count: (attendanceRecords ?? []).filter((r: any) => r.userId === m.id && r.status === 'absent').length,
+              })).sort((a, b) => b.count - a.count).slice(0, 5).filter(x => x.count > 0);
+              return absences.length > 0 ? (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-gray-400">
+                    Most Absences
+                  </p>
+                  <div className="space-y-1.5">
+                    {absences.map(({ member, count }) => (
+                      <div key={member.id} className="flex items-center justify-between text-sm">
+                        <span>{member.name}</span>
+                        <span className="text-red-500 font-medium">{count} day{count !== 1 ? 's' : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
           </motion.div>
         </div>
       </div>

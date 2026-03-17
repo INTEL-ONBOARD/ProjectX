@@ -16,7 +16,6 @@ import {
     Pencil,
     Trash2,
     GripVertical,
-    Zap,
 } from 'lucide-react';
 import {
     DndContext,
@@ -36,8 +35,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useProjects } from '../../context/ProjectContext';
 import { useAuth } from '../../context/AuthContext';
 import { useRolePerms } from '../../context/RolePermsContext';
-import { useMembersContext } from '../../context/MembersContext';
 import NewProjectModal, { ProjectRichFields } from '../modals/NewProjectModal';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 interface SidebarProps {
     collapsed: boolean;
@@ -51,7 +50,6 @@ const ALL_NAV_ITEMS = [
     { id: '/', label: 'Task Board', icon: LayoutGrid },
     { id: '/messages', label: 'Messages', icon: MessageSquare },
     { id: '/tasks', label: 'Tasks', icon: CheckSquare },
-    { id: '/sprints', label: 'Sprints', icon: Zap },
     { id: '/teams', label: 'Projects', icon: Users },
     { id: '/members', label: 'Members', icon: Users },
     { id: '/attendance', label: 'Attendance', icon: Clock3 },
@@ -160,11 +158,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     const [showNewProject, setShowNewProject] = useState(false);
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
     const [editingProject, setEditingProject] = useState<{ id: string; name: string; color: string } & Partial<ProjectRichFields> | null>(null);
+    const [confirmDeleteProjectId, setConfirmDeleteProjectId] = useState<string | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const { projects, createProject, updateProject, deleteProject } = useProjects();
     const { user } = useAuth();
     const { getAllowedRoutes } = useRolePerms();
-    const { members } = useMembersContext();
     const [unreadMsgCount, setUnreadMsgCount] = useState(0);
     const [navOrder, setNavOrder] = useState<string[]>([]);
 
@@ -229,25 +227,20 @@ const Sidebar: React.FC<SidebarProps> = ({
             .catch(() => { /* fall back to default order */ });
     }, [user?.id]);
 
-    // Unread message badge: query DB on mount and whenever user leaves the messages page.
-    // 520ms delay after leaving messages page lets markMessagesRead finish before we recount.
+    // Unread message badge: batch-fetch counts for all peers in one IPC call.
+    // 300ms delay after leaving messages page lets markMessagesRead finish before we recount.
     useEffect(() => {
-        if (!user?.id || members.length === 0) return;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const db = () => (window as any).electronAPI?.db;
+        if (!user?.id) return;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
-        const peers = members.filter((m: { id: string }) => m.id !== user.id);
 
-        const recompute = async () => {
-            let total = 0;
-            for (const peer of peers) {
-                try {
-                    const msgs: { from: string; read: boolean }[] = await db().getMessagesBetween(user.id, peer.id);
-                    total += msgs.filter((m: { from: string; read: boolean }) => m.from !== user.id && !m.read).length;
-                } catch { /* ignore */ }
-            }
-            setUnreadMsgCount(total);
+        const recompute = () => {
+            api?.db?.getUnreadCounts?.(user.id)
+                .then((counts: Record<string, number>) => {
+                    const total = Object.values(counts).reduce((sum: number, n: number) => sum + n, 0);
+                    setUnreadMsgCount(total);
+                })
+                .catch(() => { /* ignore */ });
         };
 
         if (onMessagesPage) {
@@ -256,7 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             return;
         }
 
-        // Not on messages page: recompute from DB (520ms delay on first call so any
+        // Not on messages page: recompute from DB (300ms delay so any
         // markMessagesRead calls from the messages page have time to finish in MongoDB)
         const timer = setTimeout(recompute, 300);
 
@@ -268,7 +261,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         return () => { clearTimeout(timer); unsub?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.id, members.length, onMessagesPage]);
+    }, [user?.id, onMessagesPage]);
 
     return (
         <>
@@ -438,11 +431,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                         Edit
                                                     </button>
                                                     <button
-                                                        onClick={async () => {
+                                                        onClick={() => {
                                                             setMenuOpenId(null);
-                                                            if (confirm(`Delete "${project.name}"? This cannot be undone.`)) {
-                                                                await deleteProject(project.id);
-                                                            }
+                                                            setConfirmDeleteProjectId(project.id);
                                                         }}
                                                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 transition-colors"
                                                     >
@@ -497,6 +488,25 @@ const Sidebar: React.FC<SidebarProps> = ({
                 />
             )}
         </AnimatePresence>
+
+        {/* Delete Project Confirm Dialog */}
+        {(() => {
+            const proj = projects.find(p => p.id === confirmDeleteProjectId);
+            return (
+                <ConfirmDialog
+                    open={confirmDeleteProjectId !== null}
+                    title="Delete Project"
+                    message={`Delete "${proj?.name ?? 'this project'}"? This cannot be undone.`}
+                    confirmLabel="Delete"
+                    danger
+                    onConfirm={async () => {
+                        if (confirmDeleteProjectId) await deleteProject(confirmDeleteProjectId);
+                        setConfirmDeleteProjectId(null);
+                    }}
+                    onCancel={() => setConfirmDeleteProjectId(null)}
+                />
+            );
+        })()}
         </>
     );
 };

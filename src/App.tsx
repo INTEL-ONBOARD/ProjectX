@@ -42,7 +42,6 @@ import MessagesPage from './pages/MessagesPage';
 import TasksPage from './pages/TasksPage';
 import MembersPage from './pages/MembersPage';
 import UsersPage from './pages/UsersPage';
-import SprintsPage from './pages/SprintsPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AppProvider, AppContext, User } from './context/AppContext';
 import { MembersProvider, useMembersContext } from './context/MembersContext';
@@ -52,6 +51,7 @@ import { RolesProvider } from './context/RolesContext';
 import { PresenceProvider } from './context/PresenceContext';
 import { NotificationProvider } from './context/NotificationContext';
 import BugReportModal from './components/ui/BugReportModal';
+import { ErrorBoundary as PageErrorBoundary } from './components/ui/ErrorBoundary';
 import UpdateBanner from './components/ui/UpdateBanner';
 import CommandPalette from './components/ui/CommandPalette';
 import ShortcutsHelp from './components/ui/ShortcutsHelp';
@@ -167,6 +167,10 @@ const Layout: React.FC<{
             if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setPaletteOpen(v => !v); }
             if ((e.metaKey || e.ctrlKey) && e.key === '/') { e.preventDefault(); setShortcutsOpen(v => !v); }
             if (!inInput && e.key === 'n' && !e.metaKey && !e.ctrlKey) { /* trigger new task — skip for now */ }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !inInput) {
+                e.preventDefault();
+                window.dispatchEvent(new CustomEvent('open-new-task'));
+            }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
@@ -410,8 +414,9 @@ const ProtectedRoute: React.FC<{ path: string; children: React.ReactNode }> = ({
     const [showDenied, setShowDenied] = React.useState(false);
     // Admins always have full access — never restrict them
     const isAdmin = user?.role === 'admin';
-    const allowed = isAdmin ? null : getAllowedRoutes(user?.role ?? 'member');
-    const blocked = !isAdmin && allowed !== null && !allowed.includes(path);
+    const allowedRoutes = isAdmin ? null : getAllowedRoutes(user?.role ?? 'member');
+    if (!isAdmin && !allowedRoutes) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>;
+    const blocked = !isAdmin && !allowedRoutes!.includes(path);
 
     useEffect(() => {
         if (blocked) setShowDenied(true);
@@ -441,17 +446,16 @@ const SharedLayout: React.FC = () => (
 const MainApp: React.FC = () => (
     <Routes>
         <Route element={<SharedLayout />}>
-            <Route path="/"           element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
-            <Route path="/messages"   element={<ProtectedRoute path="/messages"><MessagesPage /></ProtectedRoute>} />
-            <Route path="/tasks"      element={<ProtectedRoute path="/tasks"><TasksPage /></ProtectedRoute>} />
-            <Route path="/sprints"    element={<ProtectedRoute path="/sprints"><SprintsPage /></ProtectedRoute>} />
-            <Route path="/members"    element={<ProtectedRoute path="/members"><MembersPage /></ProtectedRoute>} />
-            <Route path="/dashboard"  element={<ProtectedRoute path="/dashboard"><DashboardPage /></ProtectedRoute>} />
-            <Route path="/teams"      element={<ProtectedRoute path="/teams"><TeamsPage /></ProtectedRoute>} />
-            <Route path="/attendance" element={<ProtectedRoute path="/attendance"><AttendancePage /></ProtectedRoute>} />
-            <Route path="/reports"    element={<ProtectedRoute path="/reports"><ReportsPage /></ProtectedRoute>} />
-            <Route path="/users"      element={<ProtectedRoute path="/users"><UsersPage /></ProtectedRoute>} />
-            <Route path="/settings"   element={<SettingsPage />} />
+            <Route path="/"           element={<ProtectedRoute path="/"><PageErrorBoundary><KanbanRoute /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/messages"   element={<ProtectedRoute path="/messages"><PageErrorBoundary><MessagesPage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/tasks"      element={<ProtectedRoute path="/tasks"><PageErrorBoundary><TasksPage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/members"    element={<ProtectedRoute path="/members"><PageErrorBoundary><MembersPage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/dashboard"  element={<ProtectedRoute path="/dashboard"><PageErrorBoundary><DashboardPage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/teams"      element={<ProtectedRoute path="/teams"><PageErrorBoundary><TeamsPage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/attendance" element={<ProtectedRoute path="/attendance"><PageErrorBoundary><AttendancePage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/reports"    element={<ProtectedRoute path="/reports"><PageErrorBoundary><ReportsPage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/users"      element={<ProtectedRoute path="/users"><PageErrorBoundary><UsersPage /></PageErrorBoundary></ProtectedRoute>} />
+            <Route path="/settings"   element={<PageErrorBoundary><SettingsPage /></PageErrorBoundary>} />
         </Route>
     </Routes>
 );

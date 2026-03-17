@@ -4,6 +4,7 @@ import { X, Keyboard } from 'lucide-react';
 
 const SHORTCUTS = [
   { key: '⌘K / Ctrl+K', description: 'Open global search' },
+  { key: '⌘N / Ctrl+N', description: 'New Task' },
   { key: 'N', description: 'Create new task (when not in input)' },
   { key: '⌘/', description: 'Show keyboard shortcuts' },
   { key: 'Esc', description: 'Close modal / panel' },

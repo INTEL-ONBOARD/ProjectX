@@ -10,6 +10,17 @@ const envPath = app.isPackaged
     : path.join(__dirname, '../.env');
 dotenv.config({ path: envPath });
 
+// ─── Active stream registry (prevents memory leaks on reconnect) ───────────────
+
+const activeStreams = new Map<string, any>();
+
+function registerStream(name: string, stream: any) {
+  if (activeStreams.has(name)) {
+    try { activeStreams.get(name).close(); } catch {}
+  }
+  activeStreams.set(name, stream);
+}
+
 // ─── Mongoose Schemas ──────────────────────────────────────────────────────────
 
 const UserSchema = new Schema({
@@ -39,11 +50,23 @@ const TaskSchema = new Schema({
     dueDate:     String,
     projectId:   String,
     taskNumber:  { type: Number, default: null },
-    sprintId:   { type: String, default: null },
     blockedBy:  { type: [String], default: [] },
     recurrence: { type: String, enum: ['none', 'daily', 'weekly', 'monthly'], default: 'none' },
     order:      { type: Number, default: 0 },
     activity:    { type: Array, default: [] },
+    subtasks: [{
+        id: String,
+        title: String,
+        completed: { type: Boolean, default: false }
+    }],
+    estimatedMinutes: { type: Number, default: 0 },
+    timeEntries: [{
+        id: String,
+        userId: String,
+        startedAt: String,
+        endedAt: String,
+        note: String,
+    }],
 });
 
 const ProjectSchema = new Schema({
@@ -71,6 +94,7 @@ const MessageSchema = new Schema({
     reactions: { type: Map, of: [String], default: {} },
     deleted:   { type: Boolean, default: false },
     read:      { type: Boolean, default: false },
+    edited:    { type: Boolean, default: false },
 });
 
 const ConvMetaSchema = new Schema({
@@ -99,6 +123,12 @@ const ProjectRichSchema = new Schema({
     dueDate:     { type: String, default: '' },
     starred:     { type: Boolean, default: false },
     category:    { type: String, default: 'General' },
+    milestones: [{
+        id: String,
+        name: String,
+        dueDate: String,
+        completed: { type: Boolean, default: false }
+    }],
 });
 
 const AuthUserSchema = new Schema({
@@ -182,6 +212,7 @@ const CommentSchema = new Schema({
     text:       { type: String, required: true },
     createdAt:  { type: String, required: true },
 });
+CommentSchema.index({ taskId: 1, createdAt: -1 });
 const CommentModel = mongoose.model('Comment', CommentSchema);
 
 const AttachmentSchema = new Schema({
@@ -194,16 +225,6 @@ const AttachmentSchema = new Schema({
 });
 const AttachmentModel = mongoose.model('Attachment', AttachmentSchema);
 
-const SprintSchema = new Schema({
-    sprintId:  { type: String, required: true, unique: true },
-    name:      { type: String, required: true },
-    projectId: { type: String, required: true },
-    startDate: { type: String, default: '' },
-    endDate:   { type: String, default: '' },
-    status:    { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
-});
-const SprintModel = mongoose.model('Sprint', SprintSchema);
-
 const TaskTemplateSchema = new Schema({
     templateId:  { type: String, required: true, unique: true },
     name:        { type: String, required: true },
@@ -214,6 +235,17 @@ const TaskTemplateSchema = new Schema({
     projectId:   { type: String, default: '' },
 });
 const TaskTemplateModel = mongoose.model('TaskTemplate', TaskTemplateSchema);
+
+TaskSchema.index({ projectId: 1, status: 1 });
+TaskSchema.index({ assignees: 1 });
+TaskSchema.index({ dueDate: 1, status: 1 });
+
+MessageSchema.index({ fromId: 1, toId: 1, read: 1 });
+
+AttendanceSchema.index({ userId: 1, date: 1 });
+
+NotificationSchema.index({ userId: 1, createdAt: -1 });
+NotificationSchema.index({ userId: 1, read: 1 });
 
 const UserModel           = mongoose.model('User', UserSchema);
 const TaskModel           = mongoose.model('Task', TaskSchema);
@@ -248,15 +280,15 @@ const toUser = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '',
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, sprintId: d.sprintId ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? 'none', order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? 'none', order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [], subtasks: d.subtasks ?? [], estimatedMinutes: d.estimatedMinutes ?? 0, timeEntries: d.timeEntries ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser    = (d: any) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toDept        = (d: any) => ({ id: d.deptId, name: d.name, color: d.color, memberIds: (d.memberIds ?? []).map(String) });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toProjectRich = (d: any) => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), startDate: d.startDate ?? '', dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General' });
+const toProjectRich = (d: any) => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), startDate: d.startDate ?? '', dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General', milestones: d.milestones ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toMsg         = (d: any) => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
+const toMsg         = (d: any) => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false, edited: d.edited ?? false });
 // Produces renderer-compatible shape (from/to/time) for IPC push events
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toMsgFrontend = (d: any) => ({
@@ -268,6 +300,7 @@ const toMsgFrontend = (d: any) => ({
     read: d.read ?? false,
     reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions as Record<string, unknown>)) : {},
     deleted: d.deleted ?? false,
+    edited: d.edited ?? false,
 });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toConvMeta    = (d: any) => ({ convId: d.convId, userId: d.userId, peerId: d.peerId, pinned: d.pinned ?? false, starred: d.starred ?? false, archived: d.archived ?? false });
@@ -319,7 +352,6 @@ let authUserStream: any = null;
 let notificationStream: any = null;
 let commentStream: any = null;
 let attachmentStream: any = null;
-let sprintStream: any = null;
 
 // Per-user system notification setting (userId → enabled). Loaded lazily from DB.
 const systemNotifsEnabled = new Map<string, boolean>();
@@ -337,6 +369,7 @@ function startMessageStream(): void {
     try {
         // Fix 3: watch all operations so reactions and soft-deletes propagate to other clients
         messageStream = (MessageModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('message', messageStream);
         messageStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -379,6 +412,7 @@ function startProjectStream(): void {
     if (projectStream) { try { projectStream.close(); } catch (_) {} projectStream = null; }
     try {
         projectStream = (ProjectModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('project', projectStream);
         projectStream.on('change', (change: any) => {
             console.log('[changeStream:project] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -408,6 +442,7 @@ function startTaskStream(): void {
     if (taskStream) { try { taskStream.close(); } catch (_) {} taskStream = null; }
     try {
         taskStream = (TaskModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('task', taskStream);
         taskStream.on('change', (change: any) => {
             console.log('[changeStream:task] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -437,6 +472,7 @@ function startMemberStream(): void {
     if (memberStream) { try { memberStream.close(); } catch (_) {} memberStream = null; }
     try {
         memberStream = (UserModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('member', memberStream);
         memberStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -465,6 +501,7 @@ function startAttendanceStream(): void {
     if (attendanceStream) { try { attendanceStream.close(); } catch (_) {} attendanceStream = null; }
     try {
         attendanceStream = (AttendanceModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('attendance', attendanceStream);
         attendanceStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -492,6 +529,7 @@ function startProjectRichStream(): void {
     if (projectRichStream) { try { projectRichStream.close(); } catch (_) {} projectRichStream = null; }
     try {
         projectRichStream = (ProjectRichModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('projectRich', projectRichStream);
         projectRichStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -519,6 +557,7 @@ function startRolePermsStream(): void {
     if (rolePermsStream) { try { rolePermsStream.close(); } catch (_) {} rolePermsStream = null; }
     try {
         rolePermsStream = (RolePermsModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('rolePerms', rolePermsStream);
         rolePermsStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -546,6 +585,7 @@ function startRolesStream(): void {
     if (rolesStream) { try { rolesStream.close(); } catch (_) {} rolesStream = null; }
     try {
         rolesStream = (RoleModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('roles', rolesStream);
         rolesStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -573,6 +613,7 @@ function startOrgStream(): void {
     if (orgStream) { try { orgStream.close(); } catch (_) {} orgStream = null; }
     try {
         orgStream = (OrgModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('org', orgStream);
         orgStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -598,6 +639,7 @@ function startNotifPrefStream(): void {
     if (notifPrefStream) { try { notifPrefStream.close(); } catch (_) {} notifPrefStream = null; }
     try {
         notifPrefStream = (NotifPrefModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('notifPref', notifPrefStream);
         notifPrefStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -623,6 +665,7 @@ function startAppearancePrefStream(): void {
     if (appearancePrefStream) { try { appearancePrefStream.close(); } catch (_) {} appearancePrefStream = null; }
     try {
         appearancePrefStream = (AppearancePrefModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('appearancePref', appearancePrefStream);
         appearancePrefStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -648,6 +691,7 @@ function startConvMetaStream(): void {
     if (convMetaStream) { try { convMetaStream.close(); } catch (_) {} convMetaStream = null; }
     try {
         convMetaStream = (ConvMetaModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('convMeta', convMetaStream);
         convMetaStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -675,6 +719,7 @@ function startDeptStream(): void {
     if (deptStream) { try { deptStream.close(); } catch (_) {} deptStream = null; }
     try {
         deptStream = (DeptModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('dept', deptStream);
         deptStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -702,6 +747,7 @@ function startAuthUserStream(): void {
     if (authUserStream) { try { authUserStream.close(); } catch (_) {} authUserStream = null; }
     try {
         authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('authUser', authUserStream);
         authUserStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -730,6 +776,7 @@ function startNotificationStream(): void {
     if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
     try {
         notificationStream = (NotificationModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('notification', notificationStream);
         notificationStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -757,6 +804,7 @@ function startCommentStream(): void {
     if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
     try {
         commentStream = (CommentModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('comment', commentStream);
         commentStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -784,6 +832,7 @@ function startAttachmentStream(): void {
     if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
     try {
         attachmentStream = (AttachmentModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('attachment', attachmentStream);
         attachmentStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
             const op = change.operationType;
@@ -806,35 +855,12 @@ function startAttachmentStream(): void {
     }
 }
 
-function startSprintStream(): void {
-    if (!windowReady) return;
-    if (sprintStream) { try { sprintStream.close(); } catch (_) {} sprintStream = null; }
-    try {
-        sprintStream = (SprintModel as any).watch([], { fullDocument: 'updateLookup' });
-        sprintStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
-            const op = change.operationType;
-            if (op === 'insert' || op === 'update' || op === 'replace') {
-                const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:sprint:changed', { op, doc: safe({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status }) });
-            } else if (op === 'delete') {
-                mainWindow.webContents.send('data:sprint:changed', { op, id: change.documentKey?._id?.toString() });
-            }
-        });
-        sprintStream.on('error', (err: any) => {
-            console.error('[changeStream:sprint] error:', err.message);
-            try { sprintStream.close(); } catch (_) {}
-            sprintStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startSprintStream(); }, 5000);
-        });
-        console.log('[changeStream] sprint stream started');
-    } catch (err: any) {
-        console.error('[changeStream:sprint] failed to start:', err.message);
-    }
-}
-
 // Coordinator — starts all data streams (each restarts itself on error independently)
 function startDataStreams(): void {
+    for (const [, stream] of activeStreams) {
+        try { stream.close(); } catch {}
+    }
+    activeStreams.clear();
     startProjectStream();
     startTaskStream();
     startMemberStream();
@@ -851,7 +877,6 @@ function startDataStreams(): void {
     startNotificationStream();
     startCommentStream();
     startAttachmentStream();
-    startSprintStream();
 }
 
 async function ensureDefaultData() {
@@ -902,7 +927,9 @@ function setupDbListeners() {
 
 async function connectDB() {
     const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
-    if (!uri) { console.error('MONGODB_URI not set'); return; }
+    if (!uri) {
+        throw new Error('MONGODB_URI environment variable is required');
+    }
     // Reduced serverSelectionTimeoutMS from 30s → 8s so failed attempts surface faster
     // and the retry loop can kick in sooner after internet is restored
     const opts = { serverSelectionTimeoutMS: 8000, connectTimeoutMS: 10000, socketTimeoutMS: 45000 };
@@ -938,7 +965,7 @@ function registerDbHandlers() {
     ipcMain.handle('db:projects:getAll', async () => safe((await ProjectModel.find().lean()).map(toProject)));
     ipcMain.handle('db:projects:create', async (_e, name: string, color: string) => { const d = await ProjectModel.create({ appId: `p${Date.now()}`, name, color }); return safe(toProject(d.toObject())); });
     ipcMain.handle('db:projects:update', async (_e, id: string, changes: object) => { const d = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toProject(d)) : null; });
-    ipcMain.handle('db:projects:delete', async (_e, id: string) => { await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); return true; });
+    ipcMain.handle('db:projects:delete', async (_e, id: string) => { await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); await ProjectRichModel.deleteOne({ projectId: id }); return true; });
 
     // Tasks
     ipcMain.handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
@@ -1015,7 +1042,6 @@ function registerDbHandlers() {
                 status: 'todo',
                 assignees: updatedObj.assignees ?? [],
                 projectId: updatedObj.projectId ?? null,
-                sprintId: updatedObj.sprintId ?? null,
                 recurrence: updatedObj.recurrence,
                 dueDate: nextDue.toISOString().split('T')[0],
                 taskNumber: nextCounter!.value,
@@ -1099,25 +1125,6 @@ function registerDbHandlers() {
     });
     ipcMain.handle('db:attachments:open', async (_e, filePath: string) => {
         await shell.openPath(filePath);
-        return true;
-    });
-
-    // Sprints
-    ipcMain.handle('db:sprints:getAll', async () => {
-        const docs = await SprintModel.find().lean();
-        return safe(docs.map((d: any) => ({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status })));
-    });
-    ipcMain.handle('db:sprints:create', async (_e, data: { name: string; projectId: string; startDate?: string; endDate?: string; status?: string }) => {
-        const doc = await SprintModel.create({ sprintId: `sp${Date.now()}`, ...data });
-        return safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status });
-    });
-    ipcMain.handle('db:sprints:update', async (_e, id: string, changes: object) => {
-        const doc = await SprintModel.findOneAndUpdate({ sprintId: id }, changes, { returnDocument: 'after' }).lean();
-        return doc ? safe({ id: (doc as any).sprintId, name: (doc as any).name, projectId: (doc as any).projectId, startDate: (doc as any).startDate, endDate: (doc as any).endDate, status: (doc as any).status }) : null;
-    });
-    ipcMain.handle('db:sprints:delete', async (_e, id: string) => {
-        await SprintModel.deleteOne({ sprintId: id });
-        await TaskModel.updateMany({ sprintId: id }, { $set: { sprintId: null } });
         return true;
     });
 
@@ -1208,9 +1215,24 @@ function registerDbHandlers() {
         await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
         return true;
     });
+    ipcMain.handle('msg:edit', async (_: any, msgId: string, newText: string) => {
+        if (!newText.trim()) return { ok: false };
+        await MessageModel.updateOne({ msgId }, { $set: { text: newText.trim(), edited: true } });
+        return { ok: true };
+    });
     ipcMain.handle('db:messages:markRead', async (_e, userId: string, peerId: string) => {
         await MessageModel.updateMany({ fromId: peerId, toId: userId, read: { $ne: true } }, { read: true });
         return true;
+    });
+    ipcMain.handle('db:messages:unread-counts', async (_: any, userId: string) => {
+        const counts: Record<string, number> = {};
+        const convMetas = await ConvMetaModel.find({ userId });
+        await Promise.all(convMetas.map(async (c: any) => {
+            counts[c.peerId] = await MessageModel.countDocuments({
+                fromId: c.peerId, toId: userId, read: false, deleted: { $ne: true }
+            });
+        }));
+        return counts;
     });
 
     // Conv meta (pin/star/archive)
@@ -1727,7 +1749,6 @@ app.on('before-quit', () => {
     if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
     if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
     if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
-    if (sprintStream) { try { sprintStream.close(); } catch (_) {} sprintStream = null; }
 });
 
 app.on('window-all-closed', () => {

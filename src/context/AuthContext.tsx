@@ -29,6 +29,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  connectionWarning: boolean;
   hasSeenWalkthrough: boolean;
   login: (email: string, password: string, remember?: boolean) => Promise<void>;
   register: (name: string, email: string, password: string, role: string, orgId?: string) => Promise<void>;
@@ -44,6 +45,7 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionWarning, setConnectionWarning] = useState(false);
   const [hasSeenWalkthrough, setHasSeenWalkthrough] = useState(false);
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try { restoredUser = JSON.parse(savedSession) as AuthUser; } catch { /* ignore */ }
 
       if (restoredUser) {
-        const tryValidate = (retriesLeft: number) => {
+        const tryValidate = (attempt: number, maxAttempts: number) => {
           authApi().validate(restoredUser!.id)
             .then(valid => {
               if (valid) {
@@ -75,19 +77,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setIsLoading(false);
             })
             .catch(() => {
-              if (retriesLeft > 0) {
-                // DB not ready yet — retry after 1.5s, user stays on splash screen
-                setTimeout(() => tryValidate(retriesLeft - 1), 1500);
+              if (attempt < maxAttempts) {
+                // DB not ready yet — retry with exponential backoff, user stays on splash screen
+                const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+                setTimeout(() => tryValidate(attempt + 1, maxAttempts), delay);
               } else {
-                // All retries exhausted — clear session and force re-login
-                localStorage.removeItem(SESSION_KEY);
-                setUser(null);
+                // All retries exhausted — keep stale session, show connection warning
+                setUser(restoredUser);
+                setConnectionWarning(true);
                 authApi().seedDefault().catch(() => {});
                 setIsLoading(false);
               }
             });
         };
-        tryValidate(4); // up to 4 retries = ~6s total wait
+        tryValidate(1, 4); // attempts 1-4: delays 1000, 2000, 4000, 8000ms
         return;
       }
     }
@@ -142,10 +145,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updatePassword = useCallback(async (currentPassword: string, newPassword: string) => {
     if (!user) throw new Error('Not authenticated.');
+    if (!newPassword || newPassword.length < 8) throw new Error('Password must be at least 8 characters');
+    if (newPassword === currentPassword) throw new Error('New password must differ from current password');
     await authApi().updatePassword(user.id, currentPassword, newPassword);
   }, [user]);
 
   const updateDisplayName = useCallback((name: string) => {
+    if (!name.trim()) throw new Error('Name cannot be empty');
+    if (name.trim().length > 80) throw new Error('Name is too long');
     setUser(prev => {
       if (!prev) return prev;
       const updated = { ...prev, name };
@@ -162,6 +169,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       isAuthenticated: !!user,
       isLoading,
+      connectionWarning,
       hasSeenWalkthrough,
       login,
       register,

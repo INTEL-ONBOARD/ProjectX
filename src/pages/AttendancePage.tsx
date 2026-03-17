@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { motion } from 'framer-motion';
-import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee, Trash2 } from 'lucide-react';
+import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, startOfWeek, addDays as dateFnsAddDays } from 'date-fns';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AppContext, AttendanceRecord } from '../context/AppContext';
@@ -58,16 +59,24 @@ const TodaySessionCard: React.FC = () => {
   };
 
   const checkInMs = todayRecord?.checkIn ? new Date(todayRecord.checkIn).getTime() : 0;
-  const closedBreakMs = (todayRecord?.breakSessions ?? [])
+  // Midnight guard: if checkIn is from a different calendar day, treat elapsed as 0
+  const checkInDateStr = todayRecord?.checkIn
+    ? new Date(todayRecord.checkIn).toISOString().split('T')[0]
+    : null;
+  const checkInIsToday = checkInDateStr === TODAY_DATE;
+  const closedBreakMs = Math.max(0, (todayRecord?.breakSessions ?? [])
     .filter(b => b.end)
-    .reduce((sum, b) => sum + (new Date(b.end!).getTime() - new Date(b.start).getTime()), 0);
-  const openBreakMs = state === 'ON_BREAK'
-    ? now - new Date(todayRecord!.breakSessions![todayRecord!.breakSessions!.length - 1].start).getTime()
+    .reduce((sum, b) => sum + (new Date(b.end!).getTime() - new Date(b.start).getTime()), 0));
+  const openBreakSession = state === 'ON_BREAK'
+    ? (todayRecord?.breakSessions ?? []).at(-1) ?? null
+    : null;
+  const openBreakMs = openBreakSession
+    ? Math.max(0, now - new Date(openBreakSession.start).getTime())
     : 0;
-  const workMs = state === 'NOT_STARTED' ? 0
+  const workMs = state === 'NOT_STARTED' || !checkInIsToday ? 0
     : state === 'DONE'
-      ? new Date(todayRecord!.checkOut!).getTime() - checkInMs - closedBreakMs
-      : now - checkInMs - closedBreakMs - openBreakMs;
+      ? Math.max(0, new Date(todayRecord!.checkOut!).getTime() - checkInMs - closedBreakMs)
+      : Math.max(0, now - checkInMs - closedBreakMs - openBreakMs);
 
   // ── Summary row helpers ─────────────────────────────────────────────────────
   const fmtTime = (iso: string | null | undefined) =>
@@ -213,13 +222,18 @@ const TodaySessionCard: React.FC = () => {
 };
 
 const AttendancePage: React.FC = () => {
-    const { attendanceRecords, selectedWeekStart, currentUser, deleteAttendanceRecord } = useContext(AppContext);
+    const { attendanceRecords, selectedWeekStart, setSelectedWeekStart, currentUser, deleteAttendanceRecord } = useContext(AppContext);
     const { members: allMembers, getMemberColor } = useMembersContext();
 
     const isAdmin = currentUser?.role === 'admin';
     const members = isAdmin
         ? allMembers
         : allMembers.filter(m => m.id === currentUser?.id);
+
+    const weekStart = new Date(selectedWeekStart + 'T00:00:00');
+    const handlePrevWeek = () => setSelectedWeekStart(addDays(selectedWeekStart, -7));
+    const handleNextWeek = () => setSelectedWeekStart(addDays(selectedWeekStart, 7));
+    const isCurrentWeek = format(weekStart, 'yyyy-MM-dd') === format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
     const WEEK_DATES = [0, 1, 2, 3, 4].map(i => addDays(selectedWeekStart, i));
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -257,14 +271,15 @@ const AttendancePage: React.FC = () => {
         members.some(m => getMemberStatus(m.id, date) !== undefined)
     ).length;
 
-    const trackedDays = daysWithData > 0 ? daysWithData : 5;
-    const avgRate = members.length > 0 ? Math.round((totalPresent / (members.length * trackedDays)) * 100) : 0;
+    const avgRate = members.length > 0 && daysWithData > 0
+      ? Math.round((totalPresent / (members.length * Math.max(daysWithData, 1))) * 100)
+      : 0;
     const hasAbsenceCount = members.filter(m =>
         WEEK_DATES.some(d => getMemberStatus(m.id, d) === 'absent')
     ).length;
 
     const metrics = [
-        { label: 'Team Avg Rate', value: `${avgRate}%`, trend: `${trackedDays} day${trackedDays !== 1 ? 's' : ''} tracked`, trendUp: true, color: '', accent: true, icon: TrendingUp, barPct: avgRate },
+        { label: 'Team Avg Rate', value: `${avgRate}%`, trend: `${daysWithData} day${daysWithData !== 1 ? 's' : ''} tracked`, trendUp: true, color: '', accent: true, icon: TrendingUp, barPct: avgRate },
         { label: 'Perfect Attendance', value: String(perfectCount), trend: '100% rate', trendUp: true, color: '#68B266', accent: false, icon: CheckCircle, barPct: members.length > 0 ? (perfectCount / members.length) * 100 : 0 },
         { label: 'Has Absence', value: String(hasAbsenceCount), trend: 'This week', trendUp: false, color: '#D58D49', accent: false, icon: AlertCircle, barPct: members.length > 0 ? (hasAbsenceCount / members.length) * 100 : 0 },
         { label: 'Days Tracked', value: String(daysWithData), trend: 'Mon–Fri', trendUp: true, color: '#30C5E5', accent: false, icon: Calendar, barPct: (daysWithData / 5) * 100 },
@@ -332,7 +347,21 @@ const AttendancePage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col min-h-0">
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
             <h2 className="font-bold text-gray-900 text-sm">Weekly Attendance</h2>
-            <span className="text-xs text-gray-400">{WEEK_DATES[0]} – {WEEK_DATES[4]}</span>
+            <div className="flex items-center gap-2">
+              <button onClick={handlePrevWeek} className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm font-medium w-44 text-center">
+                {format(weekStart, 'MMM d')} – {format(dateFnsAddDays(weekStart, 6), 'MMM d, yyyy')}
+              </span>
+              <button
+                onClick={handleNextWeek}
+                disabled={isCurrentWeek}
+                className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto min-h-0">
           <table className="w-full">

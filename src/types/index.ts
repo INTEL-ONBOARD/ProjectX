@@ -17,6 +17,20 @@ export interface User {
     lastSeen?: string | null;
 }
 
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface TimeEntry {
+  id: string;
+  userId: string;
+  startedAt: string; // ISO string
+  endedAt?: string;  // ISO string, undefined = active
+  note?: string;
+}
+
 export interface TaskComment {
     id: string;
     userId: string;
@@ -56,13 +70,13 @@ export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export interface Task {
     id: string;
+    appId?: string;
     title: string;
     description: string;
     priority: Priority;
     status: TaskStatus;
     taskType?: TaskType;
     taskNumber?: number | null;
-    sprintId?: string | null;
     blockedBy?: string[];
     recurrence?: Recurrence;
     order?: number;
@@ -75,6 +89,9 @@ export interface Task {
     dueDate?: string;
     projectId?: string;
     activity?: TaskActivityEntry[];
+    subtasks?: Subtask[];
+    estimatedMinutes?: number;
+    timeEntries?: TimeEntry[];
 }
 
 export interface Comment {
@@ -95,15 +112,6 @@ export interface Attachment {
     uploadedAt: string;
 }
 
-export interface Sprint {
-    id: string;
-    name: string;
-    projectId: string;
-    startDate?: string;
-    endDate?: string;
-    status: 'planned' | 'active' | 'completed';
-}
-
 export interface TaskTemplate {
     id: string;
     name: string;
@@ -116,6 +124,7 @@ export interface TaskTemplate {
 
 export interface Project {
     id: string;
+    appId?: string;
     name: string;
     color: string;
     tasks: Task[];
@@ -134,4 +143,11 @@ export interface NavItem {
     label: string;
     icon: string;
     badge?: number;
+}
+
+export interface Milestone {
+    id: string;
+    name: string;
+    dueDate: string;
+    completed: boolean;
 }

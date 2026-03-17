@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Users, CheckSquare, Clock, TrendingUp, Plus } from 'lucide-react';
@@ -8,11 +8,20 @@ import { AppContext } from '../context/AppContext';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import { getPresenceStatus } from '../context/PresenceContext';
+import { ACTIVITY_LABELS } from '../constants/taskMeta';
 
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 
 
 const TODAY = new Date().toISOString().split('T')[0];
+
+const FEED_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'created', label: 'Created' },
+  { key: 'status_changed', label: 'Status' },
+  { key: 'assignee_added', label: 'Assigned' },
+  { key: 'priority_changed', label: 'Priority' },
+];
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,7 +35,7 @@ const DashboardPage: React.FC = () => {
   const doneCount = doneTasks.length;
   const todoCount = todoTasks.length;
   const inProgressCount = inProgressTasks.length;
-  const sprintPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
+  const completionPctOverall = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
   const weekEnd = (() => { const d = new Date(selectedWeekStart); d.setDate(d.getDate() + 4); return d.toISOString().split('T')[0]; })();
   const weekRecords = attendanceRecords.filter(r => r.date >= selectedWeekStart && r.date <= weekEnd);
@@ -39,32 +48,30 @@ const DashboardPage: React.FC = () => {
   const completionPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
   const metrics = [
-    { label: 'Team Members', value: String(members.length), trend: 'Active this sprint', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
+    { label: 'Team Members', value: String(members.length), trend: 'Active members', trendUp: true, color: '', accent: true, icon: Users, barPct: 100 },
     { label: 'Tasks Completed', value: String(doneCount), trend: `${completionPct}% complete`, trendUp: true, color: '#68B266', accent: false, icon: CheckSquare, barPct: totalTasks > 0 ? (doneCount / totalTasks) * 100 : 0 },
     { label: 'Tasks Pending', value: String(todoCount), trend: overdueCount > 0 ? `${overdueCount} overdue` : 'On track', trendUp: overdueCount === 0, color: '#D8727D', accent: false, icon: Clock, barPct: totalTasks > 0 ? (todoCount / totalTasks) * 100 : 0 },
     { label: 'Attendance Rate', value: `${attendanceRate}%`, trend: 'Weekly avg', trendUp: true, color: '#30C5E5', accent: false, icon: TrendingUp, barPct: attendanceRate },
   ];
 
+  const [activityFilter, setActivityFilter] = useState<string>('all');
+
   const activityFeed = useMemo(() => {
     const entries: { taskTitle: string; actorName: string; type: string; timestamp: string; taskId: string }[] = [];
-    for (const task of allTasks) {
+    outer: for (const task of allTasks) {
       for (const entry of task.activity ?? []) {
         entries.push({ taskTitle: task.title, actorName: entry.actorName, type: entry.type, timestamp: entry.timestamp, taskId: task.id });
+        if (entries.length >= 200) break outer;
       }
     }
     return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 15);
   }, [allTasks]);
 
-  const activityLabel: Record<string, string> = {
-    created: 'created task',
-    status_changed: 'moved task',
-    priority_changed: 'changed priority of',
-    assignee_added: 'was assigned to',
-    assignee_removed: 'was removed from',
-    due_date_changed: 'updated due date of',
-    title_changed: 'renamed',
-    description_changed: 'updated description of',
-  };
+  const filteredFeed = activityFilter === 'all'
+    ? activityFeed
+    : activityFeed.filter(item => item.type === activityFilter);
+
+  const activityLabel = ACTIVITY_LABELS;
 
   const donutItems = [
     { label: 'To Do', count: todoCount, color: '#5030E5' },
@@ -142,9 +149,24 @@ const DashboardPage: React.FC = () => {
               <button onClick={() => navigate('/tasks')} className="text-xs text-primary-500 font-semibold hover:text-primary-700">View all →</button>
             </div>
             <div className="px-5">
-              {activityFeed.length === 0 ? (
+              <div className="flex gap-1.5 flex-wrap mb-3 pt-3">
+                {FEED_FILTERS.map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setActivityFilter(f.key)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      activityFilter === f.key
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-surface-100 text-gray-500 hover:bg-surface-200'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              {filteredFeed.length === 0 ? (
                 <p className="text-xs text-gray-400 py-4 text-center">No activity yet</p>
-              ) : activityFeed.map((item, i) => (
+              ) : filteredFeed.map((item, i) => (
                 <div key={i} className="flex items-start gap-3 py-2">
                   <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0 mt-0.5">
                     <span className="text-[10px] font-bold text-primary-600">{item.actorName.charAt(0).toUpperCase()}</span>
@@ -191,20 +213,20 @@ const DashboardPage: React.FC = () => {
 
         {/* Side panels */}
         <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
-          {/* Sprint Overview */}
+          {/* Task Overview */}
           <motion.div
             className="bg-white rounded-2xl border border-surface-200 p-4"
             initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.35, delay: 0, ease: [0.4, 0, 0.2, 1] }}
           >
-            <h3 className="font-bold text-gray-900 text-sm mb-3">Sprint Overview</h3>
+            <h3 className="font-bold text-gray-900 text-sm mb-3">Task Overview</h3>
             <div className="mb-3">
               <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                <span>Progress</span><span className="font-bold text-primary-500">{sprintPct}%</span>
+                <span>Progress</span><span className="font-bold text-primary-500">{completionPctOverall}%</span>
               </div>
               <div className="h-2 bg-surface-200 rounded-full overflow-hidden">
                 <motion.div className="h-full bg-gradient-to-r from-primary-500 to-primary-400 rounded-full"
-                  initial={{ width: 0 }} animate={{ width: `${sprintPct}%` }}
+                  initial={{ width: 0 }} animate={{ width: `${completionPctOverall}%` }}
                   transition={{ duration: 0.6, delay: 0.3, ease: [0.4, 0, 0.2, 1] }} />
               </div>
             </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MoreHorizontal, MessageSquare, Paperclip, Edit3, Trash2, ArrowRight } from 'lucide-react';
+import { MoreHorizontal, MessageSquare, Paperclip, Edit3, Trash2, ArrowRight, Lock } from 'lucide-react';
 import { Task, TaskStatus } from '../../types';
 import { useMembersContext } from '../../context/MembersContext';
 import { AvatarGroup } from '../ui/Avatar';
@@ -94,7 +94,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
             <span title={`Repeats ${task.recurrence}`} className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-primary-50 text-primary-500">↻</span>
           )}
           {task.blockedBy && task.blockedBy.length > 0 && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-500">Blocked</span>
+            <span className="inline-flex items-center gap-1 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
+              <Lock size={10} /> Blocked
+            </span>
           )}
         </div>
         <div ref={menuRef} className="relative flex items-center" onClick={e => e.stopPropagation()}>

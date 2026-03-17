@@ -109,10 +109,6 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         electron_1.ipcRenderer.on('data:attachment:changed', cb);
         return () => electron_1.ipcRenderer.removeListener('data:attachment:changed', cb);
     },
-    onSprintChanged: (cb) => {
-        electron_1.ipcRenderer.on('data:sprint:changed', cb);
-        return () => electron_1.ipcRenderer.removeListener('data:sprint:changed', cb);
-    },
     // Update event listeners
     onUpdateChecking: (cb) => {
         electron_1.ipcRenderer.on('update:checking', cb);
@@ -201,7 +197,9 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         sendMessage: (msg) => electron_1.ipcRenderer.invoke('db:messages:send', msg),
         reactToMessage: (msgId, userId, emoji) => electron_1.ipcRenderer.invoke('db:messages:react', msgId, userId, emoji),
         deleteMessage: (msgId) => electron_1.ipcRenderer.invoke('db:messages:delete', msgId),
+        editMessage: (msgId, newText) => electron_1.ipcRenderer.invoke('msg:edit', msgId, newText),
         markMessagesRead: (userId, peerId) => electron_1.ipcRenderer.invoke('db:messages:markRead', userId, peerId),
+        getUnreadCounts: (userId) => electron_1.ipcRenderer.invoke('db:messages:unread-counts', userId),
         // Conv meta
         getConvMeta: (userId) => electron_1.ipcRenderer.invoke('db:convmeta:getAll', userId),
         setConvMeta: (meta) => electron_1.ipcRenderer.invoke('db:convmeta:set', meta),
@@ -239,11 +237,6 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         pickAttachments:  (taskId)   => electron_1.ipcRenderer.invoke('db:attachments:pick', taskId),
         deleteAttachment: (attachId) => electron_1.ipcRenderer.invoke('db:attachments:delete', attachId),
         openAttachment:   (filePath) => electron_1.ipcRenderer.invoke('db:attachments:open', filePath),
-        // Sprints
-        getSprints:    ()            => electron_1.ipcRenderer.invoke('db:sprints:getAll'),
-        createSprint:  (data)        => electron_1.ipcRenderer.invoke('db:sprints:create', data),
-        updateSprint:  (id, changes) => electron_1.ipcRenderer.invoke('db:sprints:update', id, changes),
-        deleteSprint:  (id)          => electron_1.ipcRenderer.invoke('db:sprints:delete', id),
         // Task Templates
         getTemplates:   ()   => electron_1.ipcRenderer.invoke('db:templates:getAll'),
         createTemplate: (data) => electron_1.ipcRenderer.invoke('db:templates:create', data),

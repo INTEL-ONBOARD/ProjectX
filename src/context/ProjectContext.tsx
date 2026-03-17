@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Project, Task, TaskStatus } from '../types';
+import type { Milestone } from '../types';
 import { useAuth } from './AuthContext';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,6 +15,7 @@ export interface ProjectRichData {
   dueDate: string;
   starred: boolean;
   category: string;
+  milestones?: Milestone[];
 }
 
 interface ProjectContextValue {
@@ -141,7 +143,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const toRichMap = (docs: any[]): Record<string, Partial<ProjectRichData>> => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const m: Record<string, Partial<ProjectRichData>> = {};
-      docs.forEach((d: any) => { m[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category }; });
+      docs.forEach((d: any) => { m[d.projectId] = { description: d.description, status: d.status, priority: d.priority, memberIds: d.memberIds, dueDate: d.dueDate, starred: d.starred, category: d.category, milestones: d.milestones ?? [] }; });
       return m;
     };
     let cancelledRich = false;
@@ -153,7 +155,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const unsub = electronAPI?.onProjectRichChanged?.((_: unknown, payload: { op: string; doc?: any }) => {
       const { op, doc } = payload;
       if (op === 'insert' || op === 'update' || op === 'replace') {
-        if (doc) setProjectRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, dueDate: doc.dueDate, starred: doc.starred, category: doc.category } }));
+        if (doc) setProjectRichData(prev => ({ ...prev, [doc.projectId]: { description: doc.description, status: doc.status, priority: doc.priority, memberIds: doc.memberIds, dueDate: doc.dueDate, starred: doc.starred, category: doc.category, milestones: doc.milestones ?? [] } }));
       } else if (op === 'delete') {
         api().getProjectRich().then((docs: unknown[]) => setProjectRichData(toRichMap(docs as any[]))).catch(() => {});
       }

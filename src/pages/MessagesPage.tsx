@@ -14,7 +14,7 @@ import { useNotifications } from '../context/NotificationContext';
 const statusColor = { online: '#68B266', away: '#FFA500', offline: '#D1D5DB' };
 const statusLabel = { online: 'Online', away: 'Away', offline: 'Offline' };
 
-type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: Record<string, string[]>; deleted?: boolean };
+type Msg = { id: string; from: string; text: string; time: string; read: boolean; reactions?: Record<string, string[]>; deleted?: boolean; edited?: boolean };
 
 const emojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥'];
 
@@ -104,6 +104,11 @@ const MessagesPage: React.FC = () => {
   const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
   const [msgFilter, setMsgFilter] = useState<'all' | 'unread' | 'pinned' | 'archived'>('all');
   const [showNewConvo, setShowNewConvo] = useState(false);
+  const [convSearch, setConvSearch] = useState('');
+  const [threadSearch, setThreadSearch] = useState('');
+  const [showThreadSearch, setShowThreadSearch] = useState(false);
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const attachRef = useRef<HTMLInputElement>(null);
@@ -239,7 +244,7 @@ const MessagesPage: React.FC = () => {
           return { ...prev, [peerId]: existing.filter((m: Msg) => m.id !== msg.id) };
         }
         const updated = existing.map((m: Msg) =>
-          m.id === msg.id ? { ...m, text: msg.text, reactions: msg.reactions, read: msg.read } : m
+          m.id === msg.id ? { ...m, text: msg.text, reactions: msg.reactions, read: msg.read, edited: msg.edited ?? m.edited } : m
         );
         return { ...prev, [peerId]: updated };
       });
@@ -379,6 +384,24 @@ const MessagesPage: React.FC = () => {
     }
   };
 
+  async function handleSaveEdit() {
+    if (!editingMsgId || !editText.trim()) return;
+    const api = (window as any).electronAPI;
+    await api?.db?.editMessage?.(editingMsgId, editText.trim());
+    const savedId = editingMsgId;
+    const savedText = editText.trim();
+    setEditingMsgId(null);
+    setChats(prev => {
+      const targetId = activeIdRef.current;
+      return {
+        ...prev,
+        [targetId]: (prev[targetId] ?? []).map((m: Msg) =>
+          m.id === savedId ? { ...m, text: savedText, edited: true } : m
+        ),
+      };
+    });
+  }
+
   const clearChat = async () => {
     const targetId = activeId;
     const msgs = chats[targetId] ?? [];
@@ -409,9 +432,10 @@ const MessagesPage: React.FC = () => {
 
   const filteredConvos = conversations
     .filter(m => {
-      if (msgFilter === 'archived') return archivedIds.has(m.id) && m.name.toLowerCase().includes(search.toLowerCase());
+      const nameMatch = m.name.toLowerCase().includes(search.toLowerCase()) && m.name.toLowerCase().includes(convSearch.toLowerCase());
+      if (msgFilter === 'archived') return archivedIds.has(m.id) && nameMatch;
       if (archivedIds.has(m.id)) return false;
-      if (!m.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (!nameMatch) return false;
       if (msgFilter === 'pinned') return pinnedIds.includes(m.id);
       if (msgFilter === 'unread') return getUnread(m.id) > 0;
       return true;
@@ -497,6 +521,17 @@ const MessagesPage: React.FC = () => {
             ))}
           </div>
 
+          {/* Conversation search */}
+          <div className="px-3 pt-2">
+            <input
+              value={convSearch}
+              onChange={e => setConvSearch(e.target.value)}
+              placeholder="Search conversations..."
+              className="w-full px-3 py-2 text-sm rounded-xl mb-2 outline-none"
+              style={{ background: 'var(--bg-muted)', color: 'var(--text-primary)' }}
+            />
+          </div>
+
           {/* Conversation list */}
           <div className="flex-1 overflow-y-auto relative">
             {filteredConvos.map((member, i) => {
@@ -579,6 +614,14 @@ const MessagesPage: React.FC = () => {
             {/* Action icons */}
             <div className="flex items-center gap-1">
               <motion.button
+                onClick={e => { e.stopPropagation(); setShowThreadSearch(v => !v); if (showThreadSearch) setThreadSearch(''); }}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${showThreadSearch ? 'text-primary-500 bg-primary-50' : 'text-gray-400 hover:bg-surface-100'}`}
+                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
+                title="Search messages"
+              >
+                <Search size={16} />
+              </motion.button>
+              <motion.button
                 onClick={e => {
                   e.stopPropagation();
                   const newPinned = pinnedIds.includes(activeId) ? pinnedIds.filter(x => x !== activeId) : [...pinnedIds, activeId];
@@ -614,9 +657,33 @@ const MessagesPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Thread search input */}
+          {showThreadSearch && (
+            <div className="px-5 py-2 border-b border-surface-100 shrink-0">
+              <div className="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-surface-200 focus-within:border-primary-300 transition-colors">
+                <Search size={14} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search messages..."
+                  value={threadSearch}
+                  onChange={e => setThreadSearch(e.target.value)}
+                  className="flex-1 bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+                  autoFocus
+                />
+                {threadSearch && <button onClick={() => setThreadSearch('')}><X size={12} className="text-gray-400" /></button>}
+              </div>
+            </div>
+          )}
+
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
-            {sortMsgs([...activeChats]).map((msg, i, arr) => {
+            {(() => {
+              const visibleMessages = activeChats.filter((m: Msg) => !m.deleted);
+              const filtered = threadSearch.trim()
+                ? visibleMessages.filter(m => m.text.toLowerCase().includes(threadSearch.toLowerCase()))
+                : visibleMessages;
+              return sortMsgs([...filtered]);
+            })().map((msg, i, arr) => {
               const isOwn = msg.from === myId;
               const sender = members.find(m => m.id === msg.from) ?? { name: 'Unknown' };
               const senderColor = getMemberColor(msg.from);
@@ -638,6 +705,20 @@ const MessagesPage: React.FC = () => {
                       <span className="text-[10px] text-gray-400 font-semibold mb-1 ml-1">{sender.name.split(' ')[0]}</span>
                     )}
                     <div className="relative">
+                      {editingMsgId === msg.id ? (
+                        <textarea
+                          value={editText}
+                          onChange={e => setEditText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit(); }
+                            if (e.key === 'Escape') { setEditingMsgId(null); }
+                          }}
+                          autoFocus
+                          rows={2}
+                          className="w-full text-sm rounded-lg px-2 py-1 resize-none outline-none"
+                          style={{ background: 'var(--bg-muted)' }}
+                        />
+                      ) : (
                       <div
                         className={`px-4 py-2.5 text-sm rounded-2xl cursor-pointer select-text ${
                           isOwn
@@ -646,8 +727,32 @@ const MessagesPage: React.FC = () => {
                         } transition-colors`}
                         onContextMenu={e => { e.preventDefault(); setShowContextMenu({ id: msg.id, x: e.clientX, y: e.clientY }); }}
                       >
-                        {msg.text}
+                        {threadSearch.trim() ? (() => {
+                          const lower = msg.text.toLowerCase();
+                          const term = threadSearch.toLowerCase();
+                          const parts: React.ReactNode[] = [];
+                          let last = 0;
+                          let idx = lower.indexOf(term, last);
+                          while (idx !== -1) {
+                            if (idx > last) parts.push(msg.text.slice(last, idx));
+                            parts.push(<span key={idx} className="bg-yellow-200 text-gray-900 rounded px-0.5">{msg.text.slice(idx, idx + threadSearch.length)}</span>);
+                            last = idx + threadSearch.length;
+                            idx = lower.indexOf(term, last);
+                          }
+                          if (last < msg.text.length) parts.push(msg.text.slice(last));
+                          return parts;
+                        })() : msg.text}
+                        {msg.edited && <span className="ml-1 text-[10px] opacity-60 italic">(edited)</span>}
                       </div>
+                      )}
+                      {isOwn && editingMsgId !== msg.id && (
+                        <button
+                          onClick={() => { setEditingMsgId(msg.id); setEditText(msg.text); }}
+                          className="opacity-0 group-hover:opacity-100 text-xs text-gray-400 hover:text-gray-600 ml-1 absolute -bottom-4 right-0"
+                        >
+                          Edit
+                        </button>
+                      )}
                       {/* Reaction button */}
                       <button
                         className={`absolute -top-2 ${isOwn ? 'left-0 -translate-x-full ml-[-4px]' : 'right-0 translate-x-full mr-[-4px]'} opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded-full bg-white border border-surface-200 flex items-center justify-center text-xs`}

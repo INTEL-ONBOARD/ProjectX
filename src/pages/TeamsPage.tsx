@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, LayoutGrid, List, Calendar,
@@ -13,7 +13,7 @@ import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useAuth } from '../context/AuthContext';
 import NewProjectModal, { ProjectRichFields } from '../components/modals/NewProjectModal';
-import { Project } from '../types';
+import { Project, Milestone } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const dbApi = () => (window as any).electronAPI.db;
@@ -60,10 +60,15 @@ const ProjectDetail: React.FC<{
   getMemberColor: (id: string) => string;
   membersById: Record<string, { id: string; name: string; designation?: string; role: string }>;
   taskItems: { title: string; done: boolean }[];
-}> = ({ project, onClose, onOpenProject, onEdit, getMemberColor, membersById, taskItems }) => {
+  milestones: Milestone[];
+  onAddMilestone: (name: string) => void;
+  onToggleMilestone: (milestoneId: string) => void;
+}> = ({ project, onClose, onOpenProject, onEdit, getMemberColor, membersById, taskItems, milestones, onAddMilestone, onToggleMilestone }) => {
   const pct = project.taskTotal > 0 ? Math.round((project.taskDone / project.taskTotal) * 100) : 0;
   const sc = statusConfig[project.status];
   const pc = priorityConfig[project.priority];
+  const [showAddMilestone, setShowAddMilestone] = useState(false);
+  const [newMilestoneName, setNewMilestoneName] = useState('');
 
   const detailMembers = project.memberIds.map(id => {
     const member = membersById[id];
@@ -188,8 +193,67 @@ const ProjectDetail: React.FC<{
         </div>
       </div>
 
+      {/* Milestones section */}
+      <div className="px-5 py-4 border-b border-surface-100">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Milestones
+          </p>
+          <button onClick={() => setShowAddMilestone(true)} className="text-xs text-primary-500 hover:text-primary-700">+ Add</button>
+        </div>
+
+        {milestones.length === 0 && (
+          <p className="text-xs text-gray-400">No milestones yet</p>
+        )}
+
+        {milestones.map((m: Milestone) => (
+          <div key={m.id} className="flex items-center gap-2 py-1.5">
+            <input
+              type="checkbox"
+              checked={m.completed}
+              onChange={() => onToggleMilestone(m.id)}
+              className="rounded"
+            />
+            <span className={`text-sm flex-1 ${m.completed ? 'line-through text-gray-400' : ''}`}>{m.name}</span>
+            {m.dueDate && <span className="text-xs text-gray-400">{m.dueDate}</span>}
+          </div>
+        ))}
+
+        {showAddMilestone && (
+          <div className="flex gap-2 mt-2">
+            <input
+              value={newMilestoneName}
+              onChange={e => setNewMilestoneName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  onAddMilestone(newMilestoneName);
+                  setNewMilestoneName('');
+                  setShowAddMilestone(false);
+                }
+              }}
+              placeholder="Milestone name..."
+              className="flex-1 text-sm outline-none px-2 py-1 rounded-lg"
+              style={{ background: 'var(--bg-muted)' }}
+              autoFocus
+            />
+            <button
+              onClick={() => {
+                if (newMilestoneName.trim()) {
+                  onAddMilestone(newMilestoneName);
+                  setNewMilestoneName('');
+                  setShowAddMilestone(false);
+                }
+              }}
+              disabled={!newMilestoneName.trim()}
+              className="text-xs text-primary-500 disabled:opacity-40"
+            >Add</button>
+            <button onClick={() => { setShowAddMilestone(false); setNewMilestoneName(''); }} className="text-xs text-gray-400">✕</button>
+          </div>
+        )}
+      </div>
+
       {/* Actions */}
-      <div className="px-5 pb-5 flex gap-2">
+      <div className="px-5 pb-5 flex gap-2 mt-4">
         <button onClick={onOpenProject} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary-500 text-white text-xs font-semibold hover:bg-primary-600 transition-colors">
           <ArrowUpRight size={13} /> Open Project
         </button>
@@ -499,6 +563,45 @@ const TeamsPage: React.FC = () => {
     return true;
   });
 
+  // Helper: update rich data locally + persist to DB
+  const updateProjectRich = useCallback((projectId: string, changes: Partial<import('../context/ProjectContext').ProjectRichData>) => {
+    setLocalRichData(prev => ({
+      ...prev,
+      [projectId]: { ...prev[projectId], ...changes },
+    }));
+    const current = { ...localRichData[projectId], ...changes };
+    dbApi().setProjectRich({
+      projectId,
+      description: current.description ?? '',
+      status: current.status ?? 'active',
+      priority: current.priority ?? 'medium',
+      memberIds: current.memberIds ?? [],
+      dueDate: current.dueDate ?? '',
+      starred: current.starred ?? false,
+      category: current.category ?? 'General',
+      milestones: current.milestones ?? [],
+    }).catch((err: unknown) => console.error('[TeamsPage] Failed to persist project rich:', err));
+  }, [localRichData, setLocalRichData]);
+
+  const handleAddMilestone = useCallback((name: string) => {
+    if (!name.trim() || !selectedId) return;
+    const milestone: Milestone = {
+      id: `ms-${Date.now()}`,
+      name: name.trim(),
+      dueDate: '',
+      completed: false,
+    };
+    const current = localRichData[selectedId]?.milestones ?? [];
+    updateProjectRich(selectedId, { milestones: [...current, milestone] });
+  }, [selectedId, localRichData, updateProjectRich]);
+
+  const handleToggleMilestone = useCallback((milestoneId: string) => {
+    if (!selectedId) return;
+    const current = localRichData[selectedId]?.milestones ?? [];
+    const updated = current.map((m: Milestone) => m.id === milestoneId ? { ...m, completed: !m.completed } : m);
+    updateProjectRich(selectedId, { milestones: updated });
+  }, [selectedId, localRichData, updateProjectRich]);
+
   const toggleStar = (id: string) => {
     const newStarred = !localRichData[id]?.starred;
     setLocalRichData(prev => ({
@@ -732,6 +835,9 @@ const TeamsPage: React.FC = () => {
                   getMemberColor={getMemberColor}
                   membersById={membersById}
                   taskItems={allTasks.filter(t => t.projectId === selected.id).map(t => ({ title: t.title, done: t.status === 'done' }))}
+                  milestones={localRichData[selected.id]?.milestones ?? []}
+                  onAddMilestone={handleAddMilestone}
+                  onToggleMilestone={handleToggleMilestone}
                 />
               ) : (
                 <motion.div

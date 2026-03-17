@@ -5,6 +5,9 @@ import { Task, Comment, Attachment } from '../../types';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import { useMembersContext } from '../../context/MembersContext';
 import { useAuth } from '../../context/AuthContext';
+import { useProjects } from '../../context/ProjectContext';
+import { SubtaskList } from '../task/SubtaskList';
+import { TimeTracker } from '../task/TimeTracker';
 
 const dbApi = () => (window as any).electronAPI.db;
 
@@ -22,6 +25,7 @@ interface TaskModalProps {
 const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
     const { members, getMemberColor } = useMembersContext();
     const { user: authUser } = useAuth() ?? { user: null };
+    const { allTasks } = useProjects();
     const [comment, setComment] = useState('');
     const [comments, setComments] = useState<Comment[]>([]);
     const [loadingComments, setLoadingComments] = useState(false);
@@ -29,16 +33,26 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
 
     useEffect(() => {
         if (!task) return;
+        const taskId = task.id;
+        let cancelled = false;
         setLoadingComments(true);
-        dbApi().getComments(task.id).then((data: any) => {
-            setComments(data as Comment[]);
-            setLoadingComments(false);
+        dbApi().getComments(taskId).then((data: any) => {
+            if (!cancelled) {
+                setComments(data as Comment[]);
+                setLoadingComments(false);
+            }
         });
+        return () => { cancelled = true; };
     }, [task?.id]);
 
     useEffect(() => {
         if (!task) return;
-        dbApi().getAttachments(task.id).then((data: any) => setAttachments(data as Attachment[]));
+        const taskId = task.id;
+        let cancelled = false;
+        dbApi().getAttachments(taskId).then((data: any) => {
+            if (!cancelled) setAttachments(data as Attachment[]);
+        });
+        return () => { cancelled = true; };
     }, [task?.id]);
 
     useEffect(() => {
@@ -145,6 +159,54 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                 </div>
                             </div>
 
+                            {/* Blocked By section */}
+                            {task.blockedBy && task.blockedBy.length > 0 && (
+                              <div className="mb-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-secondary)' }}>
+                                  Blocked By
+                                </p>
+                                <div className="space-y-1">
+                                  {task.blockedBy.map((blockerId: string) => {
+                                    const blocker = allTasks.find((t: Task) => t.id === blockerId);
+                                    return blocker ? (
+                                      <button
+                                        key={blockerId}
+                                        onClick={() => { /* close current modal and open blocker */ }}
+                                        className="flex items-center gap-2 text-sm text-red-500 hover:text-red-700 hover:underline"
+                                      >
+                                        <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-mono">#{blocker.taskNumber}</span>
+                                        <span className="truncate max-w-[200px]">{blocker.title}</span>
+                                      </button>
+                                    ) : (
+                                      <span key={blockerId} className="text-xs text-gray-400">Deleted task</span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Subtask checklist */}
+                            <SubtaskList
+                              taskId={task.id}
+                              subtasks={task.subtasks ?? []}
+                              onUpdate={(updated) => {
+                                const api = (window as any).electronAPI;
+                                api?.db?.updateTask?.(task.id, { subtasks: updated });
+                              }}
+                            />
+
+                            {/* Time tracking */}
+                            <TimeTracker
+                              taskId={task.id}
+                              userId={authUser?.id ?? ''}
+                              timeEntries={task.timeEntries ?? []}
+                              estimatedMinutes={task.estimatedMinutes}
+                              onUpdate={(entries, est) => {
+                                const api = (window as any).electronAPI;
+                                api?.db?.updateTask?.(task.id, { timeEntries: entries, ...(est !== undefined ? { estimatedMinutes: est } : {}) });
+                              }}
+                            />
+
                             {/* Attachments section */}
                             <div className="mt-4">
                                 <div className="flex items-center justify-between mb-3">
@@ -185,7 +247,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                     Comments ({comments.length})
                                 </h3>
 
-                                <div className="space-y-4 mb-6 max-h-48 overflow-y-auto">
+                                <div className="space-y-4 mb-6">
                                     {loadingComments ? (
                                         <p className="text-xs text-gray-400">Loading...</p>
                                     ) : comments.map((c) => (

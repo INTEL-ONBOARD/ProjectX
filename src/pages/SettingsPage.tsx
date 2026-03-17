@@ -18,6 +18,7 @@ import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useProjects } from '../context/ProjectContext';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 
 // ── IPC bridge ───────────────────────────────────────────────────────────────
@@ -76,17 +77,6 @@ function calcStrength(pwd: string): { score: number; label: string; color: strin
   if (score === 3) return { score: 3, label: 'Good', color: '#30C5E5' };
   return { score: Math.min(score, 4), label: 'Strong', color: '#68B266' };
 }
-
-// ── Tab definitions ───────────────────────────────────────────────────────────
-
-const TABS = [
-  { id: 'profile',       label: 'Profile',       Icon: User       },
-  { id: 'notifications', label: 'Notifications', Icon: Bell       },
-  { id: 'appearance',    label: 'Appearance',    Icon: Palette    },
-  { id: 'security',      label: 'Security',      Icon: Shield     },
-  // { id: 'billing',       label: 'Billing',       Icon: CreditCard },
-  { id: 'about',         label: 'About',         Icon: Info       },
-] as const;
 
 // ── SettingCard ───────────────────────────────────────────────────────────────
 
@@ -239,7 +229,8 @@ const SettingsPage: React.FC = () => {
 
   const userColor = 'var(--color-primary-500, #5030E5)';
 
-  const [activeSection, setActiveSection] = useState('profile');
+  const [activeTab, setActiveTab] = useState<'account' | 'notifications' | 'appearance' | 'data'>('account');
+  const [confirmClear, setConfirmClear] = useState(false);
   const { state: updateState, checkForUpdate, installUpdate } = useAppUpdater();
 
   // Profile
@@ -536,19 +527,17 @@ const SettingsPage: React.FC = () => {
 
       {/* ── Tab bar ── */}
       <div className="px-8 shrink-0">
-        <div className="flex items-center gap-1 bg-surface-50 rounded-2xl p-1 border border-surface-200 w-fit">
-          {TABS.map(tab => (
+        <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'var(--bg-muted)' }}>
+          {(['account', 'notifications', 'appearance', 'data'] as const).map(tab => (
             <button
-              key={tab.id}
-              onClick={() => setActiveSection(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap
-                ${activeSection === tab.id
-                  ? 'bg-primary-500 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-white'
-                }`}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-1.5 text-sm font-medium rounded-lg capitalize transition-colors ${
+                activeTab === tab ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={activeTab === tab ? { background: 'var(--bg-card)' } : undefined}
             >
-              <tab.Icon size={15} />
-              {tab.label}
+              {tab === 'data' ? 'Data & Privacy' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -559,8 +548,8 @@ const SettingsPage: React.FC = () => {
         <div>
           <AnimatePresence mode="wait">
 
-            {/* ══ Profile ══ */}
-            {activeSection === 'profile' && (
+            {/* ══ Account (profile + password) ══ */}
+            {activeTab === 'account' && (
               <motion.div key="profile"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
@@ -646,11 +635,34 @@ const SettingsPage: React.FC = () => {
                     </div>
                   </div>
                 </motion.div>
+
+                {/* Danger Zone — full width under account cards */}
+                <motion.div className="col-span-2" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
+                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#FEE2E2] shrink-0">
+                        <AlertTriangle size={14} className="text-[#D8727D]" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 text-sm">Danger Zone</h3>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-4 ml-[42px]">These actions are irreversible. Proceed with caution.</p>
+                    <div className="flex gap-2 ml-[42px]">
+                      <button onClick={handleExportData}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-surface-50 text-gray-600 hover:bg-surface-100 transition-colors">
+                        <Download size={14} /> Export Data
+                      </button>
+                      <button onClick={() => setConfirmClear(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-[#FEE2E2] text-[#D8727D] hover:bg-[#fdd] transition-colors">
+                        <Trash2 size={14} /> Delete Account
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
               </motion.div>
             )}
 
             {/* ══ Notifications ══ */}
-            {activeSection === 'notifications' && (
+            {activeTab === 'notifications' && (
               <motion.div key="notifications"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
@@ -741,7 +753,7 @@ const SettingsPage: React.FC = () => {
             )}
 
             {/* ══ Appearance ══ */}
-            {activeSection === 'appearance' && (
+            {activeTab === 'appearance' && (
               <motion.div key="appearance"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
@@ -876,8 +888,8 @@ const SettingsPage: React.FC = () => {
               </motion.div>
             )}
 
-            {/* ══ Security ══ */}
-            {activeSection === 'security' && (
+            {/* ══ Data & Privacy (password + system behavior + sessions) ══ */}
+            {activeTab === 'data' && (
               <motion.div key="security"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
@@ -1024,11 +1036,45 @@ const SettingsPage: React.FC = () => {
                     </div>
                   </motion.div>
                 </div>
+
+                {/* Danger Zone — full width row */}
+                <motion.div className="col-span-2" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.15 }}>
+                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#FEE2E2] shrink-0">
+                        <AlertTriangle size={14} className="text-[#D8727D]" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 text-sm">Danger Zone</h3>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-4 ml-[42px]">These actions are irreversible. Proceed with caution.</p>
+                    <div className="flex gap-2">
+                      <button onClick={handleExportData}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-surface-50 text-gray-600 hover:bg-surface-100 transition-colors">
+                        <Download size={14} /> Export Data
+                      </button>
+                      <button onClick={() => setConfirmClear(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-[#FEE2E2] text-[#D8727D] hover:bg-[#fdd] transition-colors">
+                        <Trash2 size={14} /> Delete Account
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+
               </motion.div>
             )}
 
-            {/* ══ Billing ══ */}
-            {activeSection === 'billing' && (
+            <ConfirmDialog
+              open={confirmClear}
+              title="Delete Account"
+              message="This will permanently delete your account and all local data. This cannot be undone."
+              confirmLabel="Delete"
+              danger
+              onConfirm={() => { setConfirmClear(false); showToast('Account deletion is disabled in this version.', 'info'); }}
+              onCancel={() => setConfirmClear(false)}
+            />
+
+            {/* ══ Billing (hidden — no tab mapping) ══ */}
+            {false && (
               <motion.div key="billing"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
@@ -1164,8 +1210,8 @@ const SettingsPage: React.FC = () => {
               </motion.div>
             )}
 
-            {/* ══ About ══ */}
-            {activeSection === 'about' && (
+            {/* ══ About (hidden — no tab mapping) ══ */}
+            {false && (
               <motion.div key="about"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}

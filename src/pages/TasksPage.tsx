@@ -11,6 +11,8 @@ import { useMembersContext } from '../context/MembersContext';
 import { useAuth } from '../context/AuthContext';
 import TaskFormModal from '../components/modals/TaskFormModal';
 import { downloadCsv } from '../utils/exportCsv';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { EmptyState } from '../components/ui/EmptyState';
 
 
 // ── Activity Log helpers ────────────────────────────────────────────────────
@@ -85,6 +87,78 @@ const statusStyles: Record<string, { bg: string; text: string; label: string; do
 
 const tabs = ['All', 'To Do', 'In Progress', 'Ready for QA', 'Deployment Pending', 'Blocker', 'On Hold', 'Done'];
 
+// ── Dependency Graph ────────────────────────────────────────────────────────
+function DependencyGraph({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (t: Task) => void }) {
+  const relevantTasks = tasks.filter(t =>
+    (t.blockedBy && t.blockedBy.length > 0) || tasks.some(other => other.blockedBy?.includes(t.id))
+  );
+
+  if (relevantTasks.length === 0) {
+    return <div className="flex items-center justify-center py-16 text-sm text-gray-400">No task dependencies found. Use the "Blocked By" field on tasks to create dependencies.</div>;
+  }
+
+  const CARD_W = 160, CARD_H = 60, GAP_X = 40, GAP_Y = 40, COLS = 4;
+  const posMap: Record<string, { x: number; y: number }> = {};
+  relevantTasks.forEach((t, i) => {
+    posMap[t.id] = {
+      x: (i % COLS) * (CARD_W + GAP_X) + 20,
+      y: Math.floor(i / COLS) * (CARD_H + GAP_Y) + 20,
+    };
+  });
+
+  const svgWidth = COLS * (CARD_W + GAP_X) + 40;
+  const svgHeight = Math.ceil(relevantTasks.length / COLS) * (CARD_H + GAP_Y) + 40;
+
+  return (
+    <div className="overflow-auto p-4">
+      <svg width={svgWidth} height={svgHeight}>
+        <defs>
+          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#EF4444" />
+          </marker>
+        </defs>
+        {/* Draw arrows for blockedBy relationships */}
+        {relevantTasks.map(task =>
+          (task.blockedBy ?? []).map(blockerId => {
+            const from = posMap[blockerId];
+            const to = posMap[task.id];
+            if (!from || !to) return null;
+            return (
+              <line
+                key={`${blockerId}-${task.id}`}
+                x1={from.x + CARD_W} y1={from.y + CARD_H / 2}
+                x2={to.x} y2={to.y + CARD_H / 2}
+                stroke="#EF4444" strokeWidth={1.5} markerEnd="url(#arrowhead)"
+              />
+            );
+          })
+        )}
+        {/* Draw task nodes */}
+        {relevantTasks.map(task => {
+          const pos = posMap[task.id];
+          const isBlocked = task.blockedBy && task.blockedBy.length > 0;
+          return (
+            <g key={task.id} onClick={() => onTaskClick(task)} style={{ cursor: 'pointer' }}>
+              <rect
+                x={pos.x} y={pos.y} width={CARD_W} height={CARD_H}
+                rx={8} ry={8}
+                fill="white" stroke={isBlocked ? '#EF4444' : '#E5E7EB'} strokeWidth={isBlocked ? 2 : 1}
+              />
+              <text x={pos.x + 8} y={pos.y + 18} fontSize={10} fill="#6B7280">#{task.taskNumber}</text>
+              <foreignObject x={pos.x + 8} y={pos.y + 24} width={CARD_W - 16} height={30}>
+                <div style={{ fontSize: 12, lineHeight: '15px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
+                  {task.title}
+                </div>
+              </foreignObject>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+// ── End Dependency Graph ─────────────────────────────────────────────────────
+
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,12 +209,16 @@ const TasksPage: React.FC = () => {
   const [showAssigneeDrop, setShowAssigneeDrop] = useState(false);
   const assigneeDropRef = useRef<HTMLDivElement>(null);
 
+  // View mode (list vs deps graph)
+  const [viewMode, setViewMode] = useState<'list' | 'deps'>('list');
+
   // Delete confirmation state
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatusDrop, setBulkStatusDrop] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const totalTasks = allTasks.length;
 
@@ -221,8 +299,9 @@ const TasksPage: React.FC = () => {
 
   const saveEdit = () => {
     if (!selectedTask) return;
+    if (!editTitle.trim()) return; // silently ignore — field is required
     const changes = {
-      title: editTitle.trim() || selectedTask.title,
+      title: editTitle.trim(),
       description: editDesc,
       priority: editPriority as Task['priority'],
       taskType: editTaskType,
@@ -233,6 +312,14 @@ const TasksPage: React.FC = () => {
     updateTask(selectedTask.id, changes).catch(console.error);
     setSelectedTask(prev => prev ? { ...prev, ...changes } : prev);
     setEditMode(false);
+  };
+
+  const handleOpenTask = (task: Task) => {
+    setSelectedTask(task);
+    setDetailImage(null);
+    setShowStatusDrop(false);
+    setEditMode(false);
+    setConfirmDelete(false);
   };
 
   const selectedStatus = selectedTask ? selectedTask.status : 'todo';
@@ -318,11 +405,17 @@ const TasksPage: React.FC = () => {
                   const s = tabStatusMap[i];
                   const count = s === null ? totalTasks : allTasks.filter(task => task.status === s).length;
                   return (
-                    <button key={t} onClick={() => setActiveTab(i)} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === i ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                    <button key={t} onClick={() => { setActiveTab(i); setViewMode('list'); }} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === i && viewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                       {t} ({count})
                     </button>
                   );
                 })}
+                <button
+                  onClick={() => setViewMode('deps')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${viewMode === 'deps' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Dependencies
+                </button>
               </div>
               <div className="relative mb-3">
                 <input
@@ -339,7 +432,12 @@ const TasksPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto min-h-0">
+            {viewMode === 'deps' && (
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <DependencyGraph tasks={filteredTasks} onTaskClick={handleOpenTask} />
+              </div>
+            )}
+            {viewMode === 'list' && <div className="flex-1 overflow-y-auto min-h-0">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-surface-100">
@@ -356,6 +454,18 @@ const TasksPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
+                {filteredTasks.length === 0 && (
+                  <tr>
+                    <td colSpan={7}>
+                      <EmptyState
+                        icon={<CheckSquare size={48} />}
+                        title="No tasks found"
+                        description="Try adjusting your filters or create a new task."
+                        action={{ label: 'New Task', onClick: () => setShowTaskForm(true) }}
+                      />
+                    </td>
+                  </tr>
+                )}
                 {filteredTasks.map((task, i) => {
                   const priority = priorityStyles[task.priority] ?? priorityStyles.low;
                   const status = statusStyles[task.status] ?? statusStyles.todo;
@@ -426,7 +536,7 @@ const TasksPage: React.FC = () => {
                 })}
               </tbody>
             </table>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
@@ -874,11 +984,7 @@ const TasksPage: React.FC = () => {
             <option value="done">Done</option>
           </select>
           <button
-            onClick={async () => {
-              if (!confirm(`Delete ${selectedIds.size} tasks?`)) return;
-              for (const id of selectedIds) await deleteTask(id);
-              setSelectedIds(new Set());
-            }}
+            onClick={() => setConfirmBulkDelete(true)}
             className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-300 transition-colors"
           >
             <Trash2 size={13} /> Delete
@@ -888,6 +994,21 @@ const TasksPage: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* ── Bulk Delete Confirm Dialog ── */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title="Delete Tasks"
+        message={`Delete ${selectedIds.size} task(s)? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={async () => {
+          for (const id of selectedIds) await deleteTask(id);
+          setSelectedIds(new Set());
+          setConfirmBulkDelete(false);
+        }}
+        onCancel={() => setConfirmBulkDelete(false)}
+      />
     </motion.div>
   );
 };
