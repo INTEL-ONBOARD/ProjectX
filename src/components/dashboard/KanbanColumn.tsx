@@ -3,6 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { Task, TaskStatus } from '../../types';
 import TaskCard from './TaskCard';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+function SortableTaskCard({ task, ...props }: { task: Task } & Omit<React.ComponentProps<typeof TaskCard>, 'task'>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <TaskCard task={task} {...props} />
+    </div>
+  );
+}
 
 interface KanbanColumnProps {
   title: string;
@@ -80,16 +92,18 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {tasks.map((task, i) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            index={i}
-            onClick={() => onTaskClick(task)}
-            onMoveTask={onMoveTask}
-            onDeleteTask={onDeleteTask}
-          />
-        ))}
+        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          {tasks.map((task, i) => (
+            <SortableTaskCard
+              key={task.id}
+              task={task}
+              index={i}
+              onClick={() => onTaskClick(task)}
+              onMoveTask={onMoveTask}
+              onDeleteTask={onDeleteTask}
+            />
+          ))}
+        </SortableContext>
         {tasks.length === 0 && isDragOver && (
           <div className="h-20 rounded-xl border-2 border-dashed border-primary-300 flex items-center justify-center">
             <span className="text-xs text-primary-400 font-medium">Drop here</span>

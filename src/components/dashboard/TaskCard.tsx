@@ -44,6 +44,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
   const assigneeColors = task.assignees.map(id => getMemberColor(id));
 
   const isToday = todayMode && task.dueDate === TODAY;
+  const isOverdue = !!(task.dueDate && task.dueDate < TODAY && task.status !== 'done');
 
   useEffect(() => {
     if (!showMenu) return;
@@ -61,7 +62,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
 
   return (
     <motion.div
-      className={`bg-white rounded-2xl p-4 border cursor-pointer group relative transition-all ${isToday ? 'border-l-4 border-l-primary-500 border-surface-200' : 'border-surface-200'} ${isDragging ? 'opacity-50' : ''}`}
+      className={`bg-surface-50 rounded-2xl p-4 border cursor-pointer group relative transition-all ${isToday ? 'border-l-4 border-l-primary-500 border-surface-200' : isOverdue ? 'border-l-4 border-l-red-400 border-surface-200' : 'border-surface-200'} ${isDragging ? 'opacity-50' : ''}`}
       draggable
       onDragStart={e => { (e as unknown as React.DragEvent).dataTransfer.setData('taskId', task.id); setIsDragging(true); }}
       onDragEnd={() => setIsDragging(false)}
@@ -86,6 +87,15 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
           {(!task.taskType || task.taskType === 'task') && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#22C55E20] text-[#22C55E]">Task</span>
           )}
+          {isOverdue && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-50 text-red-500">Overdue</span>
+          )}
+          {task.recurrence && task.recurrence !== 'none' && (
+            <span title={`Repeats ${task.recurrence}`} className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-primary-50 text-primary-500">↻</span>
+          )}
+          {task.blockedBy && task.blockedBy.length > 0 && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-500">Blocked</span>
+          )}
         </div>
         <div ref={menuRef} className="relative flex items-center" onClick={e => e.stopPropagation()}>
           {task.taskNumber != null && (
@@ -105,7 +115,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
           <AnimatePresence>
             {showMenu && (
               <motion.div
-                className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl border border-surface-200 shadow-lg z-20 overflow-hidden"
+                className="absolute right-0 top-full mt-1 w-44 bg-surface-50 rounded-xl border border-surface-200 shadow-lg z-20 overflow-hidden"
                 initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.15 }}
               >

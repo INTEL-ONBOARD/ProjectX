@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, BarChart3, TrendingUp, Users, AlertCircle, ChevronDown } from 'lucide-react';
+import { Download, BarChart3, TrendingUp, Users, AlertCircle, ChevronDown, FileDown } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
@@ -149,9 +149,18 @@ const ReportsPage: React.FC = () => {
           title="Reports"
           description="Project analytics"
           actions={
-            <motion.button onClick={handleExport} className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Download size={16} /> Download Report
-            </motion.button>
+            <>
+              <button
+                onClick={() => (window as any).electronAPI.printToPDF()}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-surface-200 rounded-lg hover:bg-surface-50 transition-colors"
+              >
+                <FileDown size={13} />
+                Export PDF
+              </button>
+              <motion.button onClick={handleExport} className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Download size={16} /> Download Report
+              </motion.button>
+            </>
           }
         />
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send, Eye, UserCog, Trash2 } from 'lucide-react';
+import { Users, Shield, Briefcase, UserCheck, UserPlus, Download, MoreVertical, X, Send, Eye, UserCog, Trash2, Camera } from 'lucide-react';
 
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
@@ -25,7 +25,7 @@ const roleStyles: Record<string, { bg: string; text: string }> = {
 const getRoleStyle = (role: string) => roleStyles[role] ?? { bg: 'bg-surface-200', text: 'text-gray-500' };
 
 const MembersPage: React.FC = () => {
-  const { members, getMemberColor, addMember, removeMember, refetchMembers } = useMembersContext();
+  const { members, getMemberColor, addMember, updateMember, removeMember, refetchMembers } = useMembersContext();
   const { user: authUser } = useAuth();
   const isAdmin = authUser?.role === 'admin';
   const { scrubAssignee, allTasks } = useProjects();
@@ -84,6 +84,13 @@ const MembersPage: React.FC = () => {
     const loc = m.location ?? 'Unknown';
     locationCounts[loc] = (locationCounts[loc] ?? 0) + 1;
   });
+
+  const handlePickAvatar = async (memberId: string) => {
+    const dataUri = await (window as any).electronAPI.db.pickAvatar() as string | null;
+    if (dataUri) {
+      await updateMember(memberId, { avatar: dataUri });
+    }
+  };
 
   const handleExport = () => {
     const header = ['Name', 'Email', 'Role', 'Designation', 'Status'];
@@ -165,7 +172,6 @@ const MembersPage: React.FC = () => {
                   const color = getMemberColor(member.id);
                   const role = getRoleStyle(member.role);
                   const tc = memberTaskCounts[member.id] ?? { assigned: 0, total: 5 };
-                  const pct = tc.total > 0 ? (tc.assigned / tc.total) * 100 : 0;
                   const status: 'online' | 'away' | 'offline' = getPresenceStatus(member.lastSeen);
                   return (
                     <motion.tr
@@ -191,12 +197,25 @@ const MembersPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{member.location ?? '—'}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 bg-surface-200 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                          </div>
-                          <span className="text-[10px] text-gray-400 shrink-0">{tc.assigned}/{tc.total}</span>
-                        </div>
+                        {(() => {
+                          const mTasks = allTasks.filter(t => t.assignees.includes(member.id));
+                          const todo = mTasks.filter(t => t.status === 'todo' || t.status === 'on-hold').length;
+                          const inProg = mTasks.filter(t => ['in-progress','ready-for-qa','deployment-pending','blocker'].includes(t.status)).length;
+                          const done = mTasks.filter(t => t.status === 'done').length;
+                          const total = mTasks.length;
+                          return (
+                            <div>
+                              <div className="flex h-1.5 rounded-full overflow-hidden w-24 bg-gray-100">
+                                {total > 0 && <>
+                                  <div style={{ width: `${(todo/total)*100}%` }} className="bg-gray-400" />
+                                  <div style={{ width: `${(inProg/total)*100}%` }} className="bg-primary-500" />
+                                  <div style={{ width: `${(done/total)*100}%` }} className="bg-green-500" />
+                                </>}
+                              </div>
+                              <p className="text-[10px] text-gray-400 mt-0.5">{total} tasks</p>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-xs font-bold text-gray-900">{tc.assigned}</td>
                       <td className="px-4 py-3">
@@ -365,7 +384,15 @@ const MembersPage: React.FC = () => {
               </div>
               {/* Content */}
               <div className="px-5 py-6 flex flex-col items-center gap-4">
-                <Avatar name={selectedMember.name} color={getMemberColor(selectedMember.id)} size="lg" />
+                <div className="relative group">
+                  <Avatar name={selectedMember.name} color={getMemberColor(selectedMember.id)} size="lg" />
+                  <button
+                    onClick={() => handlePickAvatar(selectedMember.id)}
+                    className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  >
+                    <Camera size={16} className="text-white" />
+                  </button>
+                </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-gray-900">{selectedMember.name}</div>
                   <div className="text-sm text-gray-500">{selectedMember.designation ?? '—'}</div>

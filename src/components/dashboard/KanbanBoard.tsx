@@ -1,11 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { DndContext, closestCenter, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Tag, User, Calendar, ChevronDown, ImagePlus,
   Check, Edit3, Trash2, MessageSquare, Send,
   ArrowRight, Flag, UserPlus, UserMinus, FileText, Plus, Pencil, FolderPlus,
+  Download, Paperclip,
 } from 'lucide-react';
-import { Task, TaskStatus, TaskCommentItem, TaskActivityEntry } from '../../types';
+import { Task, TaskStatus, TaskActivityEntry, Comment, Attachment } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useMembersContext } from '../../context/MembersContext';
 import { useAuth } from '../../context/AuthContext';
@@ -87,8 +90,13 @@ const priorityStyles: Record<string, { bg: string; text: string; label: string }
   completed: { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]', label: 'Completed' },
 };
 
-type Comment = TaskCommentItem;
+const dbApi = () => (window as any).electronAPI.db;
 
+function fmtSize(bytes: number) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
 
 interface Filters {
   priority: string;
@@ -115,9 +123,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [formDefaultStatus, setFormDefaultStatus] = useState<TaskStatus>('todo');
   const [comments, setComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
   const [commentInput, setCommentInput] = useState('');
   const [detailImage, setDetailImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   // Edit state
   const [editTitle, setEditTitle] = useState('');
@@ -129,12 +139,48 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const [showNewProject, setShowNewProject] = useState(false);
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    for (const col of columns) {
+      const colTasks = applyFilters(allTasks.filter(t => t.status === col.status && t.projectId === activeProject));
+      const oldIndex = colTasks.findIndex(t => t.id === active.id);
+      const newIndex = colTasks.findIndex(t => t.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(colTasks, oldIndex, newIndex);
+        for (let i = 0; i < reordered.length; i++) {
+          if (reordered[i].order !== i) {
+            await updateTask(reordered[i].id, { order: i });
+          }
+        }
+        break;
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedTask) return;
+    setLoadingComments(true);
+    dbApi().getComments(selectedTask.id).then((data: any) => {
+      setComments(data as Comment[]);
+      setLoadingComments(false);
+    });
+  }, [selectedTask?.id]);
+
+  useEffect(() => {
+    if (!selectedTask) return;
+    dbApi().getAttachments(selectedTask.id).then((data: any) => setAttachments(data as Attachment[]));
+  }, [selectedTask?.id]);
+
   const openTask = (task: Task) => {
     setSelectedTask(task);
     setEditMode(false);
     setConfirmDelete(false);
     setShowStatusDrop(false);
-    setComments(task.commentData ?? []);
+    setComments([]);
     setCommentInput('');
     setDetailImage(null);
     setDetailTab('details');
@@ -171,19 +217,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     setConfirmDelete(false);
   };
 
-  const handleAddComment = () => {
-    if (!commentInput.trim() || !selectedTask) return;
-    const newComment: Comment = {
-      id: String(Date.now()),
-      author: 'You',
+  const handleAddComment = async () => {
+    if (!commentInput.trim() || !selectedTask || !authUser) return;
+    const newComment = await dbApi().addComment({
+      taskId: selectedTask.id,
+      authorId: authUser.id,
+      authorName: authUser.name,
       text: commentInput.trim(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    const newComments = [...(selectedTask.commentData ?? []), newComment];
-    const newCount = newComments.length;
-    setComments(newComments);
-    updateTask(selectedTask.id, { comments: newCount, commentData: newComments }).catch(console.error);
-    setSelectedTask(prev => prev ? { ...prev, comments: newCount, commentData: newComments } : prev);
+    }) as Comment;
+    setComments(prev => [...prev, newComment]);
     setCommentInput('');
   };
 
@@ -331,25 +373,31 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 0.3 }}
       >
-        <div className="flex gap-6 h-full">
-          {columns.map((col, index) => (
-            <KanbanColumn
-              key={col.status}
-              title={col.title}
-              status={col.status}
-              tasks={applyFilters(allTasks.filter(t => t.status === col.status && t.projectId === activeProject))}
-              dotColor={col.dotColor}
-              lineColor={col.lineColor}
-              index={index}
-              onTaskClick={openTask}
-              onAddTask={(status) => { if (!activeProject) return; setFormDefaultStatus(status); setShowTaskForm(true); }}
-              onMoveTask={(taskId, newStatus) => moveTask(taskId, newStatus).catch(console.error)}
-              onDeleteTask={(taskId) => deleteTask(taskId).catch(console.error)}
-            />
-          ))}
-          {/* Right-edge spacer so last column has breathing room */}
-          <div className="shrink-0 w-8 h-full" />
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <div className="flex gap-6 h-full">
+            {columns.map((col, index) => {
+              const colTasks = applyFilters(allTasks.filter(t => t.status === col.status && t.projectId === activeProject));
+              const sortedTasks = [...colTasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+              return (
+                <KanbanColumn
+                  key={col.status}
+                  title={col.title}
+                  status={col.status}
+                  tasks={sortedTasks}
+                  dotColor={col.dotColor}
+                  lineColor={col.lineColor}
+                  index={index}
+                  onTaskClick={openTask}
+                  onAddTask={(status) => { if (!activeProject) return; setFormDefaultStatus(status); setShowTaskForm(true); }}
+                  onMoveTask={(taskId, newStatus) => moveTask(taskId, newStatus).catch(console.error)}
+                  onDeleteTask={(taskId) => deleteTask(taskId).catch(console.error)}
+                />
+              );
+            })}
+            {/* Right-edge spacer so last column has breathing room */}
+            <div className="shrink-0 w-8 h-full" />
+          </div>
+        </DndContext>
       </motion.div>
       )}
 
@@ -604,16 +652,51 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   </div>
                 )}
 
+                {/* File Attachments */}
+                {!editMode && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-semibold text-gray-400 flex items-center gap-1"><Paperclip size={11} /> Attachments ({attachments.length})</div>
+                      <button
+                        onClick={async () => {
+                          const added = await dbApi().pickAttachments(selectedTask!.id) as Attachment[];
+                          setAttachments(prev => [...prev, ...added]);
+                        }}
+                        className="text-xs font-semibold text-primary-500 hover:text-primary-600 transition-colors"
+                      >
+                        + Attach File
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {attachments.map(a => (
+                        <div key={a.id} className="flex items-center gap-2 p-2 bg-surface-50 rounded-lg border border-surface-200">
+                          <Paperclip size={13} className="text-gray-400 shrink-0" />
+                          <span className="flex-1 text-xs text-gray-700 truncate font-medium">{a.name}</span>
+                          <span className="text-[10px] text-gray-400">{fmtSize(a.size)}</span>
+                          <button onClick={() => dbApi().openAttachment(a.filePath)} className="text-gray-400 hover:text-primary-500 transition-colors">
+                            <Download size={13} />
+                          </button>
+                          <button onClick={async () => { await dbApi().deleteAttachment(a.id); setAttachments(prev => prev.filter(x => x.id !== a.id)); }} className="text-gray-400 hover:text-red-500 transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Comments */}
                 {!editMode && (
                   <div>
                     <div className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1"><MessageSquare size={11} /> Comments ({comments.length})</div>
                     <div className="flex flex-col gap-3 mb-3 max-h-40 overflow-y-auto">
-                      {comments.map(c => (
+                      {loadingComments ? (
+                        <p className="text-xs text-gray-400">Loading...</p>
+                      ) : comments.map(c => (
                         <div key={c.id} className="flex gap-2.5">
-                          <Avatar name={c.author} color="#5030E5" size="sm" />
+                          <Avatar name={c.authorName} color="#5030E5" size="sm" />
                           <div>
-                            <div className="text-[11px] font-semibold text-gray-900">{c.author} <span className="text-gray-400 font-normal">{c.time}</span></div>
+                            <div className="text-[11px] font-semibold text-gray-900">{c.authorName} <span className="text-gray-400 font-normal">{new Date(c.createdAt).toLocaleString()}</span></div>
                             <div className="text-xs text-gray-600 mt-0.5">{c.text}</div>
                           </div>
                         </div>

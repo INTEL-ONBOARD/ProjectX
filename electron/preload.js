@@ -218,5 +218,27 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         deleteRolePerms: (data) => electron_1.ipcRenderer.invoke('db:roleperms:delete', data),
         // Presence
         heartbeat: (userId) => electron_1.ipcRenderer.invoke('db:presence:heartbeat', userId),
+        // Comments
+        getComments:      (taskId) => electron_1.ipcRenderer.invoke('db:comments:getByTask', taskId),
+        addComment:       (data)   => electron_1.ipcRenderer.invoke('db:comments:add', data),
+        deleteComment:    (commentId) => electron_1.ipcRenderer.invoke('db:comments:delete', commentId),
+        // Attachments
+        getAttachments:   (taskId)   => electron_1.ipcRenderer.invoke('db:attachments:getByTask', taskId),
+        pickAttachments:  (taskId)   => electron_1.ipcRenderer.invoke('db:attachments:pick', taskId),
+        deleteAttachment: (attachId) => electron_1.ipcRenderer.invoke('db:attachments:delete', attachId),
+        openAttachment:   (filePath) => electron_1.ipcRenderer.invoke('db:attachments:open', filePath),
+        // Sprints
+        getSprints:    ()            => electron_1.ipcRenderer.invoke('db:sprints:getAll'),
+        createSprint:  (data)        => electron_1.ipcRenderer.invoke('db:sprints:create', data),
+        updateSprint:  (id, changes) => electron_1.ipcRenderer.invoke('db:sprints:update', id, changes),
+        deleteSprint:  (id)          => electron_1.ipcRenderer.invoke('db:sprints:delete', id),
+        // Task Templates
+        getTemplates:   ()   => electron_1.ipcRenderer.invoke('db:templates:getAll'),
+        createTemplate: (data) => electron_1.ipcRenderer.invoke('db:templates:create', data),
+        deleteTemplate: (id)   => electron_1.ipcRenderer.invoke('db:templates:delete', id),
+        // Avatar
+        pickAvatar: () => electron_1.ipcRenderer.invoke('db:members:pickAvatar'),
     },
+    // PDF export
+    printToPDF: () => electron_1.ipcRenderer.invoke('app:printToPDF'),
 });

@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageCircle, Paperclip, Send } from 'lucide-react';
-import { Task } from '../../types';
+import { X, MessageCircle, Paperclip, Send, Download, Trash2 } from 'lucide-react';
+import { Task, Comment, Attachment } from '../../types';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import { useMembersContext } from '../../context/MembersContext';
+import { useAuth } from '../../context/AuthContext';
+
+const dbApi = () => (window as any).electronAPI.db;
+
+function fmtSize(bytes: number) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
 
 interface TaskModalProps {
     task: Task | null;
@@ -12,22 +21,41 @@ interface TaskModalProps {
 
 const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
     const { members, getMemberColor } = useMembersContext();
+    const { user: authUser } = useAuth() ?? { user: null };
     const [comment, setComment] = useState('');
-    const [comments, setComments] = useState<{ id: string; userId: string; author: string; text: string }[]>([]);
+    const [comments, setComments] = useState<Comment[]>([]);
+    const [loadingComments, setLoadingComments] = useState(false);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+    useEffect(() => {
+        if (!task) return;
+        setLoadingComments(true);
+        dbApi().getComments(task.id).then((data: any) => {
+            setComments(data as Comment[]);
+            setLoadingComments(false);
+        });
+    }, [task?.id]);
+
+    useEffect(() => {
+        if (!task) return;
+        dbApi().getAttachments(task.id).then((data: any) => setAttachments(data as Attachment[]));
+    }, [task?.id]);
 
     const assigneeNames = task?.assignees.map(
         (id) => members.find((m) => m.id === id)?.name ?? 'Unknown'
     ) ?? [];
     const assigneeColors = task?.assignees.map(id => getMemberColor(id)) ?? [];
 
-    const handleAddComment = () => {
-        if (comment.trim()) {
-            setComments([
-                ...comments,
-                { id: String(comments.length + 1), userId: 'u1', author: 'You', text: comment },
-            ]);
-            setComment('');
-        }
+    const handleAddComment = async () => {
+        if (!comment.trim() || !task || !authUser) return;
+        const newComment = await dbApi().addComment({
+            taskId: task.id,
+            authorId: authUser.id,
+            authorName: authUser.name,
+            text: comment.trim(),
+        }) as Comment;
+        setComments(prev => [...prev, newComment]);
+        setComment('');
     };
 
     return (
@@ -41,7 +69,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                     onClick={onClose}
                 >
                     <motion.div
-                        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                        className="bg-surface-50 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0.9, opacity: 0 }}
@@ -91,7 +119,40 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-500 font-semibold mb-1">ATTACHMENTS</p>
-                                    <span className="text-sm font-semibold text-gray-700">{task.files} files</span>
+                                    <span className="text-sm font-semibold text-gray-700">{attachments.length} files</span>
+                                </div>
+                            </div>
+
+                            {/* Attachments section */}
+                            <div className="mt-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+                                        <Paperclip size={15} /> Attachments ({attachments.length})
+                                    </h3>
+                                    <button
+                                        onClick={async () => {
+                                            const added = await dbApi().pickAttachments(task!.id) as Attachment[];
+                                            setAttachments(prev => [...prev, ...added]);
+                                        }}
+                                        className="text-xs font-semibold text-primary-500 hover:text-primary-600 transition-colors"
+                                    >
+                                        + Attach File
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {attachments.map(a => (
+                                        <div key={a.id} className="flex items-center gap-2 p-2 bg-surface-50 rounded-lg border border-surface-200">
+                                            <Paperclip size={13} className="text-gray-400 shrink-0" />
+                                            <span className="flex-1 text-xs text-gray-700 truncate font-medium">{a.name}</span>
+                                            <span className="text-[10px] text-gray-400">{fmtSize(a.size)}</span>
+                                            <button onClick={() => dbApi().openAttachment(a.filePath)} className="text-gray-400 hover:text-primary-500 transition-colors">
+                                                <Download size={13} />
+                                            </button>
+                                            <button onClick={async () => { await dbApi().deleteAttachment(a.id); setAttachments(prev => prev.filter(x => x.id !== a.id)); }} className="text-gray-400 hover:text-red-500 transition-colors">
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
@@ -103,11 +164,16 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                 </h3>
 
                                 <div className="space-y-4 mb-6 max-h-48 overflow-y-auto">
-                                    {comments.map((c) => (
+                                    {loadingComments ? (
+                                        <p className="text-xs text-gray-400">Loading...</p>
+                                    ) : comments.map((c) => (
                                         <div key={c.id} className="flex gap-3">
-                                            <Avatar name={c.author} color="#5030E5" size="sm" />
+                                            <Avatar name={c.authorName} color="#5030E5" size="sm" />
                                             <div>
-                                                <p className="font-semibold text-gray-900 text-sm">{c.author}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-semibold text-gray-900 text-sm">{c.authorName}</p>
+                                                    <p className="text-[10px] text-gray-400">{new Date(c.createdAt).toLocaleString()}</p>
+                                                </div>
                                                 <p className="text-gray-700 text-sm">{c.text}</p>
                                             </div>
                                         </div>

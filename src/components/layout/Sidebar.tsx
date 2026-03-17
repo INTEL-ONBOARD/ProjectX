@@ -17,6 +17,7 @@ import {
     Pencil,
     Trash2,
     GripVertical,
+    Zap,
 } from 'lucide-react';
 import {
     DndContext,
@@ -51,6 +52,7 @@ const ALL_NAV_ITEMS = [
     { id: '/', label: 'Task Board', icon: LayoutGrid },
     { id: '/messages', label: 'Messages', icon: MessageSquare },
     { id: '/tasks', label: 'Tasks', icon: CheckSquare },
+    { id: '/sprints', label: 'Sprints', icon: Zap },
     { id: '/teams', label: 'Projects', icon: Users },
     { id: '/members', label: 'Members', icon: Users },
     { id: '/attendance', label: 'Attendance', icon: Clock3 },

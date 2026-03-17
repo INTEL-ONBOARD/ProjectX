@@ -1,7 +1,7 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Users, CheckSquare, Clock, TrendingUp, CheckCircle, Plus } from 'lucide-react';
+import { Users, CheckSquare, Clock, TrendingUp, Plus } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AppContext } from '../context/AppContext';
@@ -45,20 +45,26 @@ const DashboardPage: React.FC = () => {
     { label: 'Attendance Rate', value: `${attendanceRate}%`, trend: 'Weekly avg', trendUp: true, color: '#30C5E5', accent: false, icon: TrendingUp, barPct: attendanceRate },
   ];
 
-  const activityItems = [
-    ...doneTasks.slice(0, 2).map(t => ({
-      id: `done-${t.id}`, icon: CheckCircle, bg: 'bg-[#83C29D33]', color: 'text-[#68B266]',
-      text: `"${t.title}" marked as Done`,
-    })),
-    ...inProgressTasks.slice(0, 2).map(t => ({
-      id: `prog-${t.id}`, icon: Clock, bg: 'bg-[#DFA87433]', color: 'text-[#D58D49]',
-      text: `"${t.title}" moved to In Progress`,
-    })),
-    ...todoTasks.slice(0, 1).map(t => ({
-      id: `todo-${t.id}`, icon: Plus, bg: 'bg-primary-50', color: 'text-primary-500',
-      text: `"${t.title}" task created`,
-    })),
-  ].slice(0, 5);
+  const activityFeed = useMemo(() => {
+    const entries: { taskTitle: string; actorName: string; type: string; timestamp: string; taskId: string }[] = [];
+    for (const task of allTasks) {
+      for (const entry of task.activity ?? []) {
+        entries.push({ taskTitle: task.title, actorName: entry.actorName, type: entry.type, timestamp: entry.timestamp, taskId: task.id });
+      }
+    }
+    return entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 15);
+  }, [allTasks]);
+
+  const activityLabel: Record<string, string> = {
+    created: 'created task',
+    status_changed: 'moved task',
+    priority_changed: 'changed priority of',
+    assignee_added: 'was assigned to',
+    assignee_removed: 'was removed from',
+    due_date_changed: 'updated due date of',
+    title_changed: 'renamed',
+    description_changed: 'updated description of',
+  };
 
   const donutItems = [
     { label: 'To Do', count: todoCount, color: '#5030E5' },
@@ -136,23 +142,23 @@ const DashboardPage: React.FC = () => {
               <button onClick={() => navigate('/tasks')} className="text-xs text-primary-500 font-semibold hover:text-primary-700">View all →</button>
             </div>
             <div className="px-5">
-              {activityItems.map((item, i) => {
-                const Icon = item.icon;
-                return (
-                  <motion.div
-                    key={item.id}
-                    className="flex items-center gap-3 py-3.5 border-b border-surface-100 last:border-0"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.35, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
-                  >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.bg}`}>
-                      <Icon size={14} className={item.color} />
-                    </div>
-                    <span className="text-sm text-gray-700 flex-1">{item.text}</span>
-                  </motion.div>
-                );
-              })}
+              {activityFeed.length === 0 ? (
+                <p className="text-xs text-gray-400 py-4 text-center">No activity yet</p>
+              ) : activityFeed.map((item, i) => (
+                <div key={i} className="flex items-start gap-3 py-2">
+                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[10px] font-bold text-primary-600">{item.actorName.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-700">
+                      <span className="font-semibold">{item.actorName}</span>
+                      {' '}{activityLabel[item.type] ?? item.type}{' '}
+                      <span className="font-medium text-gray-900 truncate">"{item.taskTitle.slice(0, 35)}{item.taskTitle.length > 35 ? '…' : ''}"</span>
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{new Date(item.timestamp).toLocaleString()}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

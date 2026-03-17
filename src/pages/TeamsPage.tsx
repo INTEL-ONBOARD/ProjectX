@@ -309,13 +309,12 @@ const ProjectCard: React.FC<{
             <span className="text-[10px] text-gray-400 font-medium">Progress</span>
             <span className="text-[10px] font-bold" style={{ color: project.color }}>{pct}%</span>
           </div>
-          <div className="h-1.5 bg-surface-200 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ backgroundColor: project.color }}
-              initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-              transition={{ duration: 0.6, delay: 0.2 + index * 0.05 }}
-            />
+          <div className="w-full h-1.5 bg-surface-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+            <span>{project.taskDone}/{project.taskTotal} tasks done</span>
+            <span>{pct}%</span>
           </div>
         </div>
 
@@ -387,11 +386,16 @@ const ProjectRow: React.FC<{
         <span className="text-xs font-semibold text-gray-700">{project.taskDone}/{project.taskTotal}</span>
       </td>
       <td className="px-4 py-3.5">
-        <div className="flex items-center gap-2">
-          <div className="w-20 h-1.5 bg-surface-200 rounded-full overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: project.color }} />
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <div className="w-full h-1.5 bg-surface-100 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-primary-500 transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-[10px] text-gray-400 shrink-0">{pct}%</span>
           </div>
-          <span className="text-[10px] text-gray-400">{pct}%</span>
+          <div className="flex justify-between text-[10px] text-gray-400">
+            <span>{project.taskDone}/{project.taskTotal} tasks done</span>
+          </div>
         </div>
       </td>
       <td className="px-4 py-3.5">

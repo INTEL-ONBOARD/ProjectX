@@ -88,7 +88,7 @@ const tabs = ['All', 'To Do', 'In Progress', 'Ready for QA', 'Deployment Pending
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { projects: contextProjects, allTasks, createTask, updateTask, deleteTask } = useProjects();
+  const { projects: contextProjects, allTasks, createTask, updateTask, deleteTask, moveTask } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const { user: authUser } = useAuth() ?? { user: null };
   const [activeTab, setActiveTab] = useState(0);
@@ -138,6 +138,10 @@ const TasksPage: React.FC = () => {
   // Delete confirmation state
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStatusDrop, setBulkStatusDrop] = useState(false);
+
   const totalTasks = allTasks.length;
 
   const tabStatusMap: (TaskStatus | null)[] = [null, 'todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'on-hold', 'done'];
@@ -151,7 +155,8 @@ const TasksPage: React.FC = () => {
   const todoCount = allTasks.filter(t => t.status === 'todo').length;
   const inProgCount = allTasks.filter(t => t.status === 'in-progress').length;
 
-  const TODAY_STR = new Date().toISOString().split('T')[0];
+  const TODAY = new Date().toISOString().split('T')[0];
+  const TODAY_STR = TODAY;
   const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY_STR && t.status !== 'done').length;
   const completionPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
 
@@ -178,6 +183,27 @@ const TasksPage: React.FC = () => {
       return [t.title, proj, t.priority, t.status, assigneeNames, t.dueDate ?? ''];
     });
     downloadCsv('tasks.csv', [header, ...rows]);
+  };
+
+  const handleExportCSV = () => {
+    const rows = [
+      ['Task #', 'Title', 'Status', 'Priority', 'Type', 'Project', 'Due Date'],
+      ...filteredTasks.map(t => [
+        t.taskNumber != null ? `#${String(t.taskNumber).padStart(3, '0')}` : '—',
+        t.title,
+        t.status,
+        t.priority,
+        t.taskType ?? 'task',
+        contextProjects.find(p => p.id === t.projectId)?.name ?? '—',
+        t.dueDate ?? '—',
+      ]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tasks.csv'; a.click();
+    URL.revokeObjectURL(url);
   };
 
   const startEdit = (task: Task) => {
@@ -229,6 +255,13 @@ const TasksPage: React.FC = () => {
                 <motion.button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-surface-100 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                   <Download size={16} /> Export
                 </motion.button>
+                <button
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-surface-200 rounded-lg hover:bg-surface-50 transition-colors"
+                >
+                  <Download size={13} />
+                  Export CSV
+                </button>
                 <motion.button
                   onClick={() => contextProjects.length > 0 && setShowTaskForm(true)}
                   className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-colors ${contextProjects.length > 0 ? 'bg-primary-500 text-white hover:bg-primary-600' : 'bg-surface-200 text-gray-400 cursor-not-allowed'}`}
@@ -310,6 +343,13 @@ const TasksPage: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-surface-100">
+                  <th className="px-4 py-3 w-8 bg-surface-50">
+                    <input type="checkbox"
+                      checked={selectedIds.size === filteredTasks.length && filteredTasks.length > 0}
+                      onChange={e => setSelectedIds(e.target.checked ? new Set(filteredTasks.map(t => t.id)) : new Set())}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
                   {['Task', 'Project', 'Priority', 'Assignees', 'Due', 'Status'].map(h => (
                     <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-surface-50${h === 'Task' ? ' w-[35%]' : ''}`}>{h}</th>
                   ))}
@@ -330,6 +370,17 @@ const TasksPage: React.FC = () => {
                       transition={{ duration: 0.35, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
                       onClick={() => { setSelectedTask(task); setDetailImage(null); setShowStatusDrop(false); setEditMode(false); setConfirmDelete(false); }}
                     >
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox"
+                          checked={selectedIds.has(task.id)}
+                          onChange={e => {
+                            const next = new Set(selectedIds);
+                            e.target.checked ? next.add(task.id) : next.delete(task.id);
+                            setSelectedIds(next);
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                      </td>
                       <td className="px-4 py-3 w-[35%]">
                         <div className="flex items-center">
                           <span className="text-[11px] font-semibold text-gray-400 mr-1.5 shrink-0">
@@ -354,7 +405,18 @@ const TasksPage: React.FC = () => {
                         <AvatarGroup names={names} colors={colors} size="sm" max={3} />
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs font-semibold text-gray-400`}>{task.dueDate ?? '—'}</span>
+                        {task.dueDate ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`text-xs ${task.dueDate < TODAY && task.status !== 'done' ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
+                              {task.dueDate}
+                            </span>
+                            {task.dueDate < TODAY && task.status !== 'done' && (
+                              <span className="text-[10px] font-bold text-red-400">Overdue</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>{status.label}</span>
@@ -783,6 +845,49 @@ const TasksPage: React.FC = () => {
           />
         )}
       </AnimatePresence>
+
+      {/* ── Bulk Action Bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-2xl px-4 py-3 flex items-center gap-4 shadow-2xl z-40">
+          <span className="text-sm font-semibold">{selectedIds.size} selected</span>
+          <div className="w-px h-4 bg-white/20" />
+          <select
+            className="bg-gray-800 text-white text-xs rounded-lg px-2 py-1 focus:outline-none"
+            defaultValue=""
+            onChange={async e => {
+              if (!e.target.value) return;
+              const status = e.target.value;
+              for (const id of selectedIds) {
+                await moveTask(id, status as any);
+              }
+              setSelectedIds(new Set());
+              e.target.value = '';
+            }}
+          >
+            <option value="" disabled>Move to…</option>
+            <option value="todo">To Do</option>
+            <option value="in-progress">In Progress</option>
+            <option value="ready-for-qa">Ready for QA</option>
+            <option value="deployment-pending">Deployment Pending</option>
+            <option value="blocker">Blocker</option>
+            <option value="on-hold">On Hold</option>
+            <option value="done">Done</option>
+          </select>
+          <button
+            onClick={async () => {
+              if (!confirm(`Delete ${selectedIds.size} tasks?`)) return;
+              for (const id of selectedIds) await deleteTask(id);
+              setSelectedIds(new Set());
+            }}
+            className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-300 transition-colors"
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-gray-400 hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 };

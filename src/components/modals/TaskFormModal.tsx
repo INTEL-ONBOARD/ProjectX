@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare, Tag } from 'lucide-react';
-import { Task, TaskStatus, TaskType } from '../../types';
+import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare, Tag, RefreshCw, Link, Zap } from 'lucide-react';
+import { Task, TaskStatus, TaskType, Sprint, TaskTemplate } from '../../types';
+
+const dbApi = () => (window as any).electronAPI.db;
 import { useProjects } from '../../context/ProjectContext';
 import { useMembersContext } from '../../context/MembersContext';
 import { Avatar } from '../ui/Avatar';
@@ -20,7 +22,7 @@ const priorityConfig = {
 };
 
 const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultStatus }) => {
-  const { projects } = useProjects();
+  const { projects, allTasks } = useProjects();
   const { members, getMemberColor } = useMembersContext();
 
   const [title, setTitle]           = useState(initial?.title ?? '');
@@ -33,6 +35,11 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [projectId, setProjectId]   = useState(initial?.projectId ?? '');
   const [startDate, setStartDate]   = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate]       = useState(initial?.dueDate ?? '');
+  const [recurrence, setRecurrence] = useState<'none'|'daily'|'weekly'|'monthly'>(initial?.recurrence ?? 'none');
+  const [blockedBy, setBlockedBy]   = useState<string[]>(initial?.blockedBy ?? []);
+  const [sprintId, setSprintId]     = useState(initial?.sprintId ?? '');
+  const [sprints, setSprints]       = useState<Sprint[]>([]);
+  const [templates, setTemplates]   = useState<TaskTemplate[]>([]);
   const [loading, setLoading]       = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [showAssigneeDrop, setShowAssigneeDrop] = useState(false);
@@ -48,6 +55,9 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => { dbApi().getSprints().then((data: any) => setSprints(data as Sprint[])); }, []);
+  useEffect(() => { dbApi().getTemplates().then((data: any) => setTemplates(data as TaskTemplate[])); }, []);
 
   const toggleAssignee = (id: string) =>
     setAssignees(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
@@ -65,8 +75,11 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
         taskType,
         assignees,
         projectId: projectId || undefined,
+        sprintId: sprintId || null,
         startDate: startDate || undefined,
         dueDate: dueDate || undefined,
+        recurrence,
+        blockedBy,
         comments: initial?.comments ?? 0,
         files: initial?.files ?? 0,
         images: initial?.images ?? [],
@@ -91,7 +104,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
       onClick={onClose}
     >
       <motion.div
-        className="bg-white rounded-2xl w-full max-w-[460px] max-h-[90vh] flex flex-col shadow-[0_16px_48px_-8px_rgba(0,0,0,0.2)]"
+        className="bg-surface-50 rounded-2xl w-full max-w-[460px] max-h-[90vh] flex flex-col shadow-[0_16px_48px_-8px_rgba(0,0,0,0.2)]"
         initial={{ scale: 0.96, opacity: 0, y: 12 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.96, opacity: 0, y: 12 }}
@@ -107,6 +120,29 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
               <span className="text-[11px] font-semibold text-gray-400">
                 #{String(initial.taskNumber).padStart(3, '0')}
               </span>
+            )}
+            {templates.length > 0 && (
+              <div className="relative ml-auto mr-2">
+                <select
+                  className="text-[10px] font-semibold border border-gray-200 rounded-lg px-2 py-1 text-gray-500 bg-surface-50 focus:outline-none focus:border-primary-400 appearance-none pr-5"
+                  defaultValue=""
+                  onChange={e => {
+                    const tmpl = templates.find(t => t.id === e.target.value);
+                    if (!tmpl) return;
+                    setTitle(tmpl.name);
+                    setDescription(tmpl.description);
+                    setPriority(tmpl.priority as any);
+                    setTaskType(tmpl.taskType as any);
+                    setAssignees(tmpl.assignees);
+                    if (tmpl.projectId) setProjectId(tmpl.projectId);
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="" disabled>Use template…</option>
+                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <ChevronDown size={9} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
             )}
           </div>
           <button
@@ -203,12 +239,27 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                 <select
                   value={projectId}
                   onChange={e => setProjectId(e.target.value)}
-                  className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 bg-white text-gray-700 pr-7 font-medium"
+                  className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 bg-surface-50 text-gray-700 pr-7 font-medium"
                 >
                   <option value="">No project</option>
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
+                </select>
+                <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Sprint */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">
+                <Zap size={10} /> Sprint
+              </label>
+              <div className="relative">
+                <select value={sprintId} onChange={e => setSprintId(e.target.value)}
+                  className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 bg-surface-50 text-gray-700 pr-7 font-medium">
+                  <option value="">No sprint</option>
+                  {sprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
                 <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
@@ -224,7 +275,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all bg-white text-gray-700 font-medium"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all bg-surface-50 text-gray-700 font-medium"
                 />
               </div>
               <div>
@@ -235,9 +286,60 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                   type="date"
                   value={dueDate}
                   onChange={e => setDueDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all bg-white text-gray-700 font-medium"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all bg-surface-50 text-gray-700 font-medium"
                 />
               </div>
+            </div>
+
+            {/* Recurrence */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">
+                <RefreshCw size={10} /> Recurrence
+              </label>
+              <div className="flex gap-2">
+                {(['none', 'daily', 'weekly', 'monthly'] as const).map(r => (
+                  <button
+                    key={r} type="button"
+                    onClick={() => setRecurrence(r)}
+                    className="flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all"
+                    style={recurrence === r ? { background: '#5030E515', color: '#5030E5', borderColor: '#5030E5' } : { background: 'var(--bg-muted)', color: 'var(--text-subtle)', borderColor: 'var(--border-default)' }}
+                  >
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Blocked By */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">
+                <Link size={10} /> Blocked By
+              </label>
+              {blockedBy.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {blockedBy.map(id => {
+                    const t = allTasks.find(x => x.id === id);
+                    return t ? (
+                      <span key={id} className="flex items-center gap-1 text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-md font-medium">
+                        #{t.taskNumber != null ? String(t.taskNumber).padStart(3,'0') : '?'} {t.title.slice(0,20)}
+                        <button type="button" onClick={() => setBlockedBy(prev => prev.filter(x => x !== id))}><X size={9} /></button>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-primary-400 bg-surface-50 text-gray-700 font-medium"
+                onChange={e => { if (e.target.value && !blockedBy.includes(e.target.value)) setBlockedBy(prev => [...prev, e.target.value]); e.target.value = ''; }}
+                defaultValue=""
+              >
+                <option value="" disabled>Select a blocking task…</option>
+                {allTasks.filter(t => t.id !== initial?.id && !blockedBy.includes(t.id)).map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.taskNumber != null ? `#${String(t.taskNumber).padStart(3,'0')} ` : ''}{t.title.slice(0, 40)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Assignees */}
@@ -275,7 +377,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                   onClick={() => setShowAssigneeDrop(v => !v)}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
                     showAssigneeDrop
-                      ? 'border-primary-400 bg-white ring-1 ring-primary-100 text-gray-700'
+                      ? 'border-primary-400 bg-surface-50 ring-1 ring-primary-100 text-gray-700'
                       : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-gray-300'
                   }`}
                 >
@@ -289,7 +391,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                 <AnimatePresence>
                   {showAssigneeDrop && (
                     <motion.div
-                      className="absolute left-0 top-full mt-1 w-full bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 z-30 overflow-hidden"
+                      className="absolute left-0 top-full mt-1 w-full bg-surface-50 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 z-30 overflow-hidden"
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
@@ -375,6 +477,20 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
             >
               Cancel
             </button>
+            {!isEdit && title.trim() && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const name = prompt('Template name:', title.trim());
+                  if (!name) return;
+                  const tmpl = await dbApi().createTemplate({ name, priority, taskType, description, assignees, projectId: projectId || '' }) as TaskTemplate;
+                  setTemplates(prev => [...prev, tmpl]);
+                }}
+                className="px-3 py-2 rounded-lg text-xs font-semibold text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                Save as template
+              </button>
+            )}
             <motion.button
               type="submit"
               disabled={loading || !title.trim()}

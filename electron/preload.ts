@@ -251,5 +251,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         // Presence
         heartbeat: (userId: string): Promise<boolean> => ipcRenderer.invoke('db:presence:heartbeat', userId),
+
+        // Comments
+        getComments:   (taskId: string): Promise<unknown[]>                         => ipcRenderer.invoke('db:comments:getByTask', taskId),
+        addComment:    (data: object): Promise<unknown>                              => ipcRenderer.invoke('db:comments:add', data),
+        deleteComment: (commentId: string): Promise<boolean>                        => ipcRenderer.invoke('db:comments:delete', commentId),
+
+        // Attachments
+        getAttachments:   (taskId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:attachments:getByTask', taskId),
+        pickAttachments:  (taskId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:attachments:pick', taskId),
+        deleteAttachment: (attachId: string): Promise<boolean>                      => ipcRenderer.invoke('db:attachments:delete', attachId),
+        openAttachment:   (filePath: string): Promise<boolean>                      => ipcRenderer.invoke('db:attachments:open', filePath),
+
+        // Sprints
+        getSprints:    (): Promise<unknown[]>                                        => ipcRenderer.invoke('db:sprints:getAll'),
+        createSprint:  (data: object): Promise<unknown>                              => ipcRenderer.invoke('db:sprints:create', data),
+        updateSprint:  (id: string, changes: object): Promise<unknown>               => ipcRenderer.invoke('db:sprints:update', id, changes),
+        deleteSprint:  (id: string): Promise<boolean>                                => ipcRenderer.invoke('db:sprints:delete', id),
+
+        // Task Templates
+        getTemplates:   (): Promise<unknown[]>                                       => ipcRenderer.invoke('db:templates:getAll'),
+        createTemplate: (data: object): Promise<unknown>                             => ipcRenderer.invoke('db:templates:create', data),
+        deleteTemplate: (id: string): Promise<boolean>                               => ipcRenderer.invoke('db:templates:delete', id),
+
+        // Avatar
+        pickAvatar: (): Promise<string | null>                                       => ipcRenderer.invoke('db:members:pickAvatar'),
     },
+
+    // PDF export
+    printToPDF: (): Promise<boolean> => ipcRenderer.invoke('app:printToPDF'),
 });

@@ -42,6 +42,7 @@ import MessagesPage from './pages/MessagesPage';
 import TasksPage from './pages/TasksPage';
 import MembersPage from './pages/MembersPage';
 import UsersPage from './pages/UsersPage';
+import SprintsPage from './pages/SprintsPage';
 import { ProjectProvider, useProjects } from './context/ProjectContext';
 import { AppProvider, AppContext, User } from './context/AppContext';
 import { MembersProvider, useMembersContext } from './context/MembersContext';
@@ -52,6 +53,8 @@ import { PresenceProvider } from './context/PresenceContext';
 import { NotificationProvider } from './context/NotificationContext';
 import BugReportModal from './components/ui/BugReportModal';
 import UpdateBanner from './components/ui/UpdateBanner';
+import CommandPalette from './components/ui/CommandPalette';
+import ShortcutsHelp from './components/ui/ShortcutsHelp';
 import { ToastProvider } from './components/ui/Toast';
 import SplashScreen from './pages/auth/SplashScreen';
 import WalkthroughScreen from './pages/auth/WalkthroughScreen';
@@ -155,6 +158,19 @@ const Layout: React.FC<{
 }> = ({ children, showProjectHeader = false, onFilterChange, onTodayToggle }) => {
     const { sidebarCollapsed, setSidebarCollapsed } = useContext(AppContext);
     const { activeProject, setActiveProject } = useProjects();
+    const [paletteOpen, setPaletteOpen] = useState(false);
+    const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            const inInput = ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName ?? '');
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setPaletteOpen(v => !v); }
+            if ((e.metaKey || e.ctrlKey) && e.key === '/') { e.preventDefault(); setShortcutsOpen(v => !v); }
+            if (!inInput && e.key === 'n' && !e.metaKey && !e.ctrlKey) { /* trigger new task — skip for now */ }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
 
     return (
         <div className="flex h-screen w-screen overflow-hidden" style={{ background: 'var(--bg-app)' }}>
@@ -174,6 +190,8 @@ const Layout: React.FC<{
                 {showProjectHeader && <ProjectHeader onFilterChange={onFilterChange} onTodayToggle={onTodayToggle} />}
                 {children}
             </motion.div>
+            <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+            <ShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
         </div>
     );
 };
@@ -426,6 +444,7 @@ const MainApp: React.FC = () => (
             <Route path="/"           element={<ProtectedRoute path="/"><KanbanRoute /></ProtectedRoute>} />
             <Route path="/messages"   element={<ProtectedRoute path="/messages"><MessagesPage /></ProtectedRoute>} />
             <Route path="/tasks"      element={<ProtectedRoute path="/tasks"><TasksPage /></ProtectedRoute>} />
+            <Route path="/sprints"    element={<ProtectedRoute path="/sprints"><SprintsPage /></ProtectedRoute>} />
             <Route path="/members"    element={<ProtectedRoute path="/members"><MembersPage /></ProtectedRoute>} />
             <Route path="/dashboard"  element={<ProtectedRoute path="/dashboard"><DashboardPage /></ProtectedRoute>} />
             <Route path="/teams"      element={<ProtectedRoute path="/teams"><TeamsPage /></ProtectedRoute>} />

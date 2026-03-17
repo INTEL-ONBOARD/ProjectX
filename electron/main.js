@@ -70,6 +70,10 @@ const TaskSchema = new mongoose_1.Schema({
     dueDate: String,
     projectId: String,
     taskNumber:  { type: Number, default: null },
+    sprintId:   { type: String, default: null },
+    blockedBy:  { type: [String], default: [] },
+    recurrence: { type: String, enum: ['none', 'daily', 'weekly', 'monthly'], default: 'none' },
+    order:      { type: Number, default: 0 },
     activity: { type: Array, default: [] },
 });
 const ProjectSchema = new mongoose_1.Schema({
@@ -186,6 +190,43 @@ const CounterSchema = new mongoose_1.Schema({
     value: { type: Number, default: 0 },
 });
 const CounterModel = mongoose_1.default.model('Counter', CounterSchema);
+const CommentSchema = new mongoose_1.Schema({
+    commentId:  { type: String, required: true, unique: true },
+    taskId:     { type: String, required: true },
+    authorId:   { type: String, required: true },
+    authorName: { type: String, required: true },
+    text:       { type: String, required: true },
+    createdAt:  { type: String, required: true },
+});
+const CommentModel = mongoose_1.default.model('Comment', CommentSchema);
+const AttachmentSchema = new mongoose_1.Schema({
+    attachId:   { type: String, required: true, unique: true },
+    taskId:     { type: String, required: true },
+    name:       { type: String, required: true },
+    filePath:   { type: String, required: true },
+    size:       { type: Number, default: 0 },
+    uploadedAt: { type: String, required: true },
+});
+const AttachmentModel = mongoose_1.default.model('Attachment', AttachmentSchema);
+const SprintSchema = new mongoose_1.Schema({
+    sprintId:  { type: String, required: true, unique: true },
+    name:      { type: String, required: true },
+    projectId: { type: String, required: true },
+    startDate: { type: String, default: '' },
+    endDate:   { type: String, default: '' },
+    status:    { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
+});
+const SprintModel = mongoose_1.default.model('Sprint', SprintSchema);
+const TaskTemplateSchema = new mongoose_1.Schema({
+    templateId:  { type: String, required: true, unique: true },
+    name:        { type: String, required: true },
+    priority:    { type: String, enum: ['low', 'medium', 'high'], default: 'low' },
+    taskType:    { type: String, enum: ['task', 'issue'], default: 'task' },
+    description: { type: String, default: '' },
+    assignees:   [String],
+    projectId:   { type: String, default: '' },
+});
+const TaskTemplateModel = mongoose_1.default.model('TaskTemplate', TaskTemplateSchema);
 const UserModel = mongoose_1.default.model('User', UserSchema);
 const TaskModel = mongoose_1.default.model('Task', TaskSchema);
 const ProjectModel = mongoose_1.default.model('Project', ProjectSchema);
@@ -215,7 +256,7 @@ const toUser = (d) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', emai
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject = (d) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask = (d) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask = (d) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, sprintId: d.sprintId ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? 'none', order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser = (d) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1076,7 +1117,34 @@ function registerDbHandlers() {
         if (entries.length > 0)
             updateDoc.$push = { activity: { $each: entries } };
         const updated = await TaskModel.findOneAndUpdate({ appId: id }, updateDoc, { returnDocument: 'after' });
-        return updated ? safe(toTask(updated.toObject())) : null;
+        if (!updated) return null;
+        // Auto-create next occurrence for recurring tasks when marked done
+        const updatedObj = updated.toObject();
+        if (updatedObj.recurrence && updatedObj.recurrence !== 'none' && updatedObj.status === 'done' && rest.status === 'done') {
+            const oldDue = updatedObj.dueDate ? new Date(updatedObj.dueDate) : new Date();
+            let nextDue;
+            if (updatedObj.recurrence === 'daily') { nextDue = new Date(oldDue); nextDue.setDate(nextDue.getDate() + 1); }
+            else if (updatedObj.recurrence === 'weekly') { nextDue = new Date(oldDue); nextDue.setDate(nextDue.getDate() + 7); }
+            else { nextDue = new Date(oldDue); nextDue.setMonth(nextDue.getMonth() + 1); }
+            const nextCounter = await CounterModel.findOneAndUpdate({ name: 'tasks' }, { $inc: { value: 1 } }, { new: true, upsert: true });
+            await TaskModel.create({
+                appId: 't' + Date.now() + '_r',
+                title: updatedObj.title,
+                description: updatedObj.description ?? '',
+                priority: updatedObj.priority,
+                taskType: updatedObj.taskType ?? 'task',
+                status: 'todo',
+                assignees: updatedObj.assignees ?? [],
+                projectId: updatedObj.projectId ?? null,
+                sprintId: updatedObj.sprintId ?? null,
+                recurrence: updatedObj.recurrence,
+                dueDate: nextDue.toISOString().split('T')[0],
+                taskNumber: nextCounter.value,
+                order: 0,
+                activity: [{ id: (0, crypto_1.randomUUID)(), type: 'created', actorId: 'system', actorName: 'System', timestamp: new Date().toISOString() }],
+            });
+        }
+        return safe(toTask(updatedObj));
     });
     electron_1.ipcMain.handle('db:tasks:delete', async (_e, id) => { await TaskModel.deleteOne({ appId: id }); return true; });
     electron_1.ipcMain.handle('db:tasks:move', async (_e, id, newStatus, actorId, actorName) => {
@@ -1096,6 +1164,113 @@ function registerDbHandlers() {
         return updated ? safe(toTask(updated.toObject())) : null;
     });
     electron_1.ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
+    // Comments
+    electron_1.ipcMain.handle('db:comments:getByTask', async (_e, taskId) => {
+        const docs = await CommentModel.find({ taskId }).sort({ createdAt: 1 }).lean();
+        return safe(docs.map((d) => ({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt })));
+    });
+    electron_1.ipcMain.handle('db:comments:add', async (_e, data) => {
+        const doc = await CommentModel.create({ commentId: (0, crypto_1.randomUUID)(), ...data, createdAt: new Date().toISOString() });
+        await TaskModel.updateOne({ appId: data.taskId }, { $inc: { comments: 1 } });
+        return safe({ id: doc.commentId, taskId: doc.taskId, authorId: doc.authorId, authorName: doc.authorName, text: doc.text, createdAt: doc.createdAt });
+    });
+    electron_1.ipcMain.handle('db:comments:delete', async (_e, commentId) => {
+        const doc = await CommentModel.findOneAndDelete({ commentId }).lean();
+        if (doc) await TaskModel.updateOne({ appId: doc.taskId }, { $inc: { comments: -1 } });
+        return true;
+    });
+    // Attachments
+    electron_1.ipcMain.handle('db:attachments:getByTask', async (_e, taskId) => {
+        const docs = await AttachmentModel.find({ taskId }).sort({ uploadedAt: 1 }).lean();
+        return safe(docs.map((d) => ({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt })));
+    });
+    electron_1.ipcMain.handle('db:attachments:pick', async (_e, taskId) => {
+        const { dialog, app: eApp } = await import('electron');
+        const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
+        if (result.canceled || !result.filePaths.length) return [];
+        const fs = await import('fs');
+        const path = await import('path');
+        const destDir = path.join(eApp.getPath('userData'), 'attachments', taskId);
+        await fs.promises.mkdir(destDir, { recursive: true });
+        const saved = [];
+        for (const src of result.filePaths) {
+            const name = path.basename(src);
+            const dest = path.join(destDir, `${Date.now()}_${name}`);
+            await fs.promises.copyFile(src, dest);
+            const stat = await fs.promises.stat(dest);
+            const doc = await AttachmentModel.create({ attachId: (0, crypto_1.randomUUID)(), taskId, name, filePath: dest, size: stat.size, uploadedAt: new Date().toISOString() });
+            await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
+            saved.push({ id: doc.attachId, taskId, name, filePath: dest, size: stat.size, uploadedAt: doc.uploadedAt });
+        }
+        return safe(saved);
+    });
+    electron_1.ipcMain.handle('db:attachments:delete', async (_e, attachId) => {
+        const doc = await AttachmentModel.findOneAndDelete({ attachId }).lean();
+        if (doc) {
+            const fs = await import('fs');
+            try { await fs.promises.unlink(doc.filePath); } catch (_) {}
+            await TaskModel.updateOne({ appId: doc.taskId }, { $inc: { files: -1 } });
+        }
+        return true;
+    });
+    electron_1.ipcMain.handle('db:attachments:open', async (_e, filePath) => {
+        await electron_1.shell.openPath(filePath);
+        return true;
+    });
+    // Sprints
+    electron_1.ipcMain.handle('db:sprints:getAll', async () => {
+        const docs = await SprintModel.find().lean();
+        return safe(docs.map((d) => ({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status })));
+    });
+    electron_1.ipcMain.handle('db:sprints:create', async (_e, data) => {
+        const doc = await SprintModel.create({ sprintId: `sp${Date.now()}`, ...data });
+        return safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status });
+    });
+    electron_1.ipcMain.handle('db:sprints:update', async (_e, id, changes) => {
+        const doc = await SprintModel.findOneAndUpdate({ sprintId: id }, changes, { returnDocument: 'after' }).lean();
+        return doc ? safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status }) : null;
+    });
+    electron_1.ipcMain.handle('db:sprints:delete', async (_e, id) => {
+        await SprintModel.deleteOne({ sprintId: id });
+        await TaskModel.updateMany({ sprintId: id }, { $set: { sprintId: null } });
+        return true;
+    });
+    // Task Templates
+    electron_1.ipcMain.handle('db:templates:getAll', async () => {
+        const docs = await TaskTemplateModel.find().lean();
+        return safe(docs.map((d) => ({ id: d.templateId, name: d.name, priority: d.priority, taskType: d.taskType, description: d.description, assignees: d.assignees, projectId: d.projectId })));
+    });
+    electron_1.ipcMain.handle('db:templates:create', async (_e, data) => {
+        const doc = await TaskTemplateModel.create({ templateId: `tmpl${Date.now()}`, ...data });
+        return safe({ id: doc.templateId, name: doc.name, priority: doc.priority, taskType: doc.taskType, description: doc.description, assignees: doc.assignees, projectId: doc.projectId });
+    });
+    electron_1.ipcMain.handle('db:templates:delete', async (_e, id) => {
+        await TaskTemplateModel.deleteOne({ templateId: id });
+        return true;
+    });
+    // Avatar pick
+    electron_1.ipcMain.handle('db:members:pickAvatar', async () => {
+        const { dialog } = await import('electron');
+        const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
+        if (result.canceled || !result.filePaths.length) return null;
+        const fs = await import('fs');
+        const data = await fs.promises.readFile(result.filePaths[0]);
+        const ext = result.filePaths[0].split('.').pop()?.toLowerCase() ?? 'png';
+        const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/png';
+        return `data:${mime};base64,${data.toString('base64')}`;
+    });
+    // PDF export
+    electron_1.ipcMain.handle('app:printToPDF', async () => {
+        const { dialog } = await import('electron');
+        if (!mainWindow) return false;
+        const save = await dialog.showSaveDialog(mainWindow, { defaultPath: 'report.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+        if (save.canceled || !save.filePath) return false;
+        const fs = await import('fs');
+        const data = await mainWindow.webContents.printToPDF({ printBackground: true });
+        await fs.promises.writeFile(save.filePath, data);
+        await electron_1.shell.openPath(save.filePath);
+        return true;
+    });
     // Members
     electron_1.ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
     electron_1.ipcMain.handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });

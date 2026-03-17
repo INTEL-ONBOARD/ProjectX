@@ -39,6 +39,10 @@ const TaskSchema = new Schema({
     dueDate:     String,
     projectId:   String,
     taskNumber:  { type: Number, default: null },
+    sprintId:   { type: String, default: null },
+    blockedBy:  { type: [String], default: [] },
+    recurrence: { type: String, enum: ['none', 'daily', 'weekly', 'monthly'], default: 'none' },
+    order:      { type: Number, default: 0 },
     activity:    { type: Array, default: [] },
 });
 
@@ -170,6 +174,47 @@ const CounterSchema = new Schema({
 });
 const CounterModel = mongoose.model('Counter', CounterSchema);
 
+const CommentSchema = new Schema({
+    commentId:  { type: String, required: true, unique: true },
+    taskId:     { type: String, required: true },
+    authorId:   { type: String, required: true },
+    authorName: { type: String, required: true },
+    text:       { type: String, required: true },
+    createdAt:  { type: String, required: true },
+});
+const CommentModel = mongoose.model('Comment', CommentSchema);
+
+const AttachmentSchema = new Schema({
+    attachId:   { type: String, required: true, unique: true },
+    taskId:     { type: String, required: true },
+    name:       { type: String, required: true },
+    filePath:   { type: String, required: true },
+    size:       { type: Number, default: 0 },
+    uploadedAt: { type: String, required: true },
+});
+const AttachmentModel = mongoose.model('Attachment', AttachmentSchema);
+
+const SprintSchema = new Schema({
+    sprintId:  { type: String, required: true, unique: true },
+    name:      { type: String, required: true },
+    projectId: { type: String, required: true },
+    startDate: { type: String, default: '' },
+    endDate:   { type: String, default: '' },
+    status:    { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
+});
+const SprintModel = mongoose.model('Sprint', SprintSchema);
+
+const TaskTemplateSchema = new Schema({
+    templateId:  { type: String, required: true, unique: true },
+    name:        { type: String, required: true },
+    priority:    { type: String, enum: ['low', 'medium', 'high'], default: 'low' },
+    taskType:    { type: String, enum: ['task', 'issue'], default: 'task' },
+    description: { type: String, default: '' },
+    assignees:   [String],
+    projectId:   { type: String, default: '' },
+});
+const TaskTemplateModel = mongoose.model('TaskTemplate', TaskTemplateSchema);
+
 const UserModel           = mongoose.model('User', UserSchema);
 const TaskModel           = mongoose.model('Task', TaskSchema);
 const ProjectModel        = mongoose.model('Project', ProjectSchema);
@@ -203,7 +248,7 @@ const toUser = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '',
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, sprintId: d.sprintId ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? 'none', order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser    = (d: any) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -864,7 +909,34 @@ function registerDbHandlers() {
         const updateDoc: any = { $set: { ...rest } };
         if (entries.length > 0) updateDoc.$push = { activity: { $each: entries } };
         const updated = await TaskModel.findOneAndUpdate({ appId: id }, updateDoc, { returnDocument: 'after' });
-        return updated ? safe(toTask(updated.toObject())) : null;
+        if (!updated) return null;
+        // Auto-create next occurrence for recurring tasks when marked done
+        const updatedObj = updated.toObject() as any;
+        if (updatedObj.recurrence && updatedObj.recurrence !== 'none' && updatedObj.status === 'done' && rest.status === 'done') {
+            const oldDue = updatedObj.dueDate ? new Date(updatedObj.dueDate) : new Date();
+            let nextDue: Date;
+            if (updatedObj.recurrence === 'daily') { nextDue = new Date(oldDue); nextDue.setDate(nextDue.getDate() + 1); }
+            else if (updatedObj.recurrence === 'weekly') { nextDue = new Date(oldDue); nextDue.setDate(nextDue.getDate() + 7); }
+            else { nextDue = new Date(oldDue); nextDue.setMonth(nextDue.getMonth() + 1); }
+            const nextCounter = await CounterModel.findOneAndUpdate({ name: 'tasks' }, { $inc: { value: 1 } }, { new: true, upsert: true });
+            await TaskModel.create({
+                appId: 't' + Date.now() + '_r',
+                title: updatedObj.title,
+                description: updatedObj.description ?? '',
+                priority: updatedObj.priority,
+                taskType: updatedObj.taskType ?? 'task',
+                status: 'todo',
+                assignees: updatedObj.assignees ?? [],
+                projectId: updatedObj.projectId ?? null,
+                sprintId: updatedObj.sprintId ?? null,
+                recurrence: updatedObj.recurrence,
+                dueDate: nextDue.toISOString().split('T')[0],
+                taskNumber: nextCounter!.value,
+                order: 0,
+                activity: [{ id: randomUUID(), type: 'created', actorId: 'system', actorName: 'System', timestamp: new Date().toISOString() }],
+            });
+        }
+        return safe(toTask(updatedObj));
     });
     ipcMain.handle('db:tasks:delete', async (_e, id: string) => { await TaskModel.deleteOne({ appId: id }); return true; });
     ipcMain.handle('db:tasks:move', async (_e, id: string, newStatus: string, actorId?: string, actorName?: string) => {
@@ -887,6 +959,119 @@ function registerDbHandlers() {
         return updated ? safe(toTask(updated.toObject())) : null;
     });
     ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId: string) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
+
+    // Comments
+    ipcMain.handle('db:comments:getByTask', async (_e, taskId: string) => {
+        const docs = await CommentModel.find({ taskId }).sort({ createdAt: 1 }).lean();
+        return safe(docs.map((d: any) => ({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt })));
+    });
+    ipcMain.handle('db:comments:add', async (_e, data: { taskId: string; authorId: string; authorName: string; text: string }) => {
+        const doc = await CommentModel.create({ commentId: randomUUID(), ...data, createdAt: new Date().toISOString() });
+        await TaskModel.updateOne({ appId: data.taskId }, { $inc: { comments: 1 } });
+        return safe({ id: doc.commentId, taskId: doc.taskId, authorId: doc.authorId, authorName: doc.authorName, text: doc.text, createdAt: doc.createdAt });
+    });
+    ipcMain.handle('db:comments:delete', async (_e, commentId: string) => {
+        const doc = await CommentModel.findOneAndDelete({ commentId }).lean();
+        if (doc) await TaskModel.updateOne({ appId: (doc as any).taskId }, { $inc: { comments: -1 } });
+        return true;
+    });
+
+    // Attachments
+    ipcMain.handle('db:attachments:getByTask', async (_e, taskId: string) => {
+        const docs = await AttachmentModel.find({ taskId }).sort({ uploadedAt: 1 }).lean();
+        return safe(docs.map((d: any) => ({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt })));
+    });
+    ipcMain.handle('db:attachments:pick', async (_e, taskId: string) => {
+        const { dialog, app: eApp } = await import('electron');
+        const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
+        if (result.canceled || !result.filePaths.length) return [];
+        const fs = await import('fs');
+        const path = await import('path');
+        const destDir = path.join(eApp.getPath('userData'), 'attachments', taskId);
+        await fs.promises.mkdir(destDir, { recursive: true });
+        const saved: any[] = [];
+        for (const src of result.filePaths) {
+            const name = path.basename(src);
+            const dest = path.join(destDir, `${Date.now()}_${name}`);
+            await fs.promises.copyFile(src, dest);
+            const stat = await fs.promises.stat(dest);
+            const doc = await AttachmentModel.create({ attachId: randomUUID(), taskId, name, filePath: dest, size: stat.size, uploadedAt: new Date().toISOString() });
+            await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
+            saved.push({ id: doc.attachId, taskId, name, filePath: dest, size: stat.size, uploadedAt: doc.uploadedAt });
+        }
+        return safe(saved);
+    });
+    ipcMain.handle('db:attachments:delete', async (_e, attachId: string) => {
+        const doc = await AttachmentModel.findOneAndDelete({ attachId }).lean();
+        if (doc) {
+            const fs = await import('fs');
+            try { await fs.promises.unlink((doc as any).filePath); } catch (_) {}
+            await TaskModel.updateOne({ appId: (doc as any).taskId }, { $inc: { files: -1 } });
+        }
+        return true;
+    });
+    ipcMain.handle('db:attachments:open', async (_e, filePath: string) => {
+        await shell.openPath(filePath);
+        return true;
+    });
+
+    // Sprints
+    ipcMain.handle('db:sprints:getAll', async () => {
+        const docs = await SprintModel.find().lean();
+        return safe(docs.map((d: any) => ({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status })));
+    });
+    ipcMain.handle('db:sprints:create', async (_e, data: { name: string; projectId: string; startDate?: string; endDate?: string; status?: string }) => {
+        const doc = await SprintModel.create({ sprintId: `sp${Date.now()}`, ...data });
+        return safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status });
+    });
+    ipcMain.handle('db:sprints:update', async (_e, id: string, changes: object) => {
+        const doc = await SprintModel.findOneAndUpdate({ sprintId: id }, changes, { returnDocument: 'after' }).lean();
+        return doc ? safe({ id: (doc as any).sprintId, name: (doc as any).name, projectId: (doc as any).projectId, startDate: (doc as any).startDate, endDate: (doc as any).endDate, status: (doc as any).status }) : null;
+    });
+    ipcMain.handle('db:sprints:delete', async (_e, id: string) => {
+        await SprintModel.deleteOne({ sprintId: id });
+        await TaskModel.updateMany({ sprintId: id }, { $set: { sprintId: null } });
+        return true;
+    });
+
+    // Task Templates
+    ipcMain.handle('db:templates:getAll', async () => {
+        const docs = await TaskTemplateModel.find().lean();
+        return safe(docs.map((d: any) => ({ id: d.templateId, name: d.name, priority: d.priority, taskType: d.taskType, description: d.description, assignees: d.assignees, projectId: d.projectId })));
+    });
+    ipcMain.handle('db:templates:create', async (_e, data: { name: string; priority: string; taskType: string; description: string; assignees: string[]; projectId: string }) => {
+        const doc = await TaskTemplateModel.create({ templateId: `tmpl${Date.now()}`, ...data });
+        return safe({ id: doc.templateId, name: doc.name, priority: doc.priority, taskType: doc.taskType, description: doc.description, assignees: doc.assignees, projectId: doc.projectId });
+    });
+    ipcMain.handle('db:templates:delete', async (_e, id: string) => {
+        await TaskTemplateModel.deleteOne({ templateId: id });
+        return true;
+    });
+
+    // Avatar pick
+    ipcMain.handle('db:members:pickAvatar', async () => {
+        const { dialog } = await import('electron');
+        const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
+        if (result.canceled || !result.filePaths.length) return null;
+        const fs = await import('fs');
+        const data = await fs.promises.readFile(result.filePaths[0]);
+        const ext = result.filePaths[0].split('.').pop()?.toLowerCase() ?? 'png';
+        const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/png';
+        return `data:${mime};base64,${data.toString('base64')}`;
+    });
+
+    // PDF export
+    ipcMain.handle('app:printToPDF', async () => {
+        const { dialog } = await import('electron');
+        if (!mainWindow) return false;
+        const save = await dialog.showSaveDialog(mainWindow, { defaultPath: 'report.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+        if (save.canceled || !save.filePath) return false;
+        const fs = await import('fs');
+        const data = await mainWindow.webContents.printToPDF({ printBackground: true });
+        await fs.promises.writeFile(save.filePath, data);
+        await shell.openPath(save.filePath);
+        return true;
+    });
 
     // Members
     ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));

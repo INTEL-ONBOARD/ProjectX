@@ -52,6 +52,7 @@ export interface TaskActivityEntry {
 }
 
 export type TaskType = 'task' | 'issue';
+export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export interface Task {
     id: string;
@@ -61,6 +62,10 @@ export interface Task {
     status: TaskStatus;
     taskType?: TaskType;
     taskNumber?: number | null;
+    sprintId?: string | null;
+    blockedBy?: string[];
+    recurrence?: Recurrence;
+    order?: number;
     assignees: string[];
     comments: number;
     commentData?: TaskCommentItem[];
@@ -70,6 +75,43 @@ export interface Task {
     dueDate?: string;
     projectId?: string;
     activity?: TaskActivityEntry[];
+}
+
+export interface Comment {
+    id: string;
+    taskId: string;
+    authorId: string;
+    authorName: string;
+    text: string;
+    createdAt: string;
+}
+
+export interface Attachment {
+    id: string;
+    taskId: string;
+    name: string;
+    filePath: string;
+    size: number;
+    uploadedAt: string;
+}
+
+export interface Sprint {
+    id: string;
+    name: string;
+    projectId: string;
+    startDate?: string;
+    endDate?: string;
+    status: 'planned' | 'active' | 'completed';
+}
+
+export interface TaskTemplate {
+    id: string;
+    name: string;
+    priority: 'low' | 'medium' | 'high';
+    taskType: TaskType;
+    description: string;
+    assignees: string[];
+    projectId: string;
 }
 
 export interface Project {
