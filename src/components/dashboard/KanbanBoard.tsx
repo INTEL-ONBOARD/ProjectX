@@ -122,7 +122,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   // Edit state
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
-  const [editPriority, setEditPriority] = useState<'low' | 'high'>('low');
+  const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high'>('low');
+  const [editTaskType, setEditTaskType] = useState<'task' | 'issue'>('task');
   const [editAssignees, setEditAssignees] = useState<string[]>([]);
   const [editDueDate, setEditDueDate] = useState('');
 
@@ -142,7 +143,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const startEdit = (task: Task) => {
     setEditTitle(task.title);
     setEditDesc(task.description ?? '');
-    setEditPriority(task.priority === 'high' ? 'high' : 'low');
+    setEditPriority(task.priority === 'high' ? 'high' : task.priority === 'medium' ? 'medium' : 'low');
+    setEditTaskType(task.taskType === 'issue' ? 'issue' : 'task');
     setEditAssignees([...task.assignees]);
     setEditDueDate(task.dueDate ?? '');
     setEditMode(true);
@@ -154,10 +156,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
       title: editTitle,
       description: editDesc,
       priority: editPriority,
+      taskType: editTaskType,
       assignees: editAssignees,
       dueDate: editDueDate || undefined,
     }).catch(console.error);
-    setSelectedTask(prev => prev ? { ...prev, title: editTitle, description: editDesc, priority: editPriority, assignees: editAssignees, dueDate: editDueDate || undefined } : prev);
+    setSelectedTask(prev => prev ? { ...prev, title: editTitle, description: editDesc, priority: editPriority, taskType: editTaskType, assignees: editAssignees, dueDate: editDueDate || undefined } : prev);
     setEditMode(false);
   };
 
@@ -481,11 +484,34 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   <div>
                     <div className="text-xs font-semibold text-gray-400 mb-1.5">Priority</div>
                     <div className="flex gap-2">
-                      {(['low', 'high'] as const).map(p => (
-                        <button key={p} onClick={() => setEditPriority(p)}
-                          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${editPriority === p ? (p === 'high' ? 'bg-[#D8727D22] text-[#D8727D] ring-1 ring-[#D8727D]' : 'bg-[#DFA87433] text-[#D58D49] ring-1 ring-[#D58D49]') : 'bg-surface-100 text-gray-500'}`}
+                      {([
+                        { value: 'low',    color: '#D58D49', bg: 'bg-[#DFA87433]', ring: 'ring-[#D58D49]', text: 'text-[#D58D49]' },
+                        { value: 'medium', color: '#A78BFA', bg: 'bg-[#A78BFA22]', ring: 'ring-[#A78BFA]', text: 'text-[#A78BFA]' },
+                        { value: 'high',   color: '#D8727D', bg: 'bg-[#D8727D22]', ring: 'ring-[#D8727D]', text: 'text-[#D8727D]' },
+                      ] as const).map(p => (
+                        <button key={p.value} onClick={() => setEditPriority(p.value)}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editPriority === p.value ? `${p.bg} ${p.text} ring-1 ${p.ring}` : 'bg-surface-100 text-gray-500'}`}
                         >
-                          {p.charAt(0).toUpperCase() + p.slice(1)}
+                          {p.value.charAt(0).toUpperCase() + p.value.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Type edit */}
+                {editMode && (
+                  <div>
+                    <div className="text-xs font-semibold text-gray-400 mb-1.5">Type</div>
+                    <div className="flex gap-2">
+                      {([
+                        { value: 'task',  label: 'Task',  bg: 'bg-[#22C55E20]', ring: 'ring-[#22C55E]', text: 'text-[#22C55E]' },
+                        { value: 'issue', label: 'Issue', bg: 'bg-[#EF444420]', ring: 'ring-[#EF4444]', text: 'text-[#EF4444]' },
+                      ] as const).map(t => (
+                        <button key={t.value} onClick={() => setEditTaskType(t.value)}
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editTaskType === t.value ? `${t.bg} ${t.text} ring-1 ${t.ring}` : 'bg-surface-100 text-gray-500'}`}
+                        >
+                          {t.label}
                         </button>
                       ))}
                     </div>

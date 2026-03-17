@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare } from 'lucide-react';
-import { Task, TaskStatus } from '../../types';
+import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare, Tag } from 'lucide-react';
+import { Task, TaskStatus, TaskType } from '../../types';
 import { useProjects } from '../../context/ProjectContext';
 import { useMembersContext } from '../../context/MembersContext';
 import { Avatar } from '../ui/Avatar';
@@ -28,6 +28,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [priority, setPriority]     = useState<'low' | 'medium' | 'high'>(
     initial?.priority === 'high' ? 'high' : initial?.priority === 'medium' ? 'medium' : 'low'
   );
+  const [taskType, setTaskType]     = useState<TaskType>(initial?.taskType ?? 'task');
   const [assignees, setAssignees]   = useState<string[]>(initial?.assignees ?? []);
   const [projectId, setProjectId]   = useState(initial?.projectId ?? '');
   const [startDate, setStartDate]   = useState(initial?.startDate ?? new Date().toISOString().slice(0, 10));
@@ -61,6 +62,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
         description: description.trim(),
         priority,
         status,
+        taskType,
         assignees,
         projectId: projectId || undefined,
         startDate: startDate || undefined,
@@ -155,6 +157,32 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                     >
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? cfg.color : 'var(--border-strong)' }} />
                       {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Type */}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5 mb-1.5">
+                <Tag size={10} /> Type
+              </label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'task', label: 'Task', color: '#22C55E', bg: '#22C55E15', ring: '#22C55E' },
+                  { value: 'issue', label: 'Issue', color: '#EF4444', bg: '#EF444415', ring: '#EF4444' },
+                ] as const).map(t => {
+                  const active = taskType === t.value;
+                  return (
+                    <button
+                      key={t.value} type="button"
+                      onClick={() => setTaskType(t.value)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all border"
+                      style={active ? { background: t.bg, color: t.color, borderColor: t.ring } : { background: 'var(--bg-muted)', color: 'var(--text-subtle)', borderColor: 'var(--border-default)' }}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? t.color : 'var(--border-strong)' }} />
+                      {t.label}
                     </button>
                   );
                 })}

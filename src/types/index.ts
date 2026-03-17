@@ -51,12 +51,15 @@ export interface TaskActivityEntry {
     to?: string;
 }
 
+export type TaskType = 'task' | 'issue';
+
 export interface Task {
     id: string;
     title: string;
     description: string;
     priority: Priority;
     status: TaskStatus;
+    taskType?: TaskType;
     assignees: string[];
     comments: number;
     commentData?: TaskCommentItem[];

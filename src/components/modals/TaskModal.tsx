@@ -52,9 +52,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                             <div>
                                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${task.priority === 'low' ? 'bg-amber-100 text-amber-700' :
                                         task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                        task.priority === 'medium' ? 'bg-purple-100 text-purple-700' :
                                             'bg-green-100 text-green-700'
                                     }`}>
                                     {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                                </span>
+                                <span className={`ml-2 text-xs font-semibold px-2.5 py-1 rounded-md ${task.taskType === 'issue' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                    {task.taskType === 'issue' ? 'Issue' : 'Task'}
                                 </span>
                             </div>
                             <motion.button

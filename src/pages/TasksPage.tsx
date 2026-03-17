@@ -126,7 +126,8 @@ const TasksPage: React.FC = () => {
   const [editMode, setEditMode] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
-  const [editPriority, setEditPriority] = useState<'low' | 'high'>('low');
+  const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high'>('low');
+  const [editTaskType, setEditTaskType] = useState<'task' | 'issue'>('task');
   const [editAssignees, setEditAssignees] = useState<string[]>([]);
   const [editDueDate, setEditDueDate] = useState('');
   const [editProjectId, setEditProjectId] = useState('');
@@ -182,7 +183,8 @@ const TasksPage: React.FC = () => {
   const startEdit = (task: Task) => {
     setEditTitle(task.title);
     setEditDesc(task.description);
-    setEditPriority(task.priority === 'high' ? 'high' : 'low');
+    setEditPriority(task.priority === 'high' ? 'high' : task.priority === 'medium' ? 'medium' : 'low');
+    setEditTaskType(task.taskType === 'issue' ? 'issue' : 'task');
     setEditAssignees([...task.assignees]);
     setEditDueDate(task.dueDate ?? '');
     setEditProjectId(task.projectId ?? '');
@@ -197,6 +199,7 @@ const TasksPage: React.FC = () => {
       title: editTitle.trim() || selectedTask.title,
       description: editDesc,
       priority: editPriority as Task['priority'],
+      taskType: editTaskType,
       assignees: editAssignees,
       dueDate: editDueDate || undefined,
       projectId: editProjectId || undefined,
@@ -446,17 +449,17 @@ const TasksPage: React.FC = () => {
                       <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Flag size={10} /> Priority</span>
                       {editMode ? (
                         <div className="flex gap-1.5">
-                          {(['low', 'high'] as const).map(p => {
-                            const active = editPriority === p;
+                          {([
+                            { value: 'low',    color: '#D58D49', activeCls: 'bg-[#DFA87415] text-[#D58D49] border-[#D58D4940]' },
+                            { value: 'medium', color: '#A78BFA', activeCls: 'bg-[#A78BFA15] text-[#A78BFA] border-[#A78BFA40]' },
+                            { value: 'high',   color: '#D8727D', activeCls: 'bg-[#D8727D15] text-[#D8727D] border-[#D8727D40]' },
+                          ] as const).map(p => {
+                            const active = editPriority === p.value;
                             return (
-                              <button key={p} type="button" onClick={() => setEditPriority(p)}
-                                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all border ${
-                                  active
-                                    ? p === 'high' ? 'bg-[#D8727D15] text-[#D8727D] border-[#D8727D40]' : 'bg-[#DFA87415] text-[#D58D49] border-[#D58D4940]'
-                                    : 'bg-gray-50 text-gray-400 border-gray-200'
-                                }`}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? (p === 'high' ? '#D8727D' : '#D58D49') : 'var(--border-strong)' }} />
-                                {p.charAt(0).toUpperCase() + p.slice(1)}
+                              <button key={p.value} type="button" onClick={() => setEditPriority(p.value)}
+                                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all border ${active ? p.activeCls : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? p.color : 'var(--border-strong)' }} />
+                                {p.value.charAt(0).toUpperCase() + p.value.slice(1)}
                               </button>
                             );
                           })}
@@ -465,6 +468,33 @@ const TasksPage: React.FC = () => {
                         <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).bg} ${(priorityStyles[selectedTask.priority] ?? priorityStyles.low).text}`}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
                           {(priorityStyles[selectedTask.priority] ?? priorityStyles.low).label}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Type */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1.5"><Tag size={10} /> Type</span>
+                      {editMode ? (
+                        <div className="flex gap-1.5">
+                          {([
+                            { value: 'task',  label: 'Task',  activeCls: 'bg-[#22C55E15] text-[#22C55E] border-[#22C55E40]', color: '#22C55E' },
+                            { value: 'issue', label: 'Issue', activeCls: 'bg-[#EF444415] text-[#EF4444] border-[#EF444440]', color: '#EF4444' },
+                          ] as const).map(t => {
+                            const active = editTaskType === t.value;
+                            return (
+                              <button key={t.value} type="button" onClick={() => setEditTaskType(t.value)}
+                                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all border ${active ? t.activeCls : 'bg-gray-50 text-gray-400 border-gray-200'}`}>
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: active ? t.color : 'var(--border-strong)' }} />
+                                {t.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md ${selectedTask.taskType === 'issue' ? 'bg-[#EF444420] text-[#EF4444]' : 'bg-[#22C55E20] text-[#22C55E]'}`}>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'currentColor' }} />
+                          {selectedTask.taskType === 'issue' ? 'Issue' : 'Task'}
                         </span>
                       )}
                     </div>

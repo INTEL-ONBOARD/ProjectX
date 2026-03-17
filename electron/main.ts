@@ -28,8 +28,9 @@ const TaskSchema = new Schema({
     appId:       { type: String, required: true, unique: true },
     title:       { type: String, required: true },
     description: { type: String, default: '' },
-    priority:    { type: String, enum: ['low', 'high', 'completed'], default: 'low' },
-    status:      { type: String, enum: ['todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'done'], default: 'todo' },
+    priority:    { type: String, enum: ['low', 'medium', 'high', 'completed'], default: 'low' },
+    status:      { type: String, enum: ['todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'on-hold', 'done'], default: 'todo' },
+    taskType:    { type: String, enum: ['task', 'issue'], default: 'task' },
     assignees:   [String],
     comments:    { type: Number, default: 0 },
     files:       { type: Number, default: 0 },
@@ -195,7 +196,7 @@ const toUser = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '',
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser    = (d: any) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

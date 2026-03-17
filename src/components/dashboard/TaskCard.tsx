@@ -7,8 +7,9 @@ import { AvatarGroup } from '../ui/Avatar';
 const TODAY = new Date().toISOString().split('T')[0];
 
 const priorityStyles: Record<string, { bg: string; text: string; label: string }> = {
-  low: { bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]', label: 'Low' },
-  high: { bg: 'bg-[#D8727D33]', text: 'text-[#D8727D]', label: 'High' },
+  low:       { bg: 'bg-[#DFA87433]', text: 'text-[#D58D49]', label: 'Low' },
+  medium:    { bg: 'bg-[#A78BFA33]', text: 'text-[#A78BFA]', label: 'Medium' },
+  high:      { bg: 'bg-[#D8727D33]', text: 'text-[#D8727D]', label: 'High' },
   completed: { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]', label: 'Completed' },
 };
 
@@ -70,14 +71,22 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
       layout
       onClick={onClick}
     >
-      {/* Priority badge & menu */}
+      {/* Priority badge, type tag & menu */}
       <div className="flex items-center justify-between mb-2">
-        <motion.span
-          className={`text-xs font-semibold px-2.5 py-1 rounded-md ${priority.bg} ${priority.text}`}
-          whileHover={{ scale: 1.05 }}
-        >
-          {priority.label}
-        </motion.span>
+        <div className="flex items-center gap-1.5">
+          <motion.span
+            className={`text-xs font-semibold px-2.5 py-1 rounded-md ${priority.bg} ${priority.text}`}
+            whileHover={{ scale: 1.05 }}
+          >
+            {priority.label}
+          </motion.span>
+          {task.taskType === 'issue' && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#EF444420] text-[#EF4444]">Issue</span>
+          )}
+          {(!task.taskType || task.taskType === 'task') && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#22C55E20] text-[#22C55E]">Task</span>
+          )}
+        </div>
         <div ref={menuRef} className="relative" onClick={e => e.stopPropagation()}>
           <motion.button
             className="text-gray-300 hover:text-gray-500 transition-colors"
