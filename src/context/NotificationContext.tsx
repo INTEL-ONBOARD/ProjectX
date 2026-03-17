@@ -132,14 +132,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             const sender = members.find((m: { id: string }) => m.id === msg.from);
             const senderName = sender ? (sender as { name: string }).name : 'Someone';
             try {
-                const n = await notifsApi().create({
+                // Only persist to DB — the onNotificationChanged change stream will
+                // pick it up and add it to state, avoiding double-add.
+                await notifsApi().create({
                     userId: user.id,
                     type: 'new_message',
                     title: `Message from ${senderName}`,
                     body: String(msg.text ?? '').slice(0, 60),
                     refId,
                 });
-                setNotifications(prev => [n, ...prev]);
             } catch { /* ignore */ }
         });
 
