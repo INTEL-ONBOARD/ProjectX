@@ -38,6 +38,7 @@ const TaskSchema = new Schema({
     startDate:   String,
     dueDate:     String,
     projectId:   String,
+    taskNumber:  { type: Number, default: null },
     activity:    { type: Array, default: [] },
 });
 
@@ -163,6 +164,12 @@ const RolePermsSchema = new Schema({
     allowedRoutes: { type: [String], default: [] },
 });
 
+const CounterSchema = new Schema({
+    name:  { type: String, required: true, unique: true },
+    value: { type: Number, default: 0 },
+});
+const CounterModel = mongoose.model('Counter', CounterSchema);
+
 const UserModel           = mongoose.model('User', UserSchema);
 const TaskModel           = mongoose.model('Task', TaskSchema);
 const ProjectModel        = mongoose.model('Project', ProjectSchema);
@@ -196,7 +203,7 @@ const toUser = (d: any) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '',
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser    = (d: any) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -796,7 +803,19 @@ function registerDbHandlers() {
             actorName: actorName ?? 'System',
             timestamp: new Date().toISOString(),
         };
-        const doc = await TaskModel.create({ appId: 't' + Date.now(), ...rest, activity: [entry] });
+        // Atomically get the next task number
+        const counter = await CounterModel.findOneAndUpdate(
+            { name: 'tasks' },
+            { $inc: { value: 1 } },
+            { new: true, upsert: true }
+        );
+        const taskNumber = counter!.value;
+        const doc = await TaskModel.create({
+            appId: 't' + Date.now(),
+            ...rest,
+            taskNumber,
+            activity: [entry],
+        });
         return safe(toTask(doc.toObject()));
     });
     ipcMain.handle('db:tasks:update', async (_e, id: string, changes: any) => {
