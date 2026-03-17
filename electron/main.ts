@@ -732,6 +732,22 @@ async function ensureDefaultData() {
     // Backfill orgId on any existing users that don't have one
     await AuthUserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
     await UserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: 'org-toursurv' } });
+    // Backfill taskNumber on existing tasks that don't have one yet
+    const unnumbered = await TaskModel.find({ taskNumber: null }).sort({ _id: 1 }).lean();
+    if (unnumbered.length > 0) {
+        const counter = await CounterModel.findOne({ name: 'tasks' }).lean();
+        let next = (counter?.value ?? 0) + 1;
+        for (const t of unnumbered) {
+            await TaskModel.updateOne({ _id: t._id }, { $set: { taskNumber: next } });
+            next++;
+        }
+        await CounterModel.findOneAndUpdate(
+            { name: 'tasks' },
+            { $set: { value: next - 1 } },
+            { upsert: true }
+        );
+        console.log(`[migration] Assigned taskNumbers ${(counter?.value ?? 0) + 1}–${next - 1} to ${unnumbered.length} existing tasks`);
+    }
 }
 
 // Set up mongoose event listeners ONCE at startup — never inside connectDB() to avoid duplicate listeners
