@@ -51,9 +51,9 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
   const isEdit = !!initial;
   const [canSubmit, setCanSubmit] = useState(isEdit);
 
-  const goNext = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const goNext = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (!name.trim()) { setNameError('Project name is required'); return; }
     setNameError('');
     setCanSubmit(false);
