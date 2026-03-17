@@ -229,7 +229,7 @@ const SettingsPage: React.FC = () => {
 
   const userColor = 'var(--color-primary-500, #5030E5)';
 
-  const [activeTab, setActiveTab] = useState<'account' | 'notifications' | 'appearance' | 'data'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'notifications' | 'appearance' | 'data' | 'about'>('account');
   const [confirmClear, setConfirmClear] = useState(false);
   const { state: updateState, checkForUpdate, installUpdate } = useAppUpdater();
 
@@ -528,7 +528,7 @@ const SettingsPage: React.FC = () => {
       {/* ── Tab bar ── */}
       <div className="px-8 shrink-0">
         <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'var(--bg-muted)' }}>
-          {(['account', 'notifications', 'appearance', 'data'] as const).map(tab => (
+          {(['account', 'notifications', 'appearance', 'data', 'about'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -636,28 +636,6 @@ const SettingsPage: React.FC = () => {
                   </div>
                 </motion.div>
 
-                {/* Danger Zone — full width under account cards */}
-                <motion.div className="col-span-2" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.1 }}>
-                  <div className="bg-white rounded-2xl p-6 shadow-sm ring-1 ring-surface-100">
-                    <div className="flex items-center gap-2.5 mb-1">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#FEE2E2] shrink-0">
-                        <AlertTriangle size={14} className="text-[#D8727D]" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 text-sm">Danger Zone</h3>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-4 ml-[42px]">These actions are irreversible. Proceed with caution.</p>
-                    <div className="flex gap-2 ml-[42px]">
-                      <button onClick={handleExportData}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-surface-50 text-gray-600 hover:bg-surface-100 transition-colors">
-                        <Download size={14} /> Export Data
-                      </button>
-                      <button onClick={() => setConfirmClear(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-[#FEE2E2] text-[#D8727D] hover:bg-[#fdd] transition-colors">
-                        <Trash2 size={14} /> Delete Account
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
               </motion.div>
             )}
 
@@ -1210,8 +1188,8 @@ const SettingsPage: React.FC = () => {
               </motion.div>
             )}
 
-            {/* ══ About (hidden — no tab mapping) ══ */}
-            {false && (
+            {/* ══ About ══ */}
+            {activeTab === 'about' && (
               <motion.div key="about"
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
