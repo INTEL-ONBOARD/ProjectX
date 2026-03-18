@@ -148,6 +148,7 @@ const UserPrefSchema = new Schema({
     projectsView:         { type: String, enum: ['grid', 'list'], default: 'grid' },
     taskBreakdownSnapshot: { type: Schema.Types.Mixed, default: {} },
     navOrder: { type: [String], default: [] },
+    backgroundMode: { type: Boolean, default: false },
 });
 
 const NotifPrefSchema = new Schema({
@@ -317,6 +318,7 @@ const toUserPref = (d: any) => ({
     projectsView: d.projectsView ?? 'grid',
     taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {},
     navOrder: d.navOrder ?? [],
+    backgroundMode: d.backgroundMode ?? false,
 });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toNotifPref   = (d: any) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours, systemNotifs: d.systemNotifs ?? true });
@@ -1754,11 +1756,30 @@ app.whenReady().then(async () => {
     handle('app:getLoginItemSettings', () => app.getLoginItemSettings());
     handle('app:setOpenAtLogin', (_e, value: boolean) => { app.setLoginItemSettings({ openAtLogin: value }); return true; });
     handle('app:getBackgroundMode', () => backgroundModeEnabled);
-    handle('app:setBackgroundMode', (_e, value: boolean) => {
+    handle('app:setBackgroundMode', async (_e, value: boolean) => {
         applyBackgroundMode(value);
+        // Persist so the setting survives app restarts
+        if (activeUserId) {
+            await UserPrefModel.findOneAndUpdate(
+                { userId: activeUserId },
+                { backgroundMode: value },
+                { upsert: true }
+            ).catch(() => {});
+        }
         return true;
     });
-    handle('app:setActiveUser', (_e, userId: string) => { activeUserId = userId ?? ''; });
+    handle('app:setActiveUser', async (_e, userId: string) => {
+        activeUserId = userId ?? '';
+        // Restore backgroundMode for this user from DB
+        if (activeUserId) {
+            try {
+                const pref = await UserPrefModel.findOne({ userId: activeUserId }).lean() as any;
+                if (pref && typeof pref.backgroundMode === 'boolean') {
+                    applyBackgroundMode(pref.backgroundMode);
+                }
+            } catch (_) {}
+        }
+    });
     handle('app:getSystemNotifsEnabled', async (_e, userId: string) => {
         // Load from DB if not yet cached
         if (!systemNotifsEnabled.has(userId)) {
