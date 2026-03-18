@@ -216,16 +216,16 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                       onChange={e => { setTitle(e.target.value); if (titleError) setTitleError(''); }}
                       placeholder="What needs to be done?"
                       autoFocus
-                      className="w-full text-base font-semibold bg-transparent focus:outline-none placeholder-opacity-30"
+                      className="w-full text-base font-semibold rounded-xl px-4 py-3 focus:outline-none transition-all duration-150"
                       style={{
                         color: 'var(--text-primary)',
-                        borderBottom: `2px solid ${titleError ? '#EF4444' : title.trim() ? '#5030E5' : 'var(--border-default)'}`,
-                        paddingBottom: 8,
-                        transition: 'border-color 0.15s',
+                        background: 'var(--bg-hover)',
+                        border: `1.5px solid ${titleError ? '#EF4444' : title.trim() ? '#5030E5' : 'var(--border-default)'}`,
+                        boxShadow: title.trim() && !titleError ? '0 0 0 3px rgba(80,48,229,0.12)' : titleError ? '0 0 0 3px rgba(239,68,68,0.10)' : 'none',
                       }}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); goNext(e); } }}
                     />
-                    {titleError && <p className="text-red-500 text-xs mt-1">{titleError}</p>}
+                    {titleError && <p className="text-red-500 text-xs mt-1.5 pl-1">{titleError}</p>}
                   </div>
 
                   {/* Priority */}
