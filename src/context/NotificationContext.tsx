@@ -66,13 +66,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         loadNotifs();
     }, [loadNotifs]);
 
-    // Generate task_overdue and task_assigned notifications from allTasks
-    // Fix 4: only run after loadNotifs has resolved (notifsReady === true)
+    // Generate task_overdue and task_assigned notifications from allTasks.
+    // All creates are fired in parallel to avoid sequential IPC round-trips.
     useEffect(() => {
         if (!user || allTasks.length === 0 || !notifsReady) return;
         const todayStr = new Date().toISOString().slice(0, 10);
 
         const generate = async () => {
+            const pending: Promise<void>[] = [];
+
             for (const task of allTasks) {
                 if (!task.assignees.includes(user.id)) continue;
 
@@ -83,36 +85,79 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     !seenRefIds.current.has(`overdue-${task.id}`)
                 ) {
                     seenRefIds.current.add(`overdue-${task.id}`);
-                    try {
-                        const n = await notifsApi().create({
+                    pending.push(
+                        notifsApi().create({
                             userId: user.id,
                             type: 'task_overdue',
                             title: task.title,
                             body: `Due ${task.dueDate}`,
                             refId: `overdue-${task.id}`,
-                        });
-                        setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
-                    } catch { /* ignore */ }
+                        }).then(n => {
+                            setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
+                        }).catch(() => { /* ignore */ })
+                    );
                 }
 
                 // task_assigned: I am in assignees
                 if (!seenRefIds.current.has(`assigned-${task.id}`)) {
                     seenRefIds.current.add(`assigned-${task.id}`);
-                    try {
-                        const n = await notifsApi().create({
+                    pending.push(
+                        notifsApi().create({
                             userId: user.id,
                             type: 'task_assigned',
                             title: task.title,
                             body: 'You were assigned to this task',
                             refId: `assigned-${task.id}`,
-                        });
-                        setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
-                    } catch { /* ignore */ }
+                        }).then(n => {
+                            setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
+                        }).catch(() => { /* ignore */ })
+                    );
                 }
             }
+
+            await Promise.all(pending);
         };
         generate();
     }, [allTasks, user?.id, notifsReady]);
+
+    // Catch-up: create new_message notifications for unread messages received while app was closed
+    useEffect(() => {
+        if (!user || !notifsReady || members.length === 0) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api = (window as any).electronAPI;
+        if (!api?.db?.getUnreadCounts) return;
+
+        const catchUp = async () => {
+            try {
+                const counts: Record<string, number> = await api.db.getUnreadCounts(user.id);
+                const pending: Promise<void>[] = [];
+                for (const [senderId, count] of Object.entries(counts)) {
+                    if (count === 0) continue;
+                    const refId = `msg-catchup-${senderId}`;
+                    if (seenRefIds.current.has(refId)) continue;
+                    seenRefIds.current.add(refId);
+                    const sender = members.find((m: { id: string }) => m.id === senderId);
+                    const senderName = sender ? (sender as { name: string }).name : 'Someone';
+                    // Use a session-unique refId so each app launch creates a fresh
+                    // notification if there are still unread messages (not DB-deduped).
+                    const sessionRefId = `${refId}-${Date.now()}`;
+                    pending.push(
+                        notifsApi().create({
+                            userId: user.id,
+                            type: 'new_message',
+                            title: `Message from ${senderName}`,
+                            body: `${count} unread message${count > 1 ? 's' : ''}`,
+                            refId: sessionRefId,
+                        }).then(n => {
+                            setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
+                        }).catch(() => { /* ignore */ })
+                    );
+                }
+                await Promise.all(pending);
+            } catch { /* ignore */ }
+        };
+        catchUp();
+    }, [user?.id, notifsReady, members]);
 
     // Real-time new_message notifications via change stream
     useEffect(() => {
