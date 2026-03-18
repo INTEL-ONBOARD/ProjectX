@@ -61,7 +61,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
 
   return (
     <motion.div
-      className={`bg-surface-50 rounded-2xl p-4 border cursor-pointer group relative transition-all ${isToday ? 'border-l-4 border-l-primary-500 border-surface-200' : isOverdue ? 'border-l-4 border-l-red-400 border-surface-200' : 'border-surface-200'}`}
+      className={`bg-surface-50 rounded-2xl p-4 border cursor-pointer group relative transition-all ${isToday ? 'border-primary-400' : isOverdue ? 'border-red-400' : 'border-surface-200'}`}
       initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.08, ease: [0.4, 0, 0.2, 1] }}
       whileHover={{ y: -3, transition: { duration: 0.2 } }}
