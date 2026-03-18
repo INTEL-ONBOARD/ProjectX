@@ -34,7 +34,7 @@ Replace the single-image local state with a thumbnail grid that reads directly f
 ### Lightbox Overlay
 
 - Triggered by `lightboxIndex: number | null` state (null = closed)
-- Rendered inside the detail panel `AnimatePresence` block
+- Rendered as a sibling to the detail panel's inner content `div`, but still within the outer `motion.div` at the top of the detail panel IIFE, so it inherits the `z-50` stacking context and covers the full viewport (not scrolled with panel content)
 - Dark backdrop: `bg-black/80`, full viewport
 - Image: `max-h-[85vh] max-w-[85vw] rounded-xl object-contain`, centered
 - Close button (X) top-right
@@ -51,7 +51,9 @@ Replace the single-image local state with a thumbnail grid that reads directly f
 | `lightboxIndex` | — | `number \| null` — index of open lightbox image |
 
 - Source of truth for images becomes `selectedTask.images` (persisted in DB)
-- Upload flow (`handleImagePick` → `updateTask`) is unchanged
+- Upload flow: the `updateTask(...)` call inside the `detailFileRef` `onChange` handler is retained as-is. The `setDetailImage(url)` call on the same line must be removed as `detailImage` state no longer exists.
+- The "Upload image" button is always visible regardless of how many images exist, allowing users to append additional images.
+- `lightboxIndex` must be reset to `null` whenever `selectedTask` changes (via a `useEffect` watching `selectedTask?.id`), to prevent stale out-of-bounds index if the newly selected task has fewer images.
 - No DB schema changes required
 
 ---

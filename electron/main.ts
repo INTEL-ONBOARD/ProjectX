@@ -750,7 +750,7 @@ function startAuthUserStream(): void {
     if (!windowReady) return;
     if (authUserStream) { try { authUserStream.close(); } catch (_) {} authUserStream = null; }
     try {
-        authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'off', projection: { password: 0 } });
+        authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'off' });
         registerStream('authUser', authUserStream);
         authUserStream.on('change', (change: any) => {
             if (!mainWindow || mainWindow.isDestroyed()) return;
