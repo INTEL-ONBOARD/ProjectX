@@ -835,7 +835,7 @@ const MessagesPage: React.FC = () => {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
+                className="chat-input flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
               />
               <div className="relative shrink-0">
                 <button

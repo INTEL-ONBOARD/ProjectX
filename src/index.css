@@ -325,12 +325,16 @@ body[data-theme='coffee'] .hover\:bg-surface-100:hover {
 body[data-theme='coffee'] .hover\:bg-white:hover {
     background-color: var(--bg-hover) !important;
 }
-body[data-theme='coffee'] input:not([type='checkbox']):not([type='radio']):not([type='color']),
+body[data-theme='coffee'] input:not([type='checkbox']):not([type='radio']):not([type='color']):not(.chat-input),
 body[data-theme='coffee'] textarea,
 body[data-theme='coffee'] select {
     background-color: var(--bg-input) !important;
     color: var(--text-primary) !important;
     border-color: var(--border-default) !important;
+}
+body[data-theme='coffee'] input.chat-input {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
 }
 body[data-theme='coffee'] input::placeholder,
 body[data-theme='coffee'] textarea::placeholder {
@@ -557,12 +561,16 @@ body[data-theme='dark'] .hover\:bg-white:hover {
 }
 
 /* Input / form fields */
-body[data-theme='dark'] input:not([type='checkbox']):not([type='radio']):not([type='color']),
+body[data-theme='dark'] input:not([type='checkbox']):not([type='radio']):not([type='color']):not(.chat-input),
 body[data-theme='dark'] textarea,
 body[data-theme='dark'] select {
     background-color: var(--bg-input) !important;
     color: var(--text-primary) !important;
     border-color: var(--border-default) !important;
+}
+body[data-theme='dark'] input.chat-input {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
 }
 body[data-theme='dark'] input::placeholder,
 body[data-theme='dark'] textarea::placeholder {

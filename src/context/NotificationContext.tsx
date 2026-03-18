@@ -56,7 +56,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         try {
             const all = await notifsApi().getAll(user.id);
             setNotifications(all);
-            seenRefIds.current = new Set(all.map(n => n.refId).filter(Boolean));
+            const refIds = new Set(all.map(n => n.refId).filter(Boolean));
+            // Also seed short-form catch-up guard keys so the catch-up effect
+            // doesn't create a new DB notification on every launch while unread messages exist.
+            refIds.forEach(refId => {
+                // catch-up refIds are stored as "msg-catchup-<senderId>-<timestamp>"
+                // seed the short-form key "msg-catchup-<senderId>" so the guard fires correctly
+                if ((refId as string).startsWith('msg-catchup-')) {
+                    const shortKey = (refId as string).replace(/-\d{13}$/, '');
+                    refIds.add(shortKey);
+                }
+            });
+            seenRefIds.current = refIds;
             await notifsApi().deleteOld(user.id);
         } catch { /* ignore */ }
         setNotifsReady(true);
@@ -98,8 +109,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     );
                 }
 
-                // task_assigned: I am in assignees
-                if (!seenRefIds.current.has(`assigned-${task.id}`)) {
+                // task_assigned: I am in assignees and task is not done
+                if (task.status !== 'done' && !seenRefIds.current.has(`assigned-${task.id}`)) {
                     seenRefIds.current.add(`assigned-${task.id}`);
                     pending.push(
                         notifsApi().create({
