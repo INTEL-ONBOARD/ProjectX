@@ -233,26 +233,31 @@ const SettingsPage: React.FC = () => {
   const [confirmClear, setConfirmClear] = useState(false);
   const { state: updateState, checkForUpdate, installUpdate } = useAppUpdater();
 
-  // Profile
-  const [nameValue,       setNameValue]       = useState(() => currentUser?.name        || '');
-  const [emailValue,      setEmailValue]      = useState(() => currentUser?.email       || '');
-  const [locationValue,   setLocationValue]   = useState(() => currentUser?.location    || '');
-  const [roleValue,       setRoleValue]       = useState(() => currentUser?.designation || '');
-  const [phoneValue,      setPhoneValue]      = useState(() => currentUser?.phone       || '');
-  const [departmentValue, setDepartmentValue] = useState(() => currentUser?.department  || '');
-  const [bioValue,        setBioValue]        = useState(() => currentUser?.bio         || '');
+  // Full member record from MembersContext — contains phone, department, bio, joinedAt
+  // that AppContext.User does not carry.
+  const fullMember = members.find(m => m.id === (currentUser?.id ?? authUser?.id));
 
-  // Sync profile fields when currentUser loads (it may be null on first render)
+  // Profile
+  const [nameValue,       setNameValue]       = useState('');
+  const [emailValue,      setEmailValue]      = useState('');
+  const [locationValue,   setLocationValue]   = useState('');
+  const [roleValue,       setRoleValue]       = useState('');
+  const [phoneValue,      setPhoneValue]      = useState('');
+  const [departmentValue, setDepartmentValue] = useState('');
+  const [bioValue,        setBioValue]        = useState('');
+
+  // Sync profile fields whenever the full member record loads or changes
   useEffect(() => {
-    if (!currentUser) return;
-    setNameValue(prev => prev || currentUser.name || '');
-    setEmailValue(prev => prev || currentUser.email || '');
-    setLocationValue(prev => prev || currentUser.location || '');
-    setRoleValue(prev => prev || currentUser.designation || '');
-    setPhoneValue(prev => prev || currentUser.phone || '');
-    setDepartmentValue(prev => prev || currentUser.department || '');
-    setBioValue(prev => prev || currentUser.bio || '');
-  }, [currentUser?.id]);
+    const src = fullMember ?? currentUser;
+    if (!src) return;
+    setNameValue(src.name || '');
+    setEmailValue(src.email || '');
+    setLocationValue(src.location || '');
+    setRoleValue(src.designation || '');
+    setPhoneValue((src as any).phone || '');
+    setDepartmentValue((src as any).department || '');
+    setBioValue((src as any).bio || '');
+  }, [fullMember?.id, fullMember?.phone, fullMember?.department, fullMember?.bio, fullMember?.location, fullMember?.designation, currentUser?.id]);
 
   // Notifications — persisted to MongoDB (localStorage fallback in mock mode)
   const [notifications, setNotifications] = useState<NotifPrefs>(defaultNotifications);
@@ -616,8 +621,8 @@ const SettingsPage: React.FC = () => {
                             />
                           </div>
                           {/* Read-only: Member ID + Joined */}
-                          <InputField label="Member ID" value={currentUser?.id ?? '—'} onChange={() => {}} readOnly />
-                          <InputField label="Joined" value={currentUser?.joinedAt ? new Date(currentUser.joinedAt).toLocaleDateString() : '—'} onChange={() => {}} readOnly />
+                          <InputField label="Member ID" value={fullMember?.id ?? currentUser?.id ?? '—'} onChange={() => {}} readOnly />
+                          <InputField label="Joined" value={fullMember?.joinedAt ? new Date(fullMember.joinedAt).toLocaleDateString() : '—'} onChange={() => {}} readOnly />
                         </div>
                       </div>
                       {/* Footer */}
