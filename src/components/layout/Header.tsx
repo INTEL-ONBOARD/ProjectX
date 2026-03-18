@@ -23,7 +23,7 @@ const Header: React.FC = () => {
     const { logout, user: authUser } = useAuth();
     const { allTasks } = useProjects();
     const { members, getMemberColor } = useMembersContext();
-    const { notifications, unreadCount, markAllRead, markRead, markAllReadOnOpen } = useNotifications();
+    const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
 
     const [searchRaw, setSearchRaw] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -254,7 +254,7 @@ const Header: React.FC = () => {
                     <motion.button
                         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors relative ${isNotifOpen ? 'bg-primary-50 text-primary-500' : 'text-gray-400 hover:text-gray-600 hover:bg-surface-100'}`}
                         whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                        onClick={() => { const opening = !isNotifOpen; setIsNotifOpen(o => !o); setIsHelpOpen(false); if (opening) markAllReadOnOpen(); }}
+                        onClick={() => { setIsNotifOpen(o => !o); setIsHelpOpen(false); }}
                     >
                         <Bell size={20} />
                         {unreadCount > 0 && (

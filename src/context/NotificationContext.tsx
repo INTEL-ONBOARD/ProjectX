@@ -20,7 +20,6 @@ interface NotificationContextValue {
     unreadCount: number;
     markAllRead: () => Promise<void>;
     markRead: (id: string) => Promise<void>;
-    markAllReadOnOpen: () => Promise<void>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,7 +36,6 @@ export const NotificationContext = createContext<NotificationContextValue>({
     unreadCount: 0,
     markAllRead: async () => {},
     markRead: async () => {},
-    markAllReadOnOpen: async () => {},
 });
 
 export const useNotifications = () => useContext(NotificationContext);
@@ -189,12 +187,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, seenAt: n.seenAt ?? now } : n));
     }, []);
 
-    const markAllReadOnOpen = useCallback(async () => {
-        await markAllRead();
-    }, [markAllRead]);
-
     return (
-        <NotificationContext.Provider value={{ notifications, unreadCount, markAllRead, markRead, markAllReadOnOpen }}>
+        <NotificationContext.Provider value={{ notifications, unreadCount, markAllRead, markRead }}>
             {children}
         </NotificationContext.Provider>
     );
