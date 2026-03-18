@@ -234,10 +234,13 @@ const SettingsPage: React.FC = () => {
   const { state: updateState, checkForUpdate, installUpdate } = useAppUpdater();
 
   // Profile
-  const [nameValue,     setNameValue]     = useState(() => currentUser?.name        || '');
-  const [emailValue,    setEmailValue]    = useState(() => currentUser?.email       || '');
-  const [locationValue, setLocationValue] = useState(() => currentUser?.location   || '');
-  const [roleValue,     setRoleValue]     = useState(() => currentUser?.designation || '');
+  const [nameValue,       setNameValue]       = useState(() => currentUser?.name        || '');
+  const [emailValue,      setEmailValue]      = useState(() => currentUser?.email       || '');
+  const [locationValue,   setLocationValue]   = useState(() => currentUser?.location    || '');
+  const [roleValue,       setRoleValue]       = useState(() => currentUser?.designation || '');
+  const [phoneValue,      setPhoneValue]      = useState(() => currentUser?.phone       || '');
+  const [departmentValue, setDepartmentValue] = useState(() => currentUser?.department  || '');
+  const [bioValue,        setBioValue]        = useState(() => currentUser?.bio         || '');
 
   // Sync profile fields when currentUser loads (it may be null on first render)
   useEffect(() => {
@@ -246,6 +249,9 @@ const SettingsPage: React.FC = () => {
     setEmailValue(prev => prev || currentUser.email || '');
     setLocationValue(prev => prev || currentUser.location || '');
     setRoleValue(prev => prev || currentUser.designation || '');
+    setPhoneValue(prev => prev || currentUser.phone || '');
+    setDepartmentValue(prev => prev || currentUser.department || '');
+    setBioValue(prev => prev || currentUser.bio || '');
   }, [currentUser?.id]);
 
   // Notifications — persisted to MongoDB (localStorage fallback in mock mode)
@@ -429,6 +435,9 @@ const SettingsPage: React.FC = () => {
           email: emailValue.trim() || currentUser.email,
           location: locationValue.trim() || undefined,
           designation: roleValue.trim() || undefined,
+          phone: phoneValue.trim() || undefined,
+          department: departmentValue.trim() || undefined,
+          bio: bioValue.trim() || undefined,
         });
         await authApi().updateName(currentUser.id, newName);
         setSaved(true);
@@ -585,10 +594,30 @@ const SettingsPage: React.FC = () => {
                             onBlur={() => { handleSave(); flashSaved('profile'); }} placeholder="Your name" />
                           <InputField label="Email" value={emailValue} onChange={setEmailValue}
                             onBlur={() => { handleSave(); flashSaved('profile'); }} placeholder="you@example.com" />
+                          <InputField label="Phone" value={phoneValue} onChange={setPhoneValue}
+                            onBlur={() => { handleSave(); flashSaved('profile'); }} placeholder="+1 234 567 890" />
                           <InputField label="Location" value={locationValue} onChange={setLocationValue}
                             onBlur={() => { handleSave(); flashSaved('profile'); }} placeholder="City, Country" />
                           <InputField label="Designation" value={roleValue} onChange={setRoleValue}
                             onBlur={() => { handleSave(); flashSaved('profile'); }} placeholder="e.g. Senior Engineer" />
+                          <InputField label="Department" value={departmentValue} onChange={setDepartmentValue}
+                            onBlur={() => { handleSave(); flashSaved('profile'); }} placeholder="e.g. Engineering" />
+                          {/* Bio — full width */}
+                          <div className="col-span-2">
+                            <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Bio</label>
+                            <textarea
+                              value={bioValue}
+                              onChange={e => setBioValue(e.target.value)}
+                              onBlur={() => { handleSave(); flashSaved('profile'); }}
+                              placeholder="Short bio..."
+                              rows={3}
+                              className="w-full text-sm rounded-lg px-3 py-2 border border-surface-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary-200 resize-none transition-all"
+                              style={{ color: 'var(--text-primary)' }}
+                            />
+                          </div>
+                          {/* Read-only: Member ID + Joined */}
+                          <InputField label="Member ID" value={currentUser?.id ?? '—'} onChange={() => {}} readOnly />
+                          <InputField label="Joined" value={currentUser?.joinedAt ? new Date(currentUser.joinedAt).toLocaleDateString() : '—'} onChange={() => {}} readOnly />
                         </div>
                       </div>
                       {/* Footer */}
