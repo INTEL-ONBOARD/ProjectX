@@ -1521,10 +1521,14 @@ function registerDbHandlers() {
 
     // Notifications
     handle('db:notifs:getAll', async (_e, userId: string) => {
-        const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(50).lean();
+        const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(100).lean();
         return safe(docs.map(toNotif));
     });
     handle('db:notifs:create', async (_e, notif: { userId: string; type: string; title: string; body?: string; refId?: string }) => {
+        if (notif.refId) {
+            const existing = await NotificationModel.findOne({ userId: notif.userId, refId: notif.refId }).lean();
+            if (existing) return safe(toNotif(existing));
+        }
         const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
         // Fire OS notification only for the user logged in on this machine
