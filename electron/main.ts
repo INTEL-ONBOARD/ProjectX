@@ -172,6 +172,7 @@ const NotificationSchema = new Schema({
     body:      { type: String, default: '' },
     refId:     { type: String, default: '' },
     read:      { type: Boolean, default: false },
+    seenAt:    { type: String, default: null },
     createdAt: { type: String, required: true },
 });
 
@@ -322,7 +323,7 @@ const toNotifPref   = (d: any) => ({ userId: d.userId, taskUpdates: d.taskUpdate
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAppearancePref = (d: any) => ({ userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor, fontSize: d.fontSize, compactMode: d.compactMode ?? false });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toNotif = (d: any) => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? '', refId: d.refId ?? '', read: d.read ?? false, createdAt: d.createdAt });
+const toNotif = (d: any) => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? '', refId: d.refId ?? '', read: d.read ?? false, seenAt: d.seenAt ?? null, createdAt: d.createdAt });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toRole = (d: any) => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 
@@ -1538,19 +1539,20 @@ function registerDbHandlers() {
         return safe(toNotif(d.toObject()));
     });
     handle('db:notifs:markRead', async (_e, notifId: string) => {
-        await NotificationModel.updateOne({ notifId }, { read: true });
+        await NotificationModel.updateOne({ notifId }, { read: true, seenAt: new Date().toISOString() });
         return true;
     });
     handle('db:notifs:markAllRead', async (_e, userId: string) => {
-        await NotificationModel.updateMany({ userId, read: false }, { read: true });
+        const now = new Date().toISOString();
+        await NotificationModel.updateMany({ userId, read: false }, { read: true, seenAt: now });
         return true;
     });
     handle('db:notifs:deleteOld', async (_e, userId: string) => {
-        const all = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).lean() as any[];
-        if (all.length > 100) {
-            const toDelete = all.slice(100).map((d: any) => d.notifId);
-            await NotificationModel.deleteMany({ notifId: { $in: toDelete } });
-        }
+        // Only delete notifications that have been seen (read) for more than 90 days.
+        // Never delete unread or recently-seen notifications — their refIds are needed
+        // to prevent re-creating duplicate notifications on subsequent app launches.
+        const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        await NotificationModel.deleteMany({ userId, read: true, seenAt: { $ne: null, $lt: cutoff } });
         return true;
     });
 }

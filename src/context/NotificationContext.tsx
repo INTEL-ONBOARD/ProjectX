@@ -11,6 +11,7 @@ export interface AppNotification {
     body: string;
     refId: string;
     read: boolean;
+    seenAt: string | null;
     createdAt: string;
 }
 
@@ -155,7 +156,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         if (!api?.onNotificationChanged) return;
 
         const unsub = api.onNotificationChanged((_: unknown, payload: { op: string; doc?: AppNotification; id?: string }) => {
-            const { op, doc } = payload;
+            const { op, doc, id } = payload;
+            if (op === 'delete') {
+                setNotifications(prev => prev.filter(n => n.id !== id));
+                return;
+            }
             if (!doc || doc.userId !== user.id) return; // only process events for current user
             if (op === 'insert') {
                 // Another device created a notification — add if not already present
@@ -163,8 +168,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             } else if (op === 'update' || op === 'replace') {
                 // e.g. read-state changed on another device
                 setNotifications(prev => prev.map(n => n.id === doc.id ? doc : n));
-            } else if (op === 'delete') {
-                setNotifications(prev => prev.filter(n => n.id !== doc.id));
             }
         });
 
@@ -176,12 +179,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const markAllRead = useCallback(async () => {
         if (!user) return;
         await notifsApi().markAllRead(user.id);
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        const now = new Date().toISOString();
+        setNotifications(prev => prev.map(n => ({ ...n, read: true, seenAt: n.seenAt ?? now })));
     }, [user?.id]);
 
     const markRead = useCallback(async (id: string) => {
         await notifsApi().markRead(id);
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+        const now = new Date().toISOString();
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true, seenAt: n.seenAt ?? now } : n));
     }, []);
 
     const markAllReadOnOpen = useCallback(async () => {

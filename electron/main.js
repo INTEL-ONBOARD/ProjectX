@@ -42,7 +42,21 @@ const crypto_1 = require("crypto");
 const dotenv_1 = __importDefault(require("dotenv"));
 const mongoose_1 = __importStar(require("mongoose"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
-dotenv_1.default.config({ path: path_1.default.join(__dirname, '../.env') });
+const envPath = electron_1.app.isPackaged
+    ? path_1.default.join(process.resourcesPath, '.env')
+    : path_1.default.join(__dirname, '../.env');
+dotenv_1.default.config({ path: envPath });
+// ─── Active stream registry (prevents memory leaks on reconnect) ───────────────
+const activeStreams = new Map();
+function registerStream(name, stream) {
+    if (activeStreams.has(name)) {
+        try {
+            activeStreams.get(name).close();
+        }
+        catch { }
+    }
+    activeStreams.set(name, stream);
+}
 // ─── Mongoose Schemas ──────────────────────────────────────────────────────────
 const UserSchema = new mongoose_1.Schema({
     appId: { type: String, required: true, unique: true },
@@ -69,26 +83,24 @@ const TaskSchema = new mongoose_1.Schema({
     startDate: String,
     dueDate: String,
     projectId: String,
-    taskNumber:  { type: Number, default: null },
-    sprintId:   { type: String, default: null },
-    blockedBy:  { type: [String], default: [] },
+    taskNumber: { type: Number, default: null },
+    blockedBy: { type: [String], default: [] },
     recurrence: { type: String, enum: ['none', 'daily', 'weekly', 'monthly'], default: 'none' },
-    order:      { type: Number, default: 0 },
+    order: { type: Number, default: 0 },
     activity: { type: Array, default: [] },
-    storyPoints: { type: Number, default: 0 },
     subtasks: [{
-        id: String,
-        title: String,
-        completed: { type: Boolean, default: false }
-    }],
+            id: String,
+            title: String,
+            completed: { type: Boolean, default: false }
+        }],
     estimatedMinutes: { type: Number, default: 0 },
     timeEntries: [{
-        id: String,
-        userId: String,
-        startedAt: String,
-        endedAt: String,
-        note: String,
-    }],
+            id: String,
+            userId: String,
+            startedAt: String,
+            endedAt: String,
+            note: String,
+        }],
 });
 const ProjectSchema = new mongoose_1.Schema({
     appId: { type: String, required: true, unique: true },
@@ -113,6 +125,7 @@ const MessageSchema = new mongoose_1.Schema({
     reactions: { type: Map, of: [String], default: {} },
     deleted: { type: Boolean, default: false },
     read: { type: Boolean, default: false },
+    edited: { type: Boolean, default: false },
 });
 const ConvMetaSchema = new mongoose_1.Schema({
     convId: { type: String, required: true, unique: true },
@@ -138,6 +151,12 @@ const ProjectRichSchema = new mongoose_1.Schema({
     dueDate: { type: String, default: '' },
     starred: { type: Boolean, default: false },
     category: { type: String, default: 'General' },
+    milestones: [{
+            id: String,
+            name: String,
+            dueDate: String,
+            completed: { type: Boolean, default: false }
+        }],
 });
 const AuthUserSchema = new mongoose_1.Schema({
     appId: { type: String, required: true, unique: true },
@@ -177,6 +196,7 @@ const NotificationSchema = new mongoose_1.Schema({
     body: { type: String, default: '' },
     refId: { type: String, default: '' },
     read: { type: Boolean, default: false },
+    seenAt: { type: String, default: null },
     createdAt: { type: String, required: true },
 });
 const AppearancePrefSchema = new mongoose_1.Schema({
@@ -200,48 +220,46 @@ const RolePermsSchema = new mongoose_1.Schema({
     allowedRoutes: { type: [String], default: [] },
 });
 const CounterSchema = new mongoose_1.Schema({
-    name:  { type: String, required: true, unique: true },
+    name: { type: String, required: true, unique: true },
     value: { type: Number, default: 0 },
 });
 const CounterModel = mongoose_1.default.model('Counter', CounterSchema);
 const CommentSchema = new mongoose_1.Schema({
-    commentId:  { type: String, required: true, unique: true },
-    taskId:     { type: String, required: true },
-    authorId:   { type: String, required: true },
+    commentId: { type: String, required: true, unique: true },
+    taskId: { type: String, required: true },
+    authorId: { type: String, required: true },
     authorName: { type: String, required: true },
-    text:       { type: String, required: true },
-    createdAt:  { type: String, required: true },
+    text: { type: String, required: true },
+    createdAt: { type: String, required: true },
 });
+CommentSchema.index({ taskId: 1, createdAt: -1 });
 const CommentModel = mongoose_1.default.model('Comment', CommentSchema);
 const AttachmentSchema = new mongoose_1.Schema({
-    attachId:   { type: String, required: true, unique: true },
-    taskId:     { type: String, required: true },
-    name:       { type: String, required: true },
-    filePath:   { type: String, required: true },
-    size:       { type: Number, default: 0 },
+    attachId: { type: String, required: true, unique: true },
+    taskId: { type: String, required: true },
+    name: { type: String, required: true },
+    filePath: { type: String, required: true },
+    size: { type: Number, default: 0 },
     uploadedAt: { type: String, required: true },
 });
 const AttachmentModel = mongoose_1.default.model('Attachment', AttachmentSchema);
-const SprintSchema = new mongoose_1.Schema({
-    sprintId:  { type: String, required: true, unique: true },
-    name:      { type: String, required: true },
-    projectId: { type: String, required: true },
-    startDate: { type: String, default: '' },
-    endDate:   { type: String, default: '' },
-    status:    { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
-    goal:      { type: String, default: '' },
-});
-const SprintModel = mongoose_1.default.model('Sprint', SprintSchema);
 const TaskTemplateSchema = new mongoose_1.Schema({
-    templateId:  { type: String, required: true, unique: true },
-    name:        { type: String, required: true },
-    priority:    { type: String, enum: ['low', 'medium', 'high'], default: 'low' },
-    taskType:    { type: String, enum: ['task', 'issue'], default: 'task' },
+    templateId: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+    priority: { type: String, enum: ['low', 'medium', 'high'], default: 'low' },
+    taskType: { type: String, enum: ['task', 'issue'], default: 'task' },
     description: { type: String, default: '' },
-    assignees:   [String],
-    projectId:   { type: String, default: '' },
+    assignees: [String],
+    projectId: { type: String, default: '' },
 });
 const TaskTemplateModel = mongoose_1.default.model('TaskTemplate', TaskTemplateSchema);
+TaskSchema.index({ projectId: 1, status: 1 });
+TaskSchema.index({ assignees: 1 });
+TaskSchema.index({ dueDate: 1, status: 1 });
+MessageSchema.index({ fromId: 1, toId: 1, read: 1 });
+AttendanceSchema.index({ userId: 1, date: 1 });
+NotificationSchema.index({ userId: 1, createdAt: -1 });
+NotificationSchema.index({ userId: 1, read: 1 });
 const UserModel = mongoose_1.default.model('User', UserSchema);
 const TaskModel = mongoose_1.default.model('Task', TaskSchema);
 const ProjectModel = mongoose_1.default.model('Project', ProjectSchema);
@@ -271,15 +289,15 @@ const toUser = (d) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? '', emai
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toProject = (d) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toTask = (d) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, sprintId: d.sprintId ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? 'none', order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [] });
+const toTask = (d) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? 'none', order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [], subtasks: d.subtasks ?? [], estimatedMinutes: d.estimatedMinutes ?? 0, timeEntries: d.timeEntries ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser = (d) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toDept = (d) => ({ id: d.deptId, name: d.name, color: d.color, memberIds: (d.memberIds ?? []).map(String) });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toProjectRich = (d) => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), startDate: d.startDate ?? '', dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General' });
+const toProjectRich = (d) => ({ projectId: d.projectId, description: d.description ?? '', status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), startDate: d.startDate ?? '', dueDate: d.dueDate ?? '', starred: d.starred ?? false, category: d.category ?? 'General', milestones: d.milestones ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toMsg = (d) => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false });
+const toMsg = (d) => ({ id: d.msgId, fromId: d.fromId, toId: d.toId, text: d.text, timestamp: d.timestamp, reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {}, deleted: d.deleted ?? false, edited: d.edited ?? false });
 // Produces renderer-compatible shape (from/to/time) for IPC push events
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toMsgFrontend = (d) => ({
@@ -291,19 +309,29 @@ const toMsgFrontend = (d) => ({
     read: d.read ?? false,
     reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {},
     deleted: d.deleted ?? false,
+    edited: d.edited ?? false,
 });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toConvMeta = (d) => ({ convId: d.convId, userId: d.userId, peerId: d.peerId, pinned: d.pinned ?? false, starred: d.starred ?? false, archived: d.archived ?? false });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toOrg = (d) => ({ id: d.orgId, name: d.name, logo: d.logo ?? '', address: d.address ?? '', workStart: d.workStart ?? '09:00', workEnd: d.workEnd ?? '18:00', createdAt: d.createdAt ?? '' });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toUserPref = (d) => ({ userId: d.userId, theme: d.theme, sidebarCollapsed: d.sidebarCollapsed ?? false, selectedWeekStart: d.selectedWeekStart ?? null, hasSeenWalkthrough: d.hasSeenWalkthrough ?? false, projectsView: d.projectsView ?? 'grid', taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {}, navOrder: d.navOrder ?? [] });
+const toUserPref = (d) => ({
+    userId: d.userId,
+    theme: d.theme,
+    sidebarCollapsed: d.sidebarCollapsed ?? false,
+    selectedWeekStart: d.selectedWeekStart ?? null,
+    hasSeenWalkthrough: d.hasSeenWalkthrough ?? false,
+    projectsView: d.projectsView ?? 'grid',
+    taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {},
+    navOrder: d.navOrder ?? [],
+});
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toNotifPref = (d) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours, systemNotifs: d.systemNotifs ?? true });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAppearancePref = (d) => ({ userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor, fontSize: d.fontSize, compactMode: d.compactMode ?? false });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const toNotif = (d) => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? '', refId: d.refId ?? '', read: d.read ?? false, createdAt: d.createdAt });
+const toNotif = (d) => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? '', refId: d.refId ?? '', read: d.read ?? false, seenAt: d.seenAt ?? null, createdAt: d.createdAt });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toRole = (d) => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
 // ─── MongoDB connection ────────────────────────────────────────────────────────
@@ -330,7 +358,6 @@ let authUserStream = null;
 let notificationStream = null;
 let commentStream = null;
 let attachmentStream = null;
-let sprintStream = null;
 // Per-user system notification setting (userId → enabled). Loaded lazily from DB.
 const systemNotifsEnabled = new Map();
 function fireSystemNotif(title, body) {
@@ -354,6 +381,7 @@ function startMessageStream() {
     try {
         // Fix 3: watch all operations so reactions and soft-deletes propagate to other clients
         messageStream = MessageModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('message', messageStream);
         messageStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -365,7 +393,7 @@ function startMessageStream() {
                 mainWindow.webContents.send('msg:new', toMsgFrontend(d));
                 // System notification — only fire on the machine where the recipient is logged in
                 const recipientId = d.toId;
-                if (recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
+                if (activeUserId && recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
                     // Look up sender name async (best-effort)
                     UserModel.findOne({ appId: d.fromId }).lean().then((sender) => {
                         const name = sender?.name ?? 'New message';
@@ -410,6 +438,7 @@ function startProjectStream() {
     }
     try {
         projectStream = ProjectModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('project', projectStream);
         projectStream.on('change', (change) => {
             console.log('[changeStream:project] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed())
@@ -453,6 +482,7 @@ function startTaskStream() {
     }
     try {
         taskStream = TaskModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('task', taskStream);
         taskStream.on('change', (change) => {
             console.log('[changeStream:task] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
             if (!mainWindow || mainWindow.isDestroyed())
@@ -496,6 +526,7 @@ function startMemberStream() {
     }
     try {
         memberStream = UserModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('member', memberStream);
         memberStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -538,6 +569,7 @@ function startAttendanceStream() {
     }
     try {
         attendanceStream = AttendanceModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('attendance', attendanceStream);
         attendanceStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -579,6 +611,7 @@ function startProjectRichStream() {
     }
     try {
         projectRichStream = ProjectRichModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('projectRich', projectRichStream);
         projectRichStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -620,6 +653,7 @@ function startRolePermsStream() {
     }
     try {
         rolePermsStream = RolePermsModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('rolePerms', rolePermsStream);
         rolePermsStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -661,6 +695,7 @@ function startRolesStream() {
     }
     try {
         rolesStream = RoleModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('roles', rolesStream);
         rolesStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -702,6 +737,7 @@ function startOrgStream() {
     }
     try {
         orgStream = OrgModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('org', orgStream);
         orgStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -710,6 +746,10 @@ function startOrgStream() {
                 const d = change.fullDocument;
                 if (d)
                     mainWindow.webContents.send('data:org:changed', { op, doc: safe(toOrg(d)) });
+            }
+            else if (op === 'delete') {
+                const id = change.documentKey?._id?.toString();
+                mainWindow.webContents.send('data:org:changed', { op, id });
             }
         });
         orgStream.on('error', (err) => {
@@ -740,6 +780,7 @@ function startNotifPrefStream() {
     }
     try {
         notifPrefStream = NotifPrefModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('notifPref', notifPrefStream);
         notifPrefStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -778,6 +819,7 @@ function startAppearancePrefStream() {
     }
     try {
         appearancePrefStream = AppearancePrefModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('appearancePref', appearancePrefStream);
         appearancePrefStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -816,6 +858,7 @@ function startConvMetaStream() {
     }
     try {
         convMetaStream = ConvMetaModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('convMeta', convMetaStream);
         convMetaStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -857,6 +900,7 @@ function startDeptStream() {
     }
     try {
         deptStream = DeptModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('dept', deptStream);
         deptStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -897,7 +941,8 @@ function startAuthUserStream() {
         authUserStream = null;
     }
     try {
-        authUserStream = AuthUserModel.watch([], { fullDocument: 'updateLookup' });
+        authUserStream = AuthUserModel.watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'off', projection: { password: 0 } });
+        registerStream('authUser', authUserStream);
         authUserStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -940,6 +985,7 @@ function startNotificationStream() {
     }
     try {
         notificationStream = NotificationModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('notification', notificationStream);
         notificationStream.on('change', (change) => {
             if (!mainWindow || mainWindow.isDestroyed())
                 return;
@@ -970,85 +1016,99 @@ function startNotificationStream() {
     }
 }
 function startCommentStream() {
-    if (!windowReady) return;
-    if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
+    if (!windowReady)
+        return;
+    if (commentStream) {
+        try {
+            commentStream.close();
+        }
+        catch (_) { }
+        commentStream = null;
+    }
     try {
         commentStream = CommentModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('comment', commentStream);
         commentStream.on('change', (change) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:comment:changed', { op, doc: safe({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt }) });
-            } else if (op === 'delete') {
+                if (d)
+                    mainWindow.webContents.send('data:comment:changed', { op, doc: safe({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt }) });
+            }
+            else if (op === 'delete') {
                 mainWindow.webContents.send('data:comment:changed', { op, id: change.documentKey?._id?.toString() });
             }
         });
         commentStream.on('error', (err) => {
             console.error('[changeStream:comment] error:', err.message);
-            try { commentStream.close(); } catch (_) {}
+            try {
+                commentStream.close();
+            }
+            catch (_) { }
             commentStream = null;
-            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1) startCommentStream(); }, 5000);
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startCommentStream(); }, 5000);
         });
         console.log('[changeStream] comment stream started');
-    } catch (err) {
+    }
+    catch (err) {
         console.error('[changeStream:comment] failed to start:', err.message);
     }
 }
 function startAttachmentStream() {
-    if (!windowReady) return;
-    if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
+    if (!windowReady)
+        return;
+    if (attachmentStream) {
+        try {
+            attachmentStream.close();
+        }
+        catch (_) { }
+        attachmentStream = null;
+    }
     try {
         attachmentStream = AttachmentModel.watch([], { fullDocument: 'updateLookup' });
+        registerStream('attachment', attachmentStream);
         attachmentStream.on('change', (change) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            if (!mainWindow || mainWindow.isDestroyed())
+                return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:attachment:changed', { op, doc: safe({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt }) });
-            } else if (op === 'delete') {
+                if (d)
+                    mainWindow.webContents.send('data:attachment:changed', { op, doc: safe({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt }) });
+            }
+            else if (op === 'delete') {
                 mainWindow.webContents.send('data:attachment:changed', { op, id: change.documentKey?._id?.toString() });
             }
         });
         attachmentStream.on('error', (err) => {
             console.error('[changeStream:attachment] error:', err.message);
-            try { attachmentStream.close(); } catch (_) {}
+            try {
+                attachmentStream.close();
+            }
+            catch (_) { }
             attachmentStream = null;
-            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1) startAttachmentStream(); }, 5000);
+            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1)
+                startAttachmentStream(); }, 5000);
         });
         console.log('[changeStream] attachment stream started');
-    } catch (err) {
-        console.error('[changeStream:attachment] failed to start:', err.message);
     }
-}
-function startSprintStream() {
-    if (!windowReady) return;
-    if (sprintStream) { try { sprintStream.close(); } catch (_) {} sprintStream = null; }
-    try {
-        sprintStream = SprintModel.watch([], { fullDocument: 'updateLookup' });
-        sprintStream.on('change', (change) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
-            const op = change.operationType;
-            if (op === 'insert' || op === 'update' || op === 'replace') {
-                const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:sprint:changed', { op, doc: safe({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status, goal: d.goal ?? '' }) });
-            } else if (op === 'delete') {
-                mainWindow.webContents.send('data:sprint:changed', { op, id: change.documentKey?._id?.toString() });
-            }
-        });
-        sprintStream.on('error', (err) => {
-            console.error('[changeStream:sprint] error:', err.message);
-            try { sprintStream.close(); } catch (_) {}
-            sprintStream = null;
-            setTimeout(() => { if (mongoose_1.default.connection.readyState === 1) startSprintStream(); }, 5000);
-        });
-        console.log('[changeStream] sprint stream started');
-    } catch (err) {
-        console.error('[changeStream:sprint] failed to start:', err.message);
+    catch (err) {
+        console.error('[changeStream:attachment] failed to start:', err.message);
     }
 }
 // Coordinator — starts all data streams (each restarts itself on error independently)
 function startDataStreams() {
+    for (const [, stream] of activeStreams) {
+        try {
+            stream.close();
+        }
+        catch { }
+    }
+    activeStreams.clear();
+    startMessageStream();
     startProjectStream();
     startTaskStream();
     startMemberStream();
@@ -1065,7 +1125,6 @@ function startDataStreams() {
     startNotificationStream();
     startCommentStream();
     startAttachmentStream();
-    startSprintStream();
 }
 async function ensureDefaultData() {
     // Ensure Toursurv org exists
@@ -1080,18 +1139,14 @@ async function ensureDefaultData() {
     // Backfill taskNumber on existing tasks that don't have one yet
     const unnumbered = await TaskModel.find({ $or: [{ taskNumber: null }, { taskNumber: { $exists: false } }] }).sort({ _id: 1 }).lean();
     if (unnumbered.length > 0) {
-        const counter = await CounterModel.findOne({ name: 'tasks' }).lean();
-        let next = (counter?.value ?? 0) + 1;
-        for (const t of unnumbered) {
-            await TaskModel.updateOne({ _id: t._id }, { $set: { taskNumber: next } });
-            next++;
+        // Atomically reserve all needed numbers up-front — counter is correct even if the app
+        // crashes mid-loop, preventing any future task from reusing an already-assigned number.
+        const counter = await CounterModel.findOneAndUpdate({ name: 'tasks' }, { $inc: { value: unnumbered.length } }, { new: false, upsert: true });
+        const firstNumber = (counter?.value ?? 0) + 1;
+        for (let i = 0; i < unnumbered.length; i++) {
+            await TaskModel.updateOne({ _id: unnumbered[i]._id }, { $set: { taskNumber: firstNumber + i } });
         }
-        await CounterModel.findOneAndUpdate(
-            { name: 'tasks' },
-            { $set: { value: next - 1 } },
-            { upsert: true }
-        );
-        console.log(`[migration] Assigned taskNumbers ${(counter?.value ?? 0) + 1}–${next - 1} to ${unnumbered.length} existing tasks`);
+        console.log(`[migration] Assigned taskNumbers ${firstNumber}–${firstNumber + unnumbered.length - 1} to ${unnumbered.length} existing tasks`);
     }
 }
 // Set up mongoose event listeners ONCE at startup — never inside connectDB() to avoid duplicate listeners
@@ -1106,7 +1161,6 @@ function setupDbListeners() {
         if (mainWindow && !mainWindow.isDestroyed())
             mainWindow.webContents.send('db:reconnected');
         // Restart all change streams — they die on disconnect and need to be re-opened
-        startMessageStream();
         startDataStreams();
     });
     mongoose_1.default.connection.on('error', (err) => {
@@ -1116,8 +1170,7 @@ function setupDbListeners() {
 async function connectDB() {
     const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
     if (!uri) {
-        console.error('MONGODB_URI not set');
-        return;
+        throw new Error('MONGODB_URI environment variable is required');
     }
     // Reduced serverSelectionTimeoutMS from 30s → 8s so failed attempts surface faster
     // and the retry loop can kick in sooner after internet is restored
@@ -1150,15 +1203,45 @@ async function connectDB() {
     }
 }
 // ─── IPC Handlers ─────────────────────────────────────────────────────────────
+// Wraps ipcMain.handle so every handler has a consistent try/catch — unhandled
+// DB errors won't crash the renderer as an uncaught rejection.
+function handle(channel, fn) {
+    electron_1.ipcMain.handle(channel, async (_e, ...args) => {
+        try {
+            return await fn(_e, ...args);
+        }
+        catch (err) {
+            console.error(`[ipc:${channel}] error:`, err?.message ?? err);
+            throw err; // re-throw so the renderer receives a rejected promise
+        }
+    });
+}
+// ─── IPC Authorization ─────────────────────────────────────────────────────────
+async function requireAdmin() {
+    if (!activeUserId)
+        throw new Error('Not authenticated.');
+    const user = await AuthUserModel.findOne({ appId: activeUserId }).lean();
+    if (!user || user.role !== 'admin')
+        throw new Error('Permission denied: admin role required.');
+}
+async function requireAuth() {
+    if (!activeUserId)
+        throw new Error('Not authenticated.');
+}
 function registerDbHandlers() {
     // Projects
-    electron_1.ipcMain.handle('db:projects:getAll', async () => safe((await ProjectModel.find().lean()).map(toProject)));
-    electron_1.ipcMain.handle('db:projects:create', async (_e, name, color) => { const d = await ProjectModel.create({ appId: `p${Date.now()}`, name, color }); return safe(toProject(d.toObject())); });
-    electron_1.ipcMain.handle('db:projects:update', async (_e, id, changes) => { const d = await ProjectModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toProject(d)) : null; });
-    electron_1.ipcMain.handle('db:projects:delete', async (_e, id) => { await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); return true; });
+    handle('db:projects:getAll', async () => safe((await ProjectModel.find().lean()).map(toProject)));
+    handle('db:projects:create', async (_e, name, color) => { const d = await ProjectModel.create({ appId: `p${(0, crypto_1.randomUUID)()}`, name, color }); return safe(toProject(d.toObject())); });
+    handle('db:projects:update', async (_e, id, changes) => {
+        const PROJECT_ALLOWED_FIELDS = new Set(['name', 'color']);
+        const safeChanges = Object.fromEntries(Object.entries(changes).filter(([k]) => PROJECT_ALLOWED_FIELDS.has(k)));
+        const d = await ProjectModel.findOneAndUpdate({ appId: id }, { $set: safeChanges }, { returnDocument: 'after' }).lean();
+        return d ? safe(toProject(d)) : null;
+    });
+    handle('db:projects:delete', async (_e, id) => { await requireAdmin(); await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); await ProjectRichModel.deleteOne({ projectId: id }); return true; });
     // Tasks
-    electron_1.ipcMain.handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
-    electron_1.ipcMain.handle('db:tasks:create', async (_e, taskData) => {
+    handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
+    handle('db:tasks:create', async (_e, taskData) => {
         const { actorId, actorName, ...rest } = taskData;
         const entry = {
             id: (0, crypto_1.randomUUID)(),
@@ -1168,21 +1251,17 @@ function registerDbHandlers() {
             timestamp: new Date().toISOString(),
         };
         // Atomically get the next task number
-        const counter = await CounterModel.findOneAndUpdate(
-            { name: 'tasks' },
-            { $inc: { value: 1 } },
-            { new: true, upsert: true }
-        );
+        const counter = await CounterModel.findOneAndUpdate({ name: 'tasks' }, { $inc: { value: 1 } }, { new: true, upsert: true });
         const taskNumber = counter.value;
         const doc = await TaskModel.create({
-            appId: 't' + Date.now(),
+            appId: 't' + (0, crypto_1.randomUUID)(),
             ...rest,
             taskNumber,
             activity: [entry],
         });
         return safe(toTask(doc.toObject()));
     });
-    electron_1.ipcMain.handle('db:tasks:update', async (_e, id, changes) => {
+    handle('db:tasks:update', async (_e, id, changes) => {
         const { actorId, actorName, ...rest } = changes;
         const actor = { actorId: actorId ?? 'system', actorName: actorName ?? 'System' };
         const current = await TaskModel.findOne({ appId: id }).lean();
@@ -1212,19 +1291,31 @@ function registerDbHandlers() {
                     entries.push({ id: (0, crypto_1.randomUUID)(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
             }
         }
-        const updateDoc = { $set: { ...rest } };
+        const TASK_ALLOWED_FIELDS = new Set(['title', 'description', 'priority', 'status', 'taskType', 'assignees', 'startDate', 'dueDate', 'projectId', 'blockedBy', 'recurrence', 'order', 'subtasks', 'estimatedMinutes', 'timeEntries', 'images']);
+        const safeRest = Object.fromEntries(Object.entries(rest).filter(([k]) => TASK_ALLOWED_FIELDS.has(k)));
+        const updateDoc = { $set: { ...safeRest } };
         if (entries.length > 0)
             updateDoc.$push = { activity: { $each: entries } };
         const updated = await TaskModel.findOneAndUpdate({ appId: id }, updateDoc, { returnDocument: 'after' });
-        if (!updated) return null;
+        if (!updated)
+            return null;
         // Auto-create next occurrence for recurring tasks when marked done
         const updatedObj = updated.toObject();
         if (updatedObj.recurrence && updatedObj.recurrence !== 'none' && updatedObj.status === 'done' && rest.status === 'done') {
             const oldDue = updatedObj.dueDate ? new Date(updatedObj.dueDate) : new Date();
             let nextDue;
-            if (updatedObj.recurrence === 'daily') { nextDue = new Date(oldDue); nextDue.setDate(nextDue.getDate() + 1); }
-            else if (updatedObj.recurrence === 'weekly') { nextDue = new Date(oldDue); nextDue.setDate(nextDue.getDate() + 7); }
-            else { nextDue = new Date(oldDue); nextDue.setMonth(nextDue.getMonth() + 1); }
+            if (updatedObj.recurrence === 'daily') {
+                nextDue = new Date(oldDue);
+                nextDue.setDate(nextDue.getDate() + 1);
+            }
+            else if (updatedObj.recurrence === 'weekly') {
+                nextDue = new Date(oldDue);
+                nextDue.setDate(nextDue.getDate() + 7);
+            }
+            else {
+                nextDue = new Date(oldDue);
+                nextDue.setMonth(nextDue.getMonth() + 1);
+            }
             const nextCounter = await CounterModel.findOneAndUpdate({ name: 'tasks' }, { $inc: { value: 1 } }, { new: true, upsert: true });
             await TaskModel.create({
                 appId: 't' + Date.now() + '_r',
@@ -1235,7 +1326,6 @@ function registerDbHandlers() {
                 status: 'todo',
                 assignees: updatedObj.assignees ?? [],
                 projectId: updatedObj.projectId ?? null,
-                sprintId: updatedObj.sprintId ?? null,
                 recurrence: updatedObj.recurrence,
                 dueDate: nextDue.toISOString().split('T')[0],
                 taskNumber: nextCounter.value,
@@ -1245,8 +1335,8 @@ function registerDbHandlers() {
         }
         return safe(toTask(updatedObj));
     });
-    electron_1.ipcMain.handle('db:tasks:delete', async (_e, id) => { await TaskModel.deleteOne({ appId: id }); return true; });
-    electron_1.ipcMain.handle('db:tasks:move', async (_e, id, newStatus, actorId, actorName) => {
+    handle('db:tasks:delete', async (_e, id) => { await TaskModel.deleteOne({ appId: id }); return true; });
+    handle('db:tasks:move', async (_e, id, newStatus, actorId, actorName) => {
         const current = await TaskModel.findOne({ appId: id }).lean();
         if (!current)
             return null;
@@ -1262,33 +1352,35 @@ function registerDbHandlers() {
         const updated = await TaskModel.findOneAndUpdate({ appId: id }, { $set: { status: newStatus }, $push: { activity: entry } }, { returnDocument: 'after' });
         return updated ? safe(toTask(updated.toObject())) : null;
     });
-    electron_1.ipcMain.handle('db:tasks:scrubAssignee', async (_e, memberId) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
+    handle('db:tasks:scrubAssignee', async (_e, memberId) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
     // Comments
-    electron_1.ipcMain.handle('db:comments:getByTask', async (_e, taskId) => {
+    handle('db:comments:getByTask', async (_e, taskId) => {
         const docs = await CommentModel.find({ taskId }).sort({ createdAt: 1 }).lean();
         return safe(docs.map((d) => ({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt })));
     });
-    electron_1.ipcMain.handle('db:comments:add', async (_e, data) => {
+    handle('db:comments:add', async (_e, data) => {
         const doc = await CommentModel.create({ commentId: (0, crypto_1.randomUUID)(), ...data, createdAt: new Date().toISOString() });
         await TaskModel.updateOne({ appId: data.taskId }, { $inc: { comments: 1 } });
         return safe({ id: doc.commentId, taskId: doc.taskId, authorId: doc.authorId, authorName: doc.authorName, text: doc.text, createdAt: doc.createdAt });
     });
-    electron_1.ipcMain.handle('db:comments:delete', async (_e, commentId) => {
+    handle('db:comments:delete', async (_e, commentId) => {
         const doc = await CommentModel.findOneAndDelete({ commentId }).lean();
-        if (doc) await TaskModel.updateOne({ appId: doc.taskId }, { $inc: { comments: -1 } });
+        if (doc)
+            await TaskModel.updateOne({ appId: doc.taskId }, { $inc: { comments: -1 } });
         return true;
     });
     // Attachments
-    electron_1.ipcMain.handle('db:attachments:getByTask', async (_e, taskId) => {
+    handle('db:attachments:getByTask', async (_e, taskId) => {
         const docs = await AttachmentModel.find({ taskId }).sort({ uploadedAt: 1 }).lean();
         return safe(docs.map((d) => ({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt })));
     });
-    electron_1.ipcMain.handle('db:attachments:pick', async (_e, taskId) => {
-        const { dialog, app: eApp } = await import('electron');
+    handle('db:attachments:pick', async (_e, taskId) => {
+        const { dialog, app: eApp } = await Promise.resolve().then(() => __importStar(require('electron')));
         const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
-        if (result.canceled || !result.filePaths.length) return [];
-        const fs = await import('fs');
-        const path = await import('path');
+        if (result.canceled || !result.filePaths.length)
+            return [];
+        const fs = await Promise.resolve().then(() => __importStar(require('fs')));
+        const path = await Promise.resolve().then(() => __importStar(require('path')));
         const destDir = path.join(eApp.getPath('userData'), 'attachments', taskId);
         await fs.promises.mkdir(destDir, { recursive: true });
         const saved = [];
@@ -1303,107 +1395,101 @@ function registerDbHandlers() {
         }
         return safe(saved);
     });
-    electron_1.ipcMain.handle('db:attachments:delete', async (_e, attachId) => {
+    handle('db:attachments:delete', async (_e, attachId) => {
         const doc = await AttachmentModel.findOneAndDelete({ attachId }).lean();
         if (doc) {
-            const fs = await import('fs');
-            try { await fs.promises.unlink(doc.filePath); } catch (_) {}
+            const fs = await Promise.resolve().then(() => __importStar(require('fs')));
+            try {
+                await fs.promises.unlink(doc.filePath);
+            }
+            catch (_) { }
             await TaskModel.updateOne({ appId: doc.taskId }, { $inc: { files: -1 } });
         }
         return true;
     });
-    electron_1.ipcMain.handle('db:attachments:open', async (_e, filePath) => {
+    handle('db:attachments:open', async (_e, filePath) => {
         await electron_1.shell.openPath(filePath);
         return true;
     });
-    // Sprints
-    electron_1.ipcMain.handle('db:sprints:getAll', async () => {
-        const docs = await SprintModel.find().lean();
-        return safe(docs.map((d) => ({ id: d.sprintId, name: d.name, projectId: d.projectId, startDate: d.startDate, endDate: d.endDate, status: d.status, goal: d.goal ?? '' })));
-    });
-    electron_1.ipcMain.handle('db:sprints:create', async (_e, data) => {
-        const doc = await SprintModel.create({ sprintId: `sp${Date.now()}`, ...data });
-        return safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status, goal: doc.goal ?? '' });
-    });
-    electron_1.ipcMain.handle('db:sprints:update', async (_e, id, changes) => {
-        const doc = await SprintModel.findOneAndUpdate({ sprintId: id }, changes, { returnDocument: 'after' }).lean();
-        return doc ? safe({ id: doc.sprintId, name: doc.name, projectId: doc.projectId, startDate: doc.startDate, endDate: doc.endDate, status: doc.status, goal: doc.goal ?? '' }) : null;
-    });
-    electron_1.ipcMain.handle('db:sprints:delete', async (_e, id) => {
-        await SprintModel.deleteOne({ sprintId: id });
-        await TaskModel.updateMany({ sprintId: id }, { $set: { sprintId: null } });
-        return true;
-    });
     // Task Templates
-    electron_1.ipcMain.handle('db:templates:getAll', async () => {
+    handle('db:templates:getAll', async () => {
         const docs = await TaskTemplateModel.find().lean();
         return safe(docs.map((d) => ({ id: d.templateId, name: d.name, priority: d.priority, taskType: d.taskType, description: d.description, assignees: d.assignees, projectId: d.projectId })));
     });
-    electron_1.ipcMain.handle('db:templates:create', async (_e, data) => {
+    handle('db:templates:create', async (_e, data) => {
         const doc = await TaskTemplateModel.create({ templateId: `tmpl${Date.now()}`, ...data });
         return safe({ id: doc.templateId, name: doc.name, priority: doc.priority, taskType: doc.taskType, description: doc.description, assignees: doc.assignees, projectId: doc.projectId });
     });
-    electron_1.ipcMain.handle('db:templates:delete', async (_e, id) => {
+    handle('db:templates:delete', async (_e, id) => {
         await TaskTemplateModel.deleteOne({ templateId: id });
         return true;
     });
     // Avatar pick
-    electron_1.ipcMain.handle('db:members:pickAvatar', async () => {
-        const { dialog } = await import('electron');
+    handle('db:members:pickAvatar', async () => {
+        const { dialog } = await Promise.resolve().then(() => __importStar(require('electron')));
         const result = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
-        if (result.canceled || !result.filePaths.length) return null;
-        const fs = await import('fs');
+        if (result.canceled || !result.filePaths.length)
+            return null;
+        const fs = await Promise.resolve().then(() => __importStar(require('fs')));
         const data = await fs.promises.readFile(result.filePaths[0]);
         const ext = result.filePaths[0].split('.').pop()?.toLowerCase() ?? 'png';
         const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/png';
         return `data:${mime};base64,${data.toString('base64')}`;
     });
     // PDF export
-    electron_1.ipcMain.handle('app:printToPDF', async () => {
-        const { dialog } = await import('electron');
-        if (!mainWindow) return false;
+    handle('app:printToPDF', async () => {
+        const { dialog } = await Promise.resolve().then(() => __importStar(require('electron')));
+        if (!mainWindow)
+            return false;
         const save = await dialog.showSaveDialog(mainWindow, { defaultPath: 'report.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] });
-        if (save.canceled || !save.filePath) return false;
-        const fs = await import('fs');
+        if (save.canceled || !save.filePath)
+            return false;
+        const fs = await Promise.resolve().then(() => __importStar(require('fs')));
         const data = await mainWindow.webContents.printToPDF({ printBackground: true });
         await fs.promises.writeFile(save.filePath, data);
         await electron_1.shell.openPath(save.filePath);
         return true;
     });
     // Members
-    electron_1.ipcMain.handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
-    electron_1.ipcMain.handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
-    electron_1.ipcMain.handle('db:members:update', async (_e, id, changes) => { const d = await UserModel.findOneAndUpdate({ appId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toUser(d)) : null; });
-    electron_1.ipcMain.handle('db:members:updateRole', async (_e, id, role) => {
+    handle('db:members:getAll', async () => safe((await UserModel.find().lean()).map(toUser)));
+    handle('db:members:add', async (_e, member) => { const d = await UserModel.create({ appId: `u${Date.now()}`, ...member }); return safe(toUser(d.toObject())); });
+    handle('db:members:update', async (_e, id, changes) => {
+        const MEMBER_ALLOWED_FIELDS = new Set(['name', 'avatar', 'email', 'location', 'role', 'designation', 'status']);
+        const safeChanges = Object.fromEntries(Object.entries(changes).filter(([k]) => MEMBER_ALLOWED_FIELDS.has(k)));
+        const d = await UserModel.findOneAndUpdate({ appId: id }, { $set: safeChanges }, { returnDocument: 'after' }).lean();
+        return d ? safe(toUser(d)) : null;
+    });
+    handle('db:members:updateRole', async (_e, id, role) => {
+        await requireAdmin();
         const d = await UserModel.findOneAndUpdate({ appId: id }, { role }, { returnDocument: 'after' }).lean();
         if (!d)
             throw new Error(`Member not found: ${id}`);
         await AuthUserModel.findOneAndUpdate({ appId: id }, { role });
         return safe(toUser(d));
     });
-    electron_1.ipcMain.handle('db:members:remove', async (_e, id) => { await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
-    electron_1.ipcMain.handle('db:presence:heartbeat', async (_e, userId) => {
+    handle('db:members:remove', async (_e, id) => { await requireAdmin(); await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
+    handle('db:presence:heartbeat', async (_e, userId) => {
         await UserModel.updateOne({ appId: userId }, { lastSeen: new Date() });
         return true;
     });
     // Attendance
-    electron_1.ipcMain.handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map((d) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
-    electron_1.ipcMain.handle('db:attendance:set', async (_e, record) => {
+    handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map((d) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
+    handle('db:attendance:set', async (_e, record) => {
         const recordId = `${record.userId}-${record.date}`;
         const d = await AttendanceModel.findOneAndUpdate({ recordId }, { recordId, ...record }, { upsert: true, returnDocument: 'after' }).lean();
         return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null });
     });
-    electron_1.ipcMain.handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
+    handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
     // Messages
-    electron_1.ipcMain.handle('db:messages:getBetween', async (_e, userId, peerId) => {
+    handle('db:messages:getBetween', async (_e, userId, peerId) => {
         const msgs = await MessageModel.find({ $or: [{ fromId: userId, toId: peerId }, { fromId: peerId, toId: userId }] }).sort({ timestamp: 1 }).lean();
         return safe(msgs.map(toMsgFrontend));
     });
-    electron_1.ipcMain.handle('db:messages:send', async (_e, msg) => {
+    handle('db:messages:send', async (_e, msg) => {
         const d = await MessageModel.create({ msgId: `m${Date.now()}`, ...msg });
         return safe(toMsgFrontend(d.toObject()));
     });
-    electron_1.ipcMain.handle('db:messages:react', async (_e, msgId, userId, emoji) => {
+    handle('db:messages:react', async (_e, msgId, userId, emoji) => {
         const msg = await MessageModel.findOne({ msgId }).lean();
         if (!msg)
             return null;
@@ -1416,15 +1502,21 @@ function registerDbHandlers() {
         const d = await MessageModel.findOneAndUpdate({ msgId }, { reactions }, { returnDocument: 'after' }).lean();
         return d ? safe(toMsgFrontend(d)) : null;
     });
-    electron_1.ipcMain.handle('db:messages:delete', async (_e, msgId) => {
+    handle('db:messages:delete', async (_e, msgId) => {
         await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
         return true;
     });
-    electron_1.ipcMain.handle('db:messages:markRead', async (_e, userId, peerId) => {
+    handle('msg:edit', async (_, msgId, newText) => {
+        if (!newText.trim())
+            return { ok: false };
+        await MessageModel.updateOne({ msgId }, { $set: { text: newText.trim(), edited: true } });
+        return { ok: true };
+    });
+    handle('db:messages:markRead', async (_e, userId, peerId) => {
         await MessageModel.updateMany({ fromId: peerId, toId: userId, read: { $ne: true } }, { read: true });
         return true;
     });
-    electron_1.ipcMain.handle('db:messages:unread-counts', async (_, userId) => {
+    handle('db:messages:unread-counts', async (_, userId) => {
         const counts = {};
         const convMetas = await ConvMetaModel.find({ userId });
         await Promise.all(convMetas.map(async (c) => {
@@ -1435,33 +1527,33 @@ function registerDbHandlers() {
         return counts;
     });
     // Conv meta (pin/star/archive)
-    electron_1.ipcMain.handle('db:convmeta:getAll', async (_e, userId) => {
+    handle('db:convmeta:getAll', async (_e, userId) => {
         const docs = await ConvMetaModel.find({ userId }).lean();
         return safe(docs.map(toConvMeta));
     });
-    electron_1.ipcMain.handle('db:convmeta:set', async (_e, meta) => {
+    handle('db:convmeta:set', async (_e, meta) => {
         const convId = `${meta.userId}-${meta.peerId}`;
         const d = await ConvMetaModel.findOneAndUpdate({ convId }, { convId, ...meta }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toConvMeta(d));
     });
     // Departments
-    electron_1.ipcMain.handle('db:depts:getAll', async () => safe((await DeptModel.find().lean()).map(toDept)));
-    electron_1.ipcMain.handle('db:depts:create', async (_e, dept) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return safe(toDept(d.toObject())); });
-    electron_1.ipcMain.handle('db:depts:update', async (_e, id, changes) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toDept(d)) : null; });
-    electron_1.ipcMain.handle('db:depts:delete', async (_e, id) => { await DeptModel.deleteOne({ deptId: id }); return true; });
+    handle('db:depts:getAll', async () => safe((await DeptModel.find().lean()).map(toDept)));
+    handle('db:depts:create', async (_e, dept) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return safe(toDept(d.toObject())); });
+    handle('db:depts:update', async (_e, id, changes) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toDept(d)) : null; });
+    handle('db:depts:delete', async (_e, id) => { await DeptModel.deleteOne({ deptId: id }); return true; });
     // Project rich data
-    electron_1.ipcMain.handle('db:projectrich:getAll', async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
-    electron_1.ipcMain.handle('db:projectrich:set', async (_e, data) => {
+    handle('db:projectrich:getAll', async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
+    handle('db:projectrich:set', async (_e, data) => {
         const { projectId, ...rest } = data;
         const d = await ProjectRichModel.findOneAndUpdate({ projectId }, { $set: rest }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toProjectRich(d));
     });
-    electron_1.ipcMain.handle('db:projectrich:delete', async (_e, projectId) => {
+    handle('db:projectrich:delete', async (_e, projectId) => {
         await ProjectRichModel.deleteOne({ projectId });
         return true;
     });
     // Auth
-    electron_1.ipcMain.handle('db:auth:login', async (_e, email, password) => {
+    handle('db:auth:login', async (_e, email, password) => {
         const found = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (!found)
             throw new Error('Invalid email or password.');
@@ -1470,7 +1562,7 @@ function registerDbHandlers() {
             throw new Error('Invalid email or password.');
         return safe(toAuthUser(found));
     });
-    electron_1.ipcMain.handle('db:auth:register', async (_e, name, email, password, _role, orgId) => {
+    handle('db:auth:register', async (_e, name, email, password, _role, orgId) => {
         const existing = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
         if (existing)
             throw new Error('An account with this email already exists.');
@@ -1481,7 +1573,7 @@ function registerDbHandlers() {
         await UserModel.create({ appId, name, email: email.toLowerCase(), role: 'guest', status: 'active', ...(orgId ? { orgId } : {}) });
         return safe(toAuthUser(d.toObject()));
     });
-    electron_1.ipcMain.handle('db:auth:updatePassword', async (_e, userId, currentPassword, newPassword) => {
+    handle('db:auth:updatePassword', async (_e, userId, currentPassword, newPassword) => {
         const found = await AuthUserModel.findOne({ appId: userId }).lean();
         if (!found)
             throw new Error('Current password is incorrect.');
@@ -1492,23 +1584,30 @@ function registerDbHandlers() {
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { password: hashed });
         return true;
     });
-    electron_1.ipcMain.handle('db:auth:updateName', async (_e, userId, newName) => {
+    handle('db:auth:updateName', async (_e, userId, newName) => {
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { name: newName });
         return true;
     });
-    electron_1.ipcMain.handle('db:auth:getAll', async () => {
+    handle('db:auth:getAll', async () => {
         const docs = await AuthUserModel.find().lean();
         return safe(docs.map(d => ({ id: d.appId, name: d.name, email: d.email, role: d.role })));
     });
-    electron_1.ipcMain.handle('db:auth:validate', async (_e, userId) => {
+    handle('db:auth:validate', async (_e, userId) => {
         const found = await AuthUserModel.findOne({ appId: userId }).lean();
         return found ? safe(toAuthUser(found)) : null;
     });
-    electron_1.ipcMain.handle('db:auth:updateRole', async (_e, userId, role) => {
+    handle('db:auth:updateRole', async (_e, userId, role) => {
+        await requireAdmin();
         await AuthUserModel.findOneAndUpdate({ appId: userId }, { role });
         return true;
     });
-    electron_1.ipcMain.handle('db:auth:seedDefault', async () => {
+    handle('db:auth:seedDefault', async () => {
+        if (electron_1.app.isPackaged)
+            return false; // dev-only: never run in production
+        // Only seed if no auth users exist yet (first-run bootstrap)
+        const count = await AuthUserModel.countDocuments();
+        if (count > 0)
+            return false;
         const existing = await AuthUserModel.findOne({ email: 'admin@projectm.com' }).lean();
         if (!existing) {
             const hashed = await bcryptjs_1.default.hash('password123', 10);
@@ -1554,33 +1653,36 @@ function registerDbHandlers() {
         }
     });
     // Organization
-    electron_1.ipcMain.handle('db:org:get', async () => {
+    handle('db:org:get', async () => {
         const d = await OrgModel.findOne().lean();
         return d ? safe(toOrg(d)) : null;
     });
-    electron_1.ipcMain.handle('db:org:list', async () => {
+    handle('db:org:list', async () => {
         const docs = await OrgModel.find().lean();
         return safe(docs.map(toOrg));
     });
-    electron_1.ipcMain.handle('db:org:set', async (_e, data) => {
+    handle('db:org:set', async (_e, data) => {
+        await requireAdmin();
         const d = await OrgModel.findOneAndUpdate({ orgId: data.id ?? 'org-toursurv' }, { ...data, orgId: data.id ?? 'org-toursurv' }, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toOrg(d));
     });
     // Role permissions
-    electron_1.ipcMain.handle('db:roleperms:getAll', async () => {
+    handle('db:roleperms:getAll', async () => {
         const docs = await RolePermsModel.find().lean();
         return safe(docs.map(d => ({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] })));
     });
-    electron_1.ipcMain.handle('db:roleperms:set', async (_e, data) => {
+    handle('db:roleperms:set', async (_e, data) => {
+        await requireAdmin();
         const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, returnDocument: 'after' }).lean();
         return safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] });
     });
     // Roles (dynamic role management)
-    electron_1.ipcMain.handle('db:roles:getAll', async () => {
+    handle('db:roles:getAll', async () => {
         const docs = await RoleModel.find().lean();
         return safe(docs.map(toRole));
     });
-    electron_1.ipcMain.handle('db:roles:create', async (_e, data) => {
+    handle('db:roles:create', async (_e, data) => {
+        await requireAdmin();
         if (data.name === 'admin')
             throw new Error('Cannot create a role named admin.');
         const existing = await RoleModel.findOne({ name: data.name }).lean();
@@ -1589,13 +1691,14 @@ function registerDbHandlers() {
         const d = await RoleModel.create({ appId: `role_${Date.now()}`, name: data.name, color: data.color });
         return safe(toRole(d.toObject()));
     });
-    electron_1.ipcMain.handle('db:roles:updateColor', async (_e, data) => {
+    handle('db:roles:updateColor', async (_e, data) => {
         const d = await RoleModel.findOneAndUpdate({ appId: data.appId }, { color: data.color }, { returnDocument: 'after' }).lean();
         if (!d)
             throw new Error('Role not found.');
         return safe(toRole(d));
     });
-    electron_1.ipcMain.handle('db:roles:rename', async (_e, data) => {
+    handle('db:roles:rename', async (_e, data) => {
+        await requireAdmin();
         const role = await RoleModel.findOne({ appId: data.appId }).lean();
         if (!role)
             throw new Error('Role not found.');
@@ -1616,7 +1719,8 @@ function registerDbHandlers() {
         await AuthUserModel.updateMany({ role: oldName }, { role: data.newName });
         return safe({ ok: true, oldName });
     });
-    electron_1.ipcMain.handle('db:roles:delete', async (_e, data) => {
+    handle('db:roles:delete', async (_e, data) => {
+        await requireAdmin();
         const role = await RoleModel.findOne({ appId: data.appId }).lean();
         if (!role)
             throw new Error('Role not found.');
@@ -1625,65 +1729,72 @@ function registerDbHandlers() {
         await RoleModel.deleteOne({ appId: data.appId });
         return safe({ ok: true });
     });
-    electron_1.ipcMain.handle('db:roleperms:delete', async (_e, data) => {
+    handle('db:roleperms:delete', async (_e, data) => {
+        await requireAdmin();
         await RolePermsModel.deleteOne({ role: data.roleName });
         return safe({ ok: true });
     });
     // User preferences
-    electron_1.ipcMain.handle('db:userpref:get', async (_e, userId) => {
+    handle('db:userpref:get', async (_e, userId) => {
         const d = await UserPrefModel.findOne({ userId }).lean();
         return d ? safe(toUserPref(d)) : null;
     });
-    electron_1.ipcMain.handle('db:userpref:set', async (_e, prefs) => {
+    handle('db:userpref:set', async (_e, prefs) => {
         const d = await UserPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toUserPref(d));
     });
     // Notification preferences
-    electron_1.ipcMain.handle('db:notifpref:get', async (_e, userId) => {
+    handle('db:notifpref:get', async (_e, userId) => {
         const d = await NotifPrefModel.findOne({ userId }).lean();
         return d ? safe(toNotifPref(d)) : null;
     });
-    electron_1.ipcMain.handle('db:notifpref:set', async (_e, prefs) => {
+    handle('db:notifpref:set', async (_e, prefs) => {
         const d = await NotifPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toNotifPref(d));
     });
     // Appearance preferences
-    electron_1.ipcMain.handle('db:appearancepref:get', async (_e, userId) => {
+    handle('db:appearancepref:get', async (_e, userId) => {
         const d = await AppearancePrefModel.findOne({ userId }).lean();
         return d ? safe(toAppearancePref(d)) : null;
     });
-    electron_1.ipcMain.handle('db:appearancepref:set', async (_e, prefs) => {
+    handle('db:appearancepref:set', async (_e, prefs) => {
         const d = await AppearancePrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: 'after' }).lean();
         return safe(toAppearancePref(d));
     });
     // Notifications
-    electron_1.ipcMain.handle('db:notifs:getAll', async (_e, userId) => {
-        const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(50).lean();
+    handle('db:notifs:getAll', async (_e, userId) => {
+        const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(100).lean();
         return safe(docs.map(toNotif));
     });
-    electron_1.ipcMain.handle('db:notifs:create', async (_e, notif) => {
+    handle('db:notifs:create', async (_e, notif) => {
+        if (notif.refId) {
+            const existing = await NotificationModel.findOne({ userId: notif.userId, refId: notif.refId }).lean();
+            if (existing)
+                return safe(toNotif(existing));
+        }
         const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const d = await NotificationModel.create({ notifId, ...notif, createdAt: new Date().toISOString() });
         // Fire OS notification only for the user logged in on this machine
-        if (notif.type !== 'new_message' && notif.userId === activeUserId && systemNotifsEnabled.get(notif.userId) !== false) {
+        if (activeUserId && notif.type !== 'new_message' && notif.userId === activeUserId && systemNotifsEnabled.get(notif.userId) !== false) {
             fireSystemNotif(notif.title, notif.body ?? '');
         }
         return safe(toNotif(d.toObject()));
     });
-    electron_1.ipcMain.handle('db:notifs:markRead', async (_e, notifId) => {
-        await NotificationModel.updateOne({ notifId }, { read: true });
+    handle('db:notifs:markRead', async (_e, notifId) => {
+        await NotificationModel.updateOne({ notifId }, { read: true, seenAt: new Date().toISOString() });
         return true;
     });
-    electron_1.ipcMain.handle('db:notifs:markAllRead', async (_e, userId) => {
-        await NotificationModel.updateMany({ userId, read: false }, { read: true });
+    handle('db:notifs:markAllRead', async (_e, userId) => {
+        const now = new Date().toISOString();
+        await NotificationModel.updateMany({ userId, read: false }, { read: true, seenAt: now });
         return true;
     });
-    electron_1.ipcMain.handle('db:notifs:deleteOld', async (_e, userId) => {
-        const all = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).lean();
-        if (all.length > 100) {
-            const toDelete = all.slice(100).map((d) => d.notifId);
-            await NotificationModel.deleteMany({ notifId: { $in: toDelete } });
-        }
+    handle('db:notifs:deleteOld', async (_e, userId) => {
+        // Only delete notifications that have been seen (read) for more than 90 days.
+        // Never delete unread or recently-seen notifications — their refIds are needed
+        // to prevent re-creating duplicate notifications on subsequent app launches.
+        const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        await NotificationModel.deleteMany({ userId, read: true, seenAt: { $ne: null, $lt: cutoff } });
         return true;
     });
 }
@@ -1825,6 +1936,7 @@ function createWindow() {
             preload: path_1.default.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
+            devTools: false,
         },
         titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
         trafficLightPosition: { x: 15, y: 15 },
@@ -1837,7 +1949,6 @@ function createWindow() {
     electron_1.Menu.setApplicationMenu(null);
     if (process.env.VITE_DEV_SERVER_URL) {
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-        mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
     else {
         mainWindow.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
@@ -1848,7 +1959,6 @@ function createWindow() {
             setTimeout(() => checkForUpdates(), 3000);
         // Fix 1: set flag before starting streams so windowReady guard passes
         windowReady = true;
-        startMessageStream();
         startDataStreams();
     });
     mainWindow.on('closed', () => { mainWindow = null; });
@@ -1870,26 +1980,26 @@ if (process.platform === 'win32') {
 }
 electron_1.app.whenReady().then(async () => {
     registerDbHandlers();
-    electron_1.ipcMain.handle('update:check', () => checkForUpdates(true));
-    electron_1.ipcMain.handle('update:install', () => { if (autoUpdater)
+    handle('update:check', () => checkForUpdates(true));
+    handle('update:install', () => { if (autoUpdater)
         autoUpdater.quitAndInstall(false, true); });
-    electron_1.ipcMain.handle('app:version', () => electron_1.app.getVersion());
-    electron_1.ipcMain.handle('app:openExternal', (_e, url) => electron_1.shell.openExternal(url));
-    electron_1.ipcMain.handle('app:setTitleBarColor', (_e, color, symbolColor) => {
+    handle('app:version', () => electron_1.app.getVersion());
+    handle('app:openExternal', (_e, url) => electron_1.shell.openExternal(url));
+    handle('app:setTitleBarColor', (_e, color, symbolColor) => {
         if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.setTitleBarOverlay({ color, symbolColor, height: 40 });
         }
         return true;
     });
-    electron_1.ipcMain.handle('app:getLoginItemSettings', () => electron_1.app.getLoginItemSettings());
-    electron_1.ipcMain.handle('app:setOpenAtLogin', (_e, value) => { electron_1.app.setLoginItemSettings({ openAtLogin: value }); return true; });
-    electron_1.ipcMain.handle('app:getBackgroundMode', () => backgroundModeEnabled);
-    electron_1.ipcMain.handle('app:setBackgroundMode', (_e, value) => {
+    handle('app:getLoginItemSettings', () => electron_1.app.getLoginItemSettings());
+    handle('app:setOpenAtLogin', (_e, value) => { electron_1.app.setLoginItemSettings({ openAtLogin: value }); return true; });
+    handle('app:getBackgroundMode', () => backgroundModeEnabled);
+    handle('app:setBackgroundMode', (_e, value) => {
         applyBackgroundMode(value);
         return true;
     });
-    electron_1.ipcMain.handle('app:setActiveUser', (_e, userId) => { activeUserId = userId ?? ''; });
-    electron_1.ipcMain.handle('app:getSystemNotifsEnabled', async (_e, userId) => {
+    handle('app:setActiveUser', (_e, userId) => { activeUserId = userId ?? ''; });
+    handle('app:getSystemNotifsEnabled', async (_e, userId) => {
         // Load from DB if not yet cached
         if (!systemNotifsEnabled.has(userId)) {
             try {
@@ -1902,12 +2012,12 @@ electron_1.app.whenReady().then(async () => {
         }
         return systemNotifsEnabled.get(userId) ?? true;
     });
-    electron_1.ipcMain.handle('app:setSystemNotifsEnabled', async (_e, userId, value) => {
+    handle('app:setSystemNotifsEnabled', async (_e, userId, value) => {
         systemNotifsEnabled.set(userId, value);
         await NotifPrefModel.findOneAndUpdate({ userId }, { systemNotifs: value }, { upsert: true });
         return true;
     });
-    electron_1.ipcMain.handle('db:force-reconnect', async () => {
+    handle('db:force-reconnect', async () => {
         if (mongoose_1.default.connection.readyState !== 1) {
             try {
                 await mongoose_1.default.disconnect();
@@ -2029,9 +2139,20 @@ electron_1.app.on('before-quit', () => {
         catch (_) { }
         notificationStream = null;
     }
-    if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
-    if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
-    if (sprintStream) { try { sprintStream.close(); } catch (_) {} sprintStream = null; }
+    if (commentStream) {
+        try {
+            commentStream.close();
+        }
+        catch (_) { }
+        commentStream = null;
+    }
+    if (attachmentStream) {
+        try {
+            attachmentStream.close();
+        }
+        catch (_) { }
+        attachmentStream = null;
+    }
 });
 electron_1.app.on('window-all-closed', () => {
     // If background mode is on, keep the app alive even if all windows are closed/hidden
