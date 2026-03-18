@@ -148,15 +148,15 @@ const NewProjectModal: React.FC<Props> = ({ onClose, onSubmit, initial }) => {
                       placeholder="Project name…"
                       autoFocus
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); goNext(); } }}
-                      className="w-full text-base font-semibold bg-transparent focus:outline-none"
+                      className="w-full text-base font-semibold rounded-xl px-4 py-3 focus:outline-none transition-all duration-150"
                       style={{
                         color: 'var(--text-primary)',
-                        borderBottom: `2px solid ${nameError ? '#EF4444' : name.trim() ? '#5030E5' : 'var(--border-default)'}`,
-                        paddingBottom: 8,
-                        transition: 'border-color 0.15s',
+                        background: 'var(--bg-hover)',
+                        border: `1.5px solid ${nameError ? '#EF4444' : name.trim() ? '#5030E5' : 'var(--border-default)'}`,
+                        boxShadow: name.trim() && !nameError ? '0 0 0 3px rgba(80,48,229,0.12)' : nameError ? '0 0 0 3px rgba(239,68,68,0.10)' : 'none',
                       }}
                     />
-                    {nameError && <p className="text-red-500 text-xs mt-1">{nameError}</p>}
+                    {nameError && <p className="text-red-500 text-xs mt-1.5 pl-1">{nameError}</p>}
                   </div>
 
                   {/* Description */}
