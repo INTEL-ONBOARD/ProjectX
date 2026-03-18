@@ -320,16 +320,6 @@ const TasksPage: React.FC = () => {
             description={`${totalTasks} tasks across ${contextProjects.length} projects`}
             actions={
               <>
-                <motion.button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-surface-100 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Download size={16} /> Export
-                </motion.button>
-                <button
-                  onClick={handleExportCSV}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-surface-200 rounded-lg hover:bg-surface-50 transition-colors"
-                >
-                  <Download size={13} />
-                  Export CSV
-                </button>
                 <motion.button
                   onClick={() => contextProjects.length > 0 && setShowTaskForm(true)}
                   className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-colors ${contextProjects.length > 0 ? 'bg-primary-500 text-white hover:bg-primary-600' : 'bg-surface-200 text-gray-400 cursor-not-allowed'}`}

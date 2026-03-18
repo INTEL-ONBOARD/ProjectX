@@ -117,16 +117,7 @@ const MembersPage: React.FC = () => {
             eyebrow="Home / Members"
             title="Members"
             description={`${members.length} team members`}
-            actions={
-              <>
-                <motion.button onClick={handleExport} className="flex items-center gap-2 bg-white text-gray-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-surface-100 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Download size={16} /> Export
-                </motion.button>
-                <motion.button onClick={() => setShowInvite(true)} className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <UserPlus size={16} /> Invite Member
-                </motion.button>
-              </>
-            }
+            actions={null}
           />
         </div>
 
@@ -163,7 +154,6 @@ const MembersPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col min-h-0">
             <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
               <h2 className="font-bold text-gray-900 text-sm">Team Directory</h2>
-              <button onClick={handleExport} className="text-xs text-primary-500 font-semibold hover:text-primary-700">Export CSV</button>
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
             <table className="w-full">

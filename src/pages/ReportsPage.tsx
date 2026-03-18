@@ -157,18 +157,7 @@ const ReportsPage: React.FC = () => {
           title="Reports"
           description="Project analytics"
           actions={
-            <>
-              <button
-                onClick={() => (window as any).electronAPI.printToPDF()}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-surface-200 rounded-lg hover:bg-surface-50 transition-colors"
-              >
-                <FileDown size={13} />
-                Export PDF
-              </button>
-              <motion.button onClick={handleExport} className="flex items-center gap-2 bg-primary-500 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-primary-600 transition-colors" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Download size={16} /> Download Report
-              </motion.button>
-            </>
+null
           }
         />
       </div>
