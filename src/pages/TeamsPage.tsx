@@ -5,6 +5,7 @@ import {
   CheckSquare, Users, TrendingUp, X, ChevronRight, Folder,
   Clock, CheckCircle2, Circle, Star,
   ArrowUpRight, Pencil, Trash2, ArrowRight, MoreVertical,
+  ChevronDown, Flag, ArrowUpDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/ui/PageHeader';
@@ -531,7 +532,22 @@ const TeamsPage: React.FC = () => {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setViewState] = useState<'grid' | 'list'>('grid');
-  const [filter, setFilter] = useState<'all' | 'active' | 'on-hold' | 'completed'>('all');
+  const [filter, setFilter] = useState<'all' | 'active' | 'on-hold' | 'completed' | 'live-and-support' | 'planning'>('all');
+  const [filterPriority, setFilterPriority] = useState<'' | 'low' | 'medium' | 'high'>('');
+  const [sortBy, setSortBy] = useState<'name' | 'progress' | 'due'>('name');
+  const [showPriorityDrop, setShowPriorityDrop] = useState(false);
+  const [showSortDrop, setShowSortDrop] = useState(false);
+  const priorityDropRef = React.useRef<HTMLDivElement>(null);
+  const sortDropRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (priorityDropRef.current && !priorityDropRef.current.contains(e.target as Node)) setShowPriorityDrop(false);
+      if (sortDropRef.current && !sortDropRef.current.contains(e.target as Node)) setShowSortDrop(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Load view preference from MongoDB on mount
   useEffect(() => {
@@ -559,8 +575,25 @@ const TeamsPage: React.FC = () => {
 
   const filtered = projects.filter(p => {
     if (filter !== 'all' && p.status !== filter) return false;
+    if (filterPriority && p.priority !== filterPriority) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
+  }).sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'progress') {
+      const pa = a.taskTotal ? Math.round((a.taskDone / a.taskTotal) * 100) : 0;
+      const pb = b.taskTotal ? Math.round((b.taskDone / b.taskTotal) * 100) : 0;
+      return pb - pa;
+    }
+    if (sortBy === 'due') {
+      const da = (a.dueDate === 'TBD' ? '' : a.dueDate) ?? '';
+      const db = (b.dueDate === 'TBD' ? '' : b.dueDate) ?? '';
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return da.localeCompare(db);
+    }
+    return 0;
   });
 
   // Helper: update rich data locally + persist to DB
@@ -707,16 +740,65 @@ const TeamsPage: React.FC = () => {
 
               {/* Filter tabs */}
               <div className="flex items-center bg-surface-100 rounded-xl p-1 gap-0.5">
-                {(['all', 'active', 'on-hold', 'completed'] as const).map(f => (
+                {(['all', 'active', 'planning', 'on-hold', 'live-and-support', 'completed'] as const).map(f => (
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${filter === f ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === f ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                   >
-                    {f === 'on-hold' ? 'On Hold' : f.charAt(0).toUpperCase() + f.slice(1)}
+                    {f === 'all' ? 'All' : f === 'on-hold' ? 'On Hold' : f === 'live-and-support' ? 'Live & Support' : f.charAt(0).toUpperCase() + f.slice(1)}
                   </button>
                 ))}
               </div>
+
+              {/* Priority filter */}
+              <div ref={priorityDropRef} className="relative">
+                <button
+                  onClick={() => { setShowPriorityDrop(v => !v); setShowSortDrop(false); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${filterPriority ? 'border-primary-300 bg-primary-50 text-primary-600' : 'border-surface-200 bg-surface-50 text-gray-500 hover:text-gray-700'}`}
+                >
+                  <Flag size={11} />
+                  {filterPriority ? filterPriority.charAt(0).toUpperCase() + filterPriority.slice(1) : 'Priority'}
+                  <ChevronDown size={10} />
+                </button>
+                {showPriorityDrop && (
+                  <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl border border-surface-200 shadow-lg z-30 overflow-hidden">
+                    {(['', 'low', 'medium', 'high'] as const).map(p => (
+                      <button key={p} onClick={() => { setFilterPriority(p); setShowPriorityDrop(false); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors ${filterPriority === p ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-surface-50'}`}>
+                        {p === '' ? 'All priorities' : p.charAt(0).toUpperCase() + p.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Sort */}
+              <div ref={sortDropRef} className="relative">
+                <button
+                  onClick={() => { setShowSortDrop(v => !v); setShowPriorityDrop(false); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${sortBy !== 'name' ? 'border-primary-300 bg-primary-50 text-primary-600' : 'border-surface-200 bg-surface-50 text-gray-500 hover:text-gray-700'}`}
+                >
+                  <ArrowUpDown size={11} />
+                  {sortBy === 'name' ? 'Sort' : sortBy === 'progress' ? 'Progress' : 'Due Date'}
+                  <ChevronDown size={10} />
+                </button>
+                {showSortDrop && (
+                  <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl border border-surface-200 shadow-lg z-30 overflow-hidden">
+                    {([['name', 'Name (A–Z)'], ['progress', 'Progress'], ['due', 'Due Date']] as const).map(([val, label]) => (
+                      <button key={val} onClick={() => { setSortBy(val); setShowSortDrop(false); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors ${sortBy === val ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-surface-50'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Clear active filters */}
+              {(filterPriority || sortBy !== 'name') && (
+                <button onClick={() => { setFilterPriority(''); setSortBy('name'); }} className="text-[10px] text-gray-400 hover:text-gray-600 font-medium">Clear</button>
+              )}
 
               <div className="flex items-center gap-1 ml-auto">
                 <button

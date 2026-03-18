@@ -64,6 +64,17 @@
     box-sizing: border-box;
 }
 
+/* Light theme: ensure inputs always show dark text regardless of body color inheritance */
+body:not([data-theme='dark']):not([data-theme='coffee']) input:not([type='checkbox']):not([type='radio']):not([type='color']),
+body:not([data-theme='dark']):not([data-theme='coffee']) textarea,
+body:not([data-theme='dark']):not([data-theme='coffee']) select {
+    color: #111827;
+}
+body:not([data-theme='dark']):not([data-theme='coffee']) input::placeholder,
+body:not([data-theme='dark']):not([data-theme='coffee']) textarea::placeholder {
+    color: #9CA3AF;
+}
+
 html,
 body,
 #root {

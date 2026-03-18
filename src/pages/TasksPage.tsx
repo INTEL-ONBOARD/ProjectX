@@ -217,6 +217,23 @@ const TasksPage: React.FC = () => {
   // View mode (list vs deps graph)
   const [viewMode, setViewMode] = useState<'list' | 'deps'>('list');
 
+  // Filter state
+  const [filterPriority, setFilterPriority] = useState<string>('');
+  const [filterAssignee, setFilterAssignee] = useState<string>('');
+  const [showPriorityFilter, setShowPriorityFilter] = useState(false);
+  const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
+  const priorityFilterRef = useRef<HTMLDivElement>(null);
+  const assigneeFilterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (priorityFilterRef.current && !priorityFilterRef.current.contains(e.target as Node)) setShowPriorityFilter(false);
+      if (assigneeFilterRef.current && !assigneeFilterRef.current.contains(e.target as Node)) setShowAssigneeFilter(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   // Delete confirmation state
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -230,9 +247,21 @@ const TasksPage: React.FC = () => {
   const tabStatusMap: (TaskStatus | null)[] = [null, 'todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'on-hold', 'done'];
   const tabTasks = activeTab === 0 ? allTasks : allTasks.filter(t => t.status === tabStatusMap[activeTab]);
 
-  const filteredTasks = searchQuery.trim()
-    ? tabTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : tabTasks;
+  const filteredTasks = tabTasks.filter(t => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      const assigneeNames = t.assignees.map(id => members.find(m => m.id === id)?.name ?? '').join(' ').toLowerCase();
+      const taskNum = t.taskNumber != null ? `#${String(t.taskNumber).padStart(3, '0')}` : '';
+      const matchesSearch = t.title.toLowerCase().includes(q)
+        || (t.description ?? '').toLowerCase().includes(q)
+        || assigneeNames.includes(q)
+        || taskNum.includes(q);
+      if (!matchesSearch) return false;
+    }
+    if (filterPriority && t.priority !== filterPriority) return false;
+    if (filterAssignee && !t.assignees.includes(filterAssignee)) return false;
+    return true;
+  });
 
   const doneCount = allTasks.filter(t => t.status === 'done').length;
   const todoCount = allTasks.filter(t => t.status === 'todo').length;
@@ -367,10 +396,73 @@ const TasksPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden flex flex-col h-full">
             <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
               <h2 className="font-bold text-gray-900 text-sm">All Tasks</h2>
-              <button onClick={() => navigate('/')} className="text-xs text-primary-500 font-semibold hover:text-primary-700 transition-colors">Board view →</button>
+              <div className="flex items-center gap-2">
+                {/* Search */}
+                <div className="relative">
+                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search tasks..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-7 pr-6 py-1.5 text-xs rounded-lg border border-surface-200 bg-surface-50 focus:outline-none focus:border-primary-300 focus:ring-1 focus:ring-primary-100 transition-all w-40"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <X size={11} />
+                    </button>
+                  )}
+                </div>
+                {/* Priority filter */}
+                <div ref={priorityFilterRef} className="relative">
+                  <button
+                    onClick={() => { setShowPriorityFilter(v => !v); setShowAssigneeFilter(false); }}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${filterPriority ? 'border-primary-300 bg-primary-50 text-primary-600' : 'border-surface-200 bg-surface-50 text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <Flag size={11} /> {filterPriority ? filterPriority.charAt(0).toUpperCase() + filterPriority.slice(1) : 'Priority'} <ChevronDown size={10} />
+                  </button>
+                  {showPriorityFilter && (
+                    <div className="absolute right-0 top-full mt-1 w-32 bg-white rounded-xl border border-surface-200 shadow-lg z-30 overflow-hidden">
+                      {['', 'low', 'medium', 'high'].map(p => (
+                        <button key={p} onClick={() => { setFilterPriority(p); setShowPriorityFilter(false); }}
+                          className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors ${filterPriority === p ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-surface-50'}`}>
+                          {p === '' ? 'All priorities' : p.charAt(0).toUpperCase() + p.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Assignee filter */}
+                <div ref={assigneeFilterRef} className="relative">
+                  <button
+                    onClick={() => { setShowAssigneeFilter(v => !v); setShowPriorityFilter(false); }}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${filterAssignee ? 'border-primary-300 bg-primary-50 text-primary-600' : 'border-surface-200 bg-surface-50 text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <User size={11} /> {filterAssignee ? (members.find(m => m.id === filterAssignee)?.name ?? 'Assignee') : 'Assignee'} <ChevronDown size={10} />
+                  </button>
+                  {showAssigneeFilter && (
+                    <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl border border-surface-200 shadow-lg z-30 overflow-hidden max-h-48 overflow-y-auto">
+                      <button onClick={() => { setFilterAssignee(''); setShowAssigneeFilter(false); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors ${!filterAssignee ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-surface-50'}`}>
+                        All members
+                      </button>
+                      {members.map(m => (
+                        <button key={m.id} onClick={() => { setFilterAssignee(m.id); setShowAssigneeFilter(false); }}
+                          className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors ${filterAssignee === m.id ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-surface-50'}`}>
+                          {m.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Clear filters */}
+                {(filterPriority || filterAssignee) && (
+                  <button onClick={() => { setFilterPriority(''); setFilterAssignee(''); }} className="text-[10px] text-gray-400 hover:text-gray-600 font-medium">Clear</button>
+                )}
+              </div>
             </div>
             {/* Tabs */}
-            <div className="px-5 pt-3 flex items-center justify-between gap-3">
+            <div className="px-5 pt-3">
               <div className="flex gap-1 bg-surface-100 rounded-lg p-1 mb-3 w-fit">
                 {tabs.map((t, i) => {
                   const s = tabStatusMap[i];
@@ -387,20 +479,6 @@ const TasksPage: React.FC = () => {
                 >
                   Dependencies
                 </button>
-              </div>
-              <div className="relative mb-3">
-                <input
-                  type="text"
-                  placeholder="Search tasks..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-3 pr-7 py-1.5 text-xs rounded-lg border border-surface-200 bg-surface-50 focus:outline-none focus:border-primary-300 focus:ring-1 focus:ring-primary-100 transition-all w-44"
-                />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    <X size={11} />
-                  </button>
-                )}
               </div>
             </div>
             {viewMode === 'deps' && (

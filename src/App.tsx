@@ -571,6 +571,8 @@ const Root: React.FC = () => {
         };
         const unsubDisconnect    = api.onDbDisconnected?.(() => showOverlay());
         const unsubReconnect     = api.onDbReconnected?.(() => hideOverlay());
+        // db:connected fires when connectDB() retry loop succeeds — also hide overlay
+        const unsubConnected     = api.onDbConnected?.(() => hideOverlay());
         const unsubConnFailed    = api.onDbConnectionFailed?.(() => setReconnectStatus('failed'));
         return () => {
             window.removeEventListener('offline', handleOffline);
@@ -578,6 +580,7 @@ const Root: React.FC = () => {
             if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
             unsubDisconnect?.();
             unsubReconnect?.();
+            unsubConnected?.();
             unsubConnFailed?.();
         };
     }, []);

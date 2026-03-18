@@ -256,13 +256,13 @@ const AttendanceTab: React.FC = () => {
                                                             <span className="text-[9px] text-gray-400 font-medium">{hours}</span>
                                                         )}
                                                         {record?.checkIn && (
-                                                            <span className="text-[9px] text-gray-300">
+                                                            <span className="text-[9px] text-gray-400">
                                                                 {new Date(record.checkIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                                             </span>
                                                         )}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-[10px] text-gray-200">—</span>
+                                                    <span className="text-[10px] text-gray-400">—</span>
                                                 )}
                                             </td>
                                         );

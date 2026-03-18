@@ -347,16 +347,16 @@ const AttendancePage: React.FC = () => {
           <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
             <h2 className="font-bold text-gray-900 text-sm">Weekly Attendance</h2>
             <div className="flex items-center gap-2">
-              <button onClick={handlePrevWeek} className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors">
+              <button onClick={handlePrevWeek} className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors text-gray-500">
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-sm font-medium w-44 text-center">
+              <span className="text-sm font-medium w-44 text-center text-gray-700">
                 {format(weekStart, 'MMM d')} – {format(dateFnsAddDays(weekStart, 6), 'MMM d, yyyy')}
               </span>
               <button
                 onClick={handleNextWeek}
                 disabled={isCurrentWeek}
-                className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-500"
               >
                 <ChevronRight size={16} />
               </button>
