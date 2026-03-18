@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, AlignLeft, Check, Circle } from 'lucide-react';
+import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, AlignLeft, Check, Circle } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AvatarGroup } from '../components/ui/Avatar';
@@ -194,7 +194,14 @@ const TasksPage: React.FC = () => {
   }, []);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const detailFileRef = useRef<HTMLInputElement>(null);
-  const [detailImage, setDetailImage] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (lightboxIndex !== null) lightboxRef.current?.focus();
+  }, [lightboxIndex]);
+  useEffect(() => {
+    setLightboxIndex(null);
+  }, [selectedTask?.id]);
 
   // Inline edit state
   const [editingTitle, setEditingTitle] = useState(false);
@@ -531,7 +538,7 @@ const TasksPage: React.FC = () => {
             >
               <div className="flex-1" onClick={() => { setSelectedTask(null); setConfirmDelete(false); }} />
               <motion.div
-                className="w-[420px] h-full overflow-y-auto flex flex-col border-l shrink-0"
+                className="w-[420px] h-full overflow-y-auto flex flex-col border-l shrink-0 relative"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border-default)' }}
                 initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }}
                 transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
@@ -804,26 +811,29 @@ const TasksPage: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Image upload */}
+                    {/* Image gallery */}
                     <div className="mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-                      {detailImage ? (
-                        <div className="relative rounded-xl overflow-hidden mb-2">
-                          <img src={detailImage} alt="attachment" className="w-full h-36 object-cover" />
-                          <button onClick={() => setDetailImage(null)} className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white">
-                            <X size={11} />
-                          </button>
+                      {(selectedTask.images ?? []).length > 0 && (
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          {(selectedTask.images ?? []).map((img, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setLightboxIndex(i)}
+                              className="h-20 rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                            >
+                              <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
                         </div>
-                      ) : (
-                        <button onClick={() => detailFileRef.current?.click()}
-                          className="flex items-center gap-3 px-1 py-2.5 text-sm w-full text-left transition-colors"
-                          style={{ color: 'var(--text-muted)' }}
-                          onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-                          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-                          <ImagePlus size={14} /> Upload image
-                        </button>
                       )}
+                      <button onClick={() => detailFileRef.current?.click()}
+                        className="flex items-center gap-3 px-1 py-2.5 text-sm w-full text-left transition-colors"
+                        style={{ color: 'var(--text-muted)' }}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
+                        <ImagePlus size={14} /> Upload image
+                      </button>
                       <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, url => {
-                        setDetailImage(url);
                         if (selectedTask) updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
                       })} />
                     </div>
@@ -890,6 +900,64 @@ const TasksPage: React.FC = () => {
                   </div>
                 )}
               </motion.div>
+
+              {/* Lightbox overlay */}
+              <AnimatePresence>
+                {lightboxIndex !== null && (selectedTask.images ?? []).length > 0 && (() => {
+                  const imgs = selectedTask.images ?? [];
+                  const total = imgs.length;
+                  const prev = () => setLightboxIndex(i => i !== null ? (i - 1 + total) % total : 0);
+                  const next = () => setLightboxIndex(i => i !== null ? (i + 1) % total : 0);
+                  return (
+                    <motion.div
+                      ref={lightboxRef}
+                      className="absolute inset-0 z-50 flex items-center justify-center bg-black/80"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setLightboxIndex(null)}
+                      onKeyDown={(e: React.KeyboardEvent) => {
+                        if (e.key === 'Escape') setLightboxIndex(null);
+                        if (e.key === 'ArrowLeft') prev();
+                        if (e.key === 'ArrowRight') next();
+                      }}
+                      tabIndex={0}
+                      style={{ outline: 'none' }}
+                    >
+                      <img
+                        src={imgs[lightboxIndex]}
+                        alt={`Image ${lightboxIndex + 1}`}
+                        className="max-h-[85vh] max-w-[85vw] rounded-xl object-contain"
+                        onClick={e => e.stopPropagation()}
+                      />
+                      {/* Close */}
+                      <button
+                        onClick={() => setLightboxIndex(null)}
+                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                      {/* Arrows */}
+                      {total > 1 && (
+                        <>
+                          <button
+                            onClick={e => { e.stopPropagation(); prev(); }}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                          >
+                            <ChevronLeft size={18} />
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); next(); }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                          >
+                            <ChevronRight size={18} />
+                          </button>
+                        </>
+                      )}
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
             </motion.div>
           );
         })()}
