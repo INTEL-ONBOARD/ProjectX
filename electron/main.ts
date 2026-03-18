@@ -1057,8 +1057,17 @@ function registerDbHandlers() {
             }
         }
         const TASK_ALLOWED_FIELDS = new Set(['title', 'description', 'priority', 'status', 'taskType', 'assignees', 'startDate', 'dueDate', 'projectId', 'blockedBy', 'recurrence', 'order', 'subtasks', 'estimatedMinutes', 'timeEntries', 'images']);
-        const safeRest = Object.fromEntries(Object.entries(rest).filter(([k]) => TASK_ALLOWED_FIELDS.has(k)));
-        const updateDoc: any = { $set: { ...safeRest } };
+        // Separate fields to $set (defined values) from fields to $unset (explicitly null/undefined)
+        const toSet: any = {};
+        const toUnset: any = {};
+        for (const [k, v] of Object.entries(rest)) {
+            if (!TASK_ALLOWED_FIELDS.has(k)) continue;
+            if (v === null || v === undefined || v === '') toUnset[k] = '';
+            else toSet[k] = v;
+        }
+        const updateDoc: any = {};
+        if (Object.keys(toSet).length > 0) updateDoc.$set = toSet;
+        if (Object.keys(toUnset).length > 0) updateDoc.$unset = toUnset;
         if (entries.length > 0) updateDoc.$push = { activity: { $each: entries } };
         const updated = await TaskModel.findOneAndUpdate({ appId: id }, updateDoc, { returnDocument: 'after' });
         if (!updated) return null;

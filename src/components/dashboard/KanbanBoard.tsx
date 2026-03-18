@@ -705,24 +705,40 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Due date</span>
                       </div>
                       {editingDueDate ? (
-                        <input
-                          autoFocus
-                          type="date"
-                          defaultValue={selectedTask.dueDate ?? ''}
-                          onBlur={e => { patchTask({ dueDate: e.target.value || undefined }); setEditingDueDate(false); }}
-                          onKeyDown={e => { if (e.key === 'Escape') setEditingDueDate(false); }}
-                          className="text-xs rounded-md px-2 py-1 focus:outline-none"
-                          style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--color-primary-400)' }}
-                        />
+                        <div className="flex items-center gap-1">
+                          <input
+                            autoFocus
+                            type="date"
+                            defaultValue={selectedTask.dueDate ?? ''}
+                            onChange={e => { patchTask({ dueDate: e.target.value || undefined }); setEditingDueDate(false); }}
+                            onKeyDown={e => { if (e.key === 'Escape') setEditingDueDate(false); }}
+                            className="text-xs rounded-md px-2 py-1 focus:outline-none"
+                            style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--color-primary-400)' }}
+                          />
+                          {selectedTask.dueDate && (
+                            <button onClick={() => { patchTask({ dueDate: null as any }); setEditingDueDate(false); }}
+                              className="text-gray-400 hover:text-red-400 transition-colors" title="Clear due date">
+                              <X size={13} />
+                            </button>
+                          )}
+                        </div>
                       ) : (
-                        <button
-                          onClick={() => setEditingDueDate(true)}
-                          className="flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70"
-                          style={{ color: selectedTask.dueDate && selectedTask.dueDate < TODAY && selectedTask.status !== 'done' ? '#D8727D' : 'var(--text-secondary)' }}
-                        >
-                          <Calendar size={12} style={{ color: 'var(--text-subtle)' }} />
-                          {selectedTask.dueDate ?? <span style={{ color: 'var(--text-subtle)' }}>Set due date</span>}
-                        </button>
+                        <div className="flex items-center gap-1 group">
+                          <button
+                            onClick={() => setEditingDueDate(true)}
+                            className="flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70"
+                            style={{ color: selectedTask.dueDate && selectedTask.dueDate < TODAY && selectedTask.status !== 'done' ? '#D8727D' : 'var(--text-secondary)' }}
+                          >
+                            <Calendar size={12} style={{ color: 'var(--text-subtle)' }} />
+                            {selectedTask.dueDate ?? <span style={{ color: 'var(--text-subtle)' }}>Set due date</span>}
+                          </button>
+                          {selectedTask.dueDate && (
+                            <button onClick={() => patchTask({ dueDate: null as any })}
+                              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all" title="Clear due date">
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
 
