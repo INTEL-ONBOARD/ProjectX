@@ -297,7 +297,6 @@ const TasksPage: React.FC = () => {
 
   const handleOpenTask = (task: Task) => {
     setSelectedTask(task);
-    setDetailImage(null);
     setShowStatusDrop(false);
     setShowPriorityPicker(false);
     setShowAssigneePicker(false);
@@ -460,7 +459,7 @@ const TasksPage: React.FC = () => {
                       className="border-b border-surface-100 hover:bg-surface-50 transition-colors cursor-pointer"
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.35, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
-                      onClick={() => { setSelectedTask(task); setDetailImage(null); setShowStatusDrop(false); setConfirmDelete(false); }}
+                      onClick={() => { setSelectedTask(task); setShowStatusDrop(false); setConfirmDelete(false); }}
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <input type="checkbox"

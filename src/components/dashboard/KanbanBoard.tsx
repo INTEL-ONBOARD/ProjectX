@@ -3,7 +3,7 @@ import { DndContext, rectIntersection, DragEndEvent, PointerSensor, useSensor, u
 import { arrayMove } from '@dnd-kit/sortable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, Tag, User, Calendar, ChevronDown, ImagePlus,
+  X, Tag, User, Calendar, ChevronDown, ChevronLeft, ChevronRight, ImagePlus,
   Check, Trash2, MessageSquare, Send,
   ArrowRight, Flag, UserPlus, UserMinus, FileText, Plus, Pencil, FolderPlus,
   Download, Paperclip, Lock, Clock, Play, MoreHorizontal, AlignLeft,
@@ -133,8 +133,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentInput, setCommentInput] = useState('');
-  const [detailImage, setDetailImage] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightboxRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (lightboxIndex !== null) lightboxRef.current?.focus();
+  }, [lightboxIndex]);
+  useEffect(() => {
+    setLightboxIndex(null);
+  }, [selectedTask?.id]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const [showNewProject, setShowNewProject] = useState(false);
@@ -255,7 +262,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     setEditingTimeEst(false);
     setComments([]);
     setCommentInput('');
-    setDetailImage(null);
     setDetailTab('details');
   };
 
@@ -290,7 +296,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     const reader = new FileReader();
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
-      setDetailImage(dataUrl);
       updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), dataUrl] }).catch(console.error);
     };
     reader.readAsDataURL(file);
@@ -485,7 +490,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
           >
             <div className="flex-1" onClick={() => setSelectedTask(null)} />
             <motion.div
-              className="w-[460px] h-full overflow-y-auto flex flex-col border-l shrink-0"
+              className="w-[460px] h-full overflow-y-auto flex flex-col border-l shrink-0 relative"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border-default)' }}
               initial={{ x: 460 }} animate={{ x: 0 }} exit={{ x: 460 }}
               transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
@@ -897,13 +902,18 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                     <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   </div>
 
-                  {/* Image preview */}
-                  {detailImage && (
-                    <div className="relative rounded-xl overflow-hidden mb-4">
-                      <img src={detailImage} alt="attachment" className="w-full h-40 object-cover rounded-xl" />
-                      <button onClick={() => setDetailImage(null)} className="absolute top-2 right-2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center text-white">
-                        <X size={12} />
-                      </button>
+                  {/* Image gallery */}
+                  {(selectedTask.images ?? []).length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      {(selectedTask.images ?? []).map((img, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setLightboxIndex(i)}
+                          className="h-20 rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        >
+                          <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
                     </div>
                   )}
 
@@ -1034,6 +1044,61 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   )}
                 </div>
               )}
+              {/* Lightbox overlay */}
+              <AnimatePresence>
+                {lightboxIndex !== null && (selectedTask.images ?? []).length > 0 && (() => {
+                  const imgs = selectedTask.images ?? [];
+                  const total = imgs.length;
+                  const prev = () => setLightboxIndex(i => i !== null ? (i - 1 + total) % total : 0);
+                  const next = () => setLightboxIndex(i => i !== null ? (i + 1) % total : 0);
+                  return (
+                    <motion.div
+                      ref={lightboxRef}
+                      className="absolute inset-0 z-50 flex items-center justify-center bg-black/80"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setLightboxIndex(null)}
+                      onKeyDown={(e: React.KeyboardEvent) => {
+                        if (e.key === 'Escape') setLightboxIndex(null);
+                        if (e.key === 'ArrowLeft') prev();
+                        if (e.key === 'ArrowRight') next();
+                      }}
+                      tabIndex={0}
+                      style={{ outline: 'none' }}
+                    >
+                      <img
+                        src={imgs[lightboxIndex]}
+                        alt={`Image ${lightboxIndex + 1}`}
+                        className="max-h-[85vh] max-w-[85vw] rounded-xl object-contain"
+                        onClick={e => e.stopPropagation()}
+                      />
+                      <button
+                        onClick={() => setLightboxIndex(null)}
+                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                      {total > 1 && (
+                        <>
+                          <button
+                            onClick={e => { e.stopPropagation(); prev(); }}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                          >
+                            <ChevronLeft size={18} />
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); next(); }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                          >
+                            <ChevronRight size={18} />
+                          </button>
+                        </>
+                      )}
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
             </motion.div>
           </motion.div>
         )}
