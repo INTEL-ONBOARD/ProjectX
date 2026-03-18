@@ -122,16 +122,16 @@ const AttendanceTab: React.FC = () => {
             {/* Controls */}
             <div className="flex items-center justify-between mb-4 shrink-0">
                 <div className="flex items-center gap-2">
-                    <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors">
+                    <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors text-gray-500">
                         <ChevronLeft size={16} />
                     </button>
-                    <span className="text-sm font-medium w-44 text-center">
+                    <span className="text-sm font-medium w-44 text-center text-gray-800">
                         {format(weekStart, 'MMM d')} – {format(dateFnsAddDays(weekStart, 6), 'MMM d, yyyy')}
                     </span>
                     <button
                         onClick={nextWeek}
                         disabled={isCurrentWeek}
-                        className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-gray-500"
                     >
                         <ChevronRight size={16} />
                     </button>

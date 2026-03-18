@@ -249,13 +249,18 @@ const Sidebar: React.FC<SidebarProps> = ({
         // markMessagesRead calls from the messages page have time to finish in MongoDB)
         const timer = setTimeout(recompute, 300);
 
+        // Re-fetch badge when DB connects or reconnects (handles app reopen race condition
+        // where the initial recompute fires before MongoDB is ready and fails silently)
+        const unsubConnected   = api?.onDbConnected?.(() => recompute());
+        const unsubReconnected = api?.onDbReconnected?.(() => recompute());
+
         // Increment badge in real-time when a new message arrives while away from messages page
         const unsub = api?.onNewMessage?.((_: unknown, msg: { from: string; to: string }) => {
             if (msg.to !== user.id) return;
             setUnreadMsgCount(prev => prev + 1);
         });
 
-        return () => { clearTimeout(timer); unsub?.(); };
+        return () => { clearTimeout(timer); unsub?.(); unsubConnected?.(); unsubReconnected?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, onMessagesPage]);
 

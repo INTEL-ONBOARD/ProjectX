@@ -44,7 +44,14 @@ const Header: React.FC = () => {
     // Use searchRaw for instant display while the debounced searchQuery catches up
     const q = (searchRaw.length >= searchQuery.length ? searchRaw : searchQuery).toLowerCase().trim();
     const matchedTasks = q.length >= 2
-        ? allTasks.filter(t => t.title.toLowerCase().includes(q)).slice(0, 5)
+        ? allTasks.filter(t => {
+            if (t.title.toLowerCase().includes(q)) return true;
+            if (t.taskNumber != null) {
+                const num = String(t.taskNumber).padStart(3, '0');
+                return num.includes(q.replace(/^#/, '')) || `#${num}`.includes(q);
+            }
+            return false;
+        }).slice(0, 5)
         : [];
     const matchedMembers = q.length >= 2
         ? members.filter(m => m.name.toLowerCase().includes(q)).slice(0, 3)
@@ -288,7 +295,14 @@ const Header: React.FC = () => {
                                     <div className="px-4 py-6 text-center text-xs text-gray-400">No notifications</div>
                                 ) : (
                                     <div className="max-h-72 overflow-y-auto">
-                                        {notifications.slice(0, 15).map(notif => {
+                                        {[...notifications]
+                                            .sort((a, b) => {
+                                                // Unread first, then newest first
+                                                if (a.read !== b.read) return a.read ? 1 : -1;
+                                                return b.createdAt.localeCompare(a.createdAt);
+                                            })
+                                            .slice(0, 15)
+                                            .map(notif => {
                                             const IconComp = notif.type === 'new_message' ? MessageCircle
                                                 : notif.type === 'task_assigned' ? CheckSquare2
                                                 : notif.type === 'permission_request' ? ShieldAlert

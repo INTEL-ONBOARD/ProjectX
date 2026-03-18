@@ -57,7 +57,7 @@ const InviteMemberModal: React.FC<Props> = ({ onClose, onSubmit }) => {
             <input
               value={name} onChange={e => setName(e.target.value)}
               placeholder="e.g. Priya Sharma"
-              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
               required
             />
           </div>
@@ -66,7 +66,7 @@ const InviteMemberModal: React.FC<Props> = ({ onClose, onSubmit }) => {
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="e.g. priya@techcorp.com"
-              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
               required
             />
           </div>
@@ -74,7 +74,7 @@ const InviteMemberModal: React.FC<Props> = ({ onClose, onSubmit }) => {
             <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Role</label>
             <select
               value={role} onChange={e => setRole(e.target.value as User['role'])}
-              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 bg-white"
+              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-primary-400 bg-white"
             >
               <option value="admin">Admin</option>
               <option value="manager">Manager</option>
@@ -86,7 +86,7 @@ const InviteMemberModal: React.FC<Props> = ({ onClose, onSubmit }) => {
             <input
               value={designation} onChange={e => setDesignation(e.target.value)}
               placeholder="e.g. Frontend Developer"
-              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              className="w-full border border-surface-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
             />
           </div>
           {error && <p className="text-xs text-red-500">{error}</p>}
