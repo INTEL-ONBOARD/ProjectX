@@ -83,6 +83,10 @@ const AttendanceSchema = new Schema({
     checkOut: String,
     status:   { type: String, enum: ['present', 'absent', 'half-day', 'on-leave', 'holiday', 'wfh'], default: 'present' },
     notes:    String,
+    breakSessions: [{
+        start: { type: String, required: true },
+        end:   { type: String, default: null },
+    }],
 });
 
 const MessageSchema = new Schema({
