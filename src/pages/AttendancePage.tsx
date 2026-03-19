@@ -59,11 +59,6 @@ const TodaySessionCard: React.FC = () => {
   };
 
   const checkInMs = todayRecord?.checkIn ? new Date(todayRecord.checkIn).getTime() : 0;
-  // Midnight guard: if checkIn is from a different calendar day, treat elapsed as 0
-  const checkInDateStr = todayRecord?.checkIn
-    ? new Date(todayRecord.checkIn).toISOString().split('T')[0]
-    : null;
-  const checkInIsToday = checkInDateStr === TODAY_DATE;
   const closedBreakMs = Math.max(0, (todayRecord?.breakSessions ?? [])
     .filter(b => b.end)
     .reduce((sum, b) => sum + (new Date(b.end!).getTime() - new Date(b.start).getTime()), 0));
@@ -73,7 +68,7 @@ const TodaySessionCard: React.FC = () => {
   const openBreakMs = openBreakSession
     ? Math.max(0, now - new Date(openBreakSession.start).getTime())
     : 0;
-  const workMs = state === 'NOT_STARTED' || !checkInIsToday ? 0
+  const workMs = state === 'NOT_STARTED' ? 0
     : state === 'DONE'
       ? Math.max(0, new Date(todayRecord!.checkOut!).getTime() - checkInMs - closedBreakMs)
       : Math.max(0, now - checkInMs - closedBreakMs - openBreakMs);
