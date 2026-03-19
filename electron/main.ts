@@ -1641,6 +1641,8 @@ function setupAutoUpdater() {
     if (!autoUpdater) return;
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
+    // App is distributed without Apple code signing — skip signature validation
+    autoUpdater.verifyUpdateCodeSignature = false;
     autoUpdater.on('checking-for-update', () => mainWindow?.webContents.send('update:checking'));
     autoUpdater.on('update-available', (info) => mainWindow?.webContents.send('update:available', { version: info.version, releaseDate: info.releaseDate, releaseNotes: info.releaseNotes }));
     autoUpdater.on('update-not-available', () => mainWindow?.webContents.send('update:not-available'));

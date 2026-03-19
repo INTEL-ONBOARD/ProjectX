@@ -1,6 +1,6 @@
 {
   "name": "projectm",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "description": "Project Planning Desktop App",
   "main": "electron/main.js",
   "author": "",
@@ -50,7 +50,9 @@
     "icon": "build/icon",
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "identity": null,
+      "gatekeeperAssess": false
     },
     "win": {
       "target": "nsis",
