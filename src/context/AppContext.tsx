@@ -82,7 +82,7 @@ interface AppContextType {
     org: Organization | null;
     setOrg: (org: Organization) => void;
     currentUser: User | null;
-    setCurrentUser: (user: User) => void;
+    setCurrentUser: (user: User | null) => void;
     theme: 'light' | 'dark' | 'coffee';
     setTheme: (theme: 'light' | 'dark' | 'coffee') => void;
     sidebarCollapsed: boolean;
@@ -121,8 +121,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // Load user prefs from MongoDB whenever currentUser changes
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser) {
+            // User logged out — reset prefs state so the next login loads fresh
+            setPrefLoadedFor(null);
+            setThemeState('dark');
+            setSidebarCollapsedState(false);
+            return;
+        }
         if (prefLoadedFor === currentUser.id) return;
+        // Reset to defaults before loading the new user's prefs to avoid showing previous user's theme
+        setThemeState('dark');
+        setSidebarCollapsedState(false);
         prefsApi().get(currentUser.id)
             .then((prefs: { theme?: 'light' | 'dark' | 'coffee'; sidebarCollapsed?: boolean; selectedWeekStart?: string | null } | null) => {
                 if (!prefs) return;

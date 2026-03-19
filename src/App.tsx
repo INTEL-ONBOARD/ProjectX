@@ -75,6 +75,8 @@ const AuthAppSync: React.FC = () => {
                 role: authUser.role,
                 status: 'active',
             });
+        } else {
+            setCurrentUser(null);
         }
     }, [authUser?.id, authUser?.name, authUser?.email, authUser?.role]);
     return null;
