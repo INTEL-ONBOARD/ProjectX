@@ -935,6 +935,41 @@ function setupDbListeners() {
     });
 }
 
+async function healOpenSessions(): Promise<void> {
+    try {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        // { checkOut: null } matches both missing field and explicitly null — intentional
+        const stale = await AttendanceModel.find({
+            checkIn: { $exists: true, $ne: null },
+            checkOut: null,
+            date: { $lt: today },
+        }).lean() as any[];
+
+        for (const record of stale) {
+            const [y, m, d] = (record.date as string).split('-').map(Number);
+            const closeTime = new Date(y, m - 1, d, 23, 59, 59).toISOString();
+
+            const healedBreaks = ((record.breakSessions ?? []) as { start: string; end: string | null }[])
+                .map(b => b.end ? b : { ...b, end: closeTime });
+
+            await AttendanceModel.findOneAndUpdate(
+                { recordId: record.recordId },
+                { checkOut: closeTime, breakSessions: healedBreaks },
+                { upsert: false }
+            );
+        }
+
+        if (stale.length > 0) {
+            console.log(`[healOpenSessions] Closed ${stale.length} stale open session(s)`);
+        }
+    } catch (err: any) {
+        // Non-fatal: log and continue. ensureDefaultData() will still run.
+        console.error('[healOpenSessions] Failed to heal stale sessions:', err?.message ?? err);
+    }
+}
+
 async function connectDB() {
     const uri = process.env.MONGODB_URI || 'mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority';
     if (!uri) {
@@ -949,6 +984,7 @@ async function connectDB() {
             await mongoose.connect(uri, opts);
             console.log('MongoDB connected');
             if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('db:connected');
+            await healOpenSessions();
             await ensureDefaultData();
             return;
         } catch (err: unknown) {
