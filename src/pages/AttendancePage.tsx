@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
-import { motion } from 'framer-motion';
-import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { format, startOfWeek, addDays as dateFnsAddDays } from 'date-fns';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
@@ -21,6 +21,68 @@ function addDays(dateStr: string, n: number): string {
 
 const TODAY_DATE = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(); // local "YYYY-MM-DD"
 
+const StuckSessionBanner: React.FC = () => {
+  const { currentUser, attendanceRecords, setAttendanceRecord } = useContext(AppContext);
+  const [closing, setClosing] = React.useState(false);
+
+  if (!currentUser) return null;
+
+  // Find the most recent past record that is clocked-in but never clocked-out
+  const stuck = attendanceRecords
+    .filter(r =>
+      r.userId === currentUser.id &&
+      r.date < TODAY_DATE &&
+      r.checkIn &&
+      !r.checkOut
+    )
+    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+
+  if (!stuck) return null;
+
+  const label = new Date(stuck.date + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+  });
+
+  const handleClose = async () => {
+    if (closing) return;
+    setClosing(true);
+    try {
+      const { id: _id, ...rec } = stuck;
+      const closeTime = `${stuck.date}T23:59:59.000Z`;
+      const healedBreaks = (rec.breakSessions ?? [])
+        .filter(b => !!b.start)
+        .map(b => b.end ? b : { ...b, end: closeTime });
+      await setAttendanceRecord({ ...rec, checkOut: closeTime, breakSessions: healedBreaks });
+    } finally {
+      setClosing(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.button
+        onClick={handleClose}
+        disabled={closing}
+        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-[#D8727D40] text-left disabled:opacity-60"
+        style={{ background: 'linear-gradient(135deg, #D8727D12 0%, #D8727D08 100%)' }}
+        initial={{ opacity: 0, x: 12 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 12 }}
+        transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: '#D8727D20' }}>
+          <AlertTriangle size={14} className="text-[#D8727D]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-[#D8727D]">Open session from {label}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{closing ? 'Closing…' : 'Tap to close at end of that day'}</p>
+        </div>
+        <LogOut size={13} className="text-[#D8727D] shrink-0" />
+      </motion.button>
+    </AnimatePresence>
+  );
+};
+
 const TodaySessionCard: React.FC = () => {
   const { currentUser, attendanceRecords, setAttendanceRecord } = useContext(AppContext);
   const [now, setNow] = React.useState(Date.now());
@@ -38,7 +100,12 @@ const TodaySessionCard: React.FC = () => {
     if (!todayRecord?.checkIn) return 'NOT_STARTED';
     if (todayRecord.checkOut) return 'DONE';
     const sessions = todayRecord.breakSessions ?? [];
-    if (sessions.length > 0 && sessions[sessions.length - 1].end === null) return 'ON_BREAK';
+    // Guard: require a valid start field to avoid NaN in timer when DB record is malformed
+    if (
+      sessions.length > 0 &&
+      sessions[sessions.length - 1].end === null &&
+      sessions[sessions.length - 1].start
+    ) return 'ON_BREAK';
     return 'WORKING';
   })();
 
@@ -47,7 +114,7 @@ const TodaySessionCard: React.FC = () => {
     if (state !== 'WORKING' && state !== 'ON_BREAK') return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [state]);
+  }, [state, todayRecord]);
 
   // ── Time math ───────────────────────────────────────────────────────────────
   const fmt = (ms: number) => {
@@ -95,6 +162,8 @@ const TodaySessionCard: React.FC = () => {
   };
 
   const handlePunchIn = () => act(async () => {
+    // Guard: if already clocked in, do nothing (prevents double-click from overwriting punch-in time and wiping breaks)
+    if (state !== 'NOT_STARTED') return;
     const existing = attendanceRecords.find(r => r.userId === currentUser.id && r.date === TODAY_DATE);
     const { id: _id, ...existingRest } = existing ?? { id: '' };
     await setAttendanceRecord({
@@ -108,7 +177,8 @@ const TodaySessionCard: React.FC = () => {
   });
 
   const handleBreakOut = () => act(async () => {
-    const { id: _id, ...rec } = todayRecord!;
+    if (!todayRecord) return;
+    const { id: _id, ...rec } = todayRecord;
     await setAttendanceRecord({
       ...rec,
       breakSessions: [...(rec.breakSessions ?? []), { start: new Date().toISOString(), end: null }],
@@ -116,14 +186,20 @@ const TodaySessionCard: React.FC = () => {
   });
 
   const handleBreakIn = () => act(async () => {
-    const { id: _id, ...rec } = todayRecord!;
+    if (!todayRecord) return;
+    const { id: _id, ...rec } = todayRecord;
     const sessions = [...(rec.breakSessions ?? [])];
-    sessions[sessions.length - 1] = { ...sessions[sessions.length - 1], end: new Date().toISOString() };
+    // Guard: nothing to close if no break sessions, or last one is already closed
+    if (sessions.length === 0) return;
+    const lastIdx = sessions.length - 1;
+    if (sessions[lastIdx].end !== null) return;
+    sessions[lastIdx] = { ...sessions[lastIdx], end: new Date().toISOString() };
     await setAttendanceRecord({ ...rec, breakSessions: sessions });
   });
 
   const handlePunchOut = () => act(async () => {
-    const { id: _id, ...rec } = todayRecord!;
+    if (!todayRecord) return;
+    const { id: _id, ...rec } = todayRecord;
     const sessions = [...(rec.breakSessions ?? [])];
     if (sessions.length > 0 && !sessions[sessions.length - 1].end) {
       sessions[sessions.length - 1] = { ...sessions[sessions.length - 1], end: new Date().toISOString() };
@@ -374,7 +450,7 @@ const AttendancePage: React.FC = () => {
                 const color = getMemberColor(member.id);
                 const dayStatuses = WEEK_DATES.map(date => getMemberStatus(member.id, date));
                 const presentCount = dayStatuses.filter(isPresent).length;
-                const rate = `${Math.round((presentCount / Math.max(daysWithData, 1)) * 100)}%`;
+                const rate = daysWithData === 0 ? 'N/A' : `${Math.round((presentCount / Math.max(daysWithData, 1)) * 100)}%`;
                 const rateStyle = rateStyles[rate];
                 return (
                   <motion.tr
@@ -427,6 +503,7 @@ const AttendancePage: React.FC = () => {
 
         {/* Side panels */}
         <div className="flex flex-col gap-4 overflow-y-auto min-h-0">
+          <StuckSessionBanner />
           <TodaySessionCard />
           {/* Attendance Summary */}
           <motion.div className="bg-white rounded-2xl border border-surface-200 p-4"

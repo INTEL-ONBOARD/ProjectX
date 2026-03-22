@@ -265,6 +265,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     setDetailTab('details');
   };
 
+  // Keep selectedTask in sync when allTasks updates (real-time changes from other clients)
+  useEffect(() => {
+    if (!selectedTask) return;
+    const fresh = allTasks.find(t => t.id === selectedTask.id);
+    if (fresh) setSelectedTask(fresh);
+  }, [allTasks]);
+
   const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
     updateTask(selectedTask.id, patch).catch(console.error);
@@ -296,7 +303,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     const reader = new FileReader();
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
-      updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), dataUrl] }).catch(console.error);
+      patchTask({ images: [...(selectedTask.images ?? []), dataUrl] });
     };
     reader.readAsDataURL(file);
   };
@@ -809,21 +816,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                           value={timeEstDraft}
                           onChange={e => setTimeEstDraft(e.target.value)}
                           onBlur={() => {
-                            const mins = parseInt(timeEstDraft, 10);
-                            if (!isNaN(mins) && mins > 0) patchTask({ estimatedMinutes: mins });
+                            const hrs = parseFloat(timeEstDraft);
+                            if (!isNaN(hrs) && hrs > 0) patchTask({ estimatedMinutes: Math.round(hrs * 60) });
                             setEditingTimeEst(false);
                           }}
                           onKeyDown={e => {
-                            if (e.key === 'Enter') { const mins = parseInt(timeEstDraft, 10); if (!isNaN(mins) && mins > 0) patchTask({ estimatedMinutes: mins }); setEditingTimeEst(false); }
+                            if (e.key === 'Enter') { const hrs = parseFloat(timeEstDraft); if (!isNaN(hrs) && hrs > 0) patchTask({ estimatedMinutes: Math.round(hrs * 60) }); setEditingTimeEst(false); }
                             if (e.key === 'Escape') setEditingTimeEst(false);
                           }}
-                          placeholder="minutes"
+                          placeholder="hours"
                           className="text-xs rounded-md px-2 py-1 w-24 focus:outline-none"
                           style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--color-primary-400)' }}
                         />
                       ) : (
                         <button
-                          onClick={() => { setTimeEstDraft(selectedTask.estimatedMinutes ? String(selectedTask.estimatedMinutes) : ''); setEditingTimeEst(true); }}
+                          onClick={() => { setTimeEstDraft(selectedTask.estimatedMinutes ? String(+(selectedTask.estimatedMinutes / 60).toFixed(2)) : ''); setEditingTimeEst(true); }}
                           className="text-xs transition-opacity hover:opacity-70"
                           style={{ color: selectedTask.estimatedMinutes ? 'var(--text-secondary)' : 'var(--text-subtle)' }}
                         >
@@ -922,13 +929,26 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   {(selectedTask.images ?? []).length > 0 && (
                     <div className="grid grid-cols-2 gap-2 mb-4">
                       {(selectedTask.images ?? []).map((img, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setLightboxIndex(i)}
-                          className="h-20 rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
-                        >
-                          <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
-                        </button>
+                        <div key={i} className="relative group h-20">
+                          <button
+                            onClick={() => setLightboxIndex(i)}
+                            className="w-full h-full rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                          >
+                            <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation();
+                              const updated = (selectedTask.images ?? []).filter((_, idx) => idx !== i);
+                              patchTask({ images: updated });
+                            }}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ background: 'rgba(0,0,0,0.6)' }}
+                            title="Delete image"
+                          >
+                            <Trash2 size={11} color="white" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}

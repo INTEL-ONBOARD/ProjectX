@@ -948,10 +948,13 @@ async function healOpenSessions(): Promise<void> {
         }).lean() as any[];
 
         for (const record of stale) {
-            const [y, m, d] = (record.date as string).split('-').map(Number);
-            const closeTime = new Date(y, m - 1, d, 23, 59, 59).toISOString();
+            // Build end-of-day close time directly from the date string to avoid server-local-timezone bias.
+            // The frontend stores `date` as local YYYY-MM-DD and all timestamps as ISO UTC strings, so
+            // appending T23:59:59.000Z is consistent with that convention.
+            const closeTime = `${record.date as string}T23:59:59.000Z`;
 
-            const healedBreaks = ((record.breakSessions ?? []) as { start: string; end: string | null }[])
+            const healedBreaks = ((record.breakSessions ?? []) as { start?: string; end: string | null }[])
+                .filter(b => !!b.start)  // drop malformed sessions missing a start time to prevent NaN timer on frontend
                 .map(b => b.end ? b : { ...b, end: closeTime });
 
             await AttendanceModel.findOneAndUpdate(

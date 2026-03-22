@@ -193,7 +193,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             } else if (op === 'update' || op === 'replace') {
                 setAttendanceRecords(prev => {
                     const exists = prev.some(r => r.id === doc!.id);
-                    return exists ? prev.map(r => r.id === doc!.id ? doc! : r) : [...prev, doc!];
+                    if (!exists) return [...prev, doc!];
+                    // Skip no-op update caused by our own optimistic write reflecting back from the change stream
+                    const current = prev.find(r => r.id === doc!.id)!;
+                    if (
+                        current.checkIn === doc!.checkIn &&
+                        current.checkOut === doc!.checkOut &&
+                        (current.breakSessions?.length ?? 0) === (doc!.breakSessions?.length ?? 0)
+                    ) return prev;
+                    return prev.map(r => r.id === doc!.id ? doc! : r);
                 });
             } else if (op === 'delete') {
                 dbApi().getAttendance().then((docs: AttendanceRecord[]) => setAttendanceRecords(docs)).catch(() => {});
@@ -299,7 +307,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             selectedWeekStart,
             setSelectedWeekStart,
         }),
-        [org, currentUser, theme, setTheme, sidebarCollapsed, setSidebarCollapsed, attendanceRecords, setAttendanceRecord, selectedWeekStart, setSelectedWeekStart]
+        [org, setOrg, currentUser, setCurrentUser, theme, setTheme, sidebarCollapsed, setSidebarCollapsed, attendanceRecords, setAttendanceRecord, deleteAttendanceRecord, selectedWeekStart, setSelectedWeekStart]
     );
 
     return (

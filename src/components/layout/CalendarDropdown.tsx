@@ -100,6 +100,8 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
     const nowISO = () => new Date().toISOString();
 
     function clockIn() {
+        // Guard: don't overwrite an existing active session (handles stale-closure race)
+        if (isClockedIn && !isClockedOut) return;
         const base = currentRecord ?? { userId: currentUser!.id, date: selectedDate, status: 'present' as const };
         setAttendanceRecord({ ...base, status: 'present', checkIn: nowISO(), checkOut: undefined, breakSessions: [] });
     }
