@@ -62,7 +62,7 @@ function workHours(checkIn?: string, checkOut?: string): string {
 
 const AttendanceTab: React.FC = () => {
     const { attendanceRecords } = useContext(AppContext);
-    const { members } = useMembersContext();
+    const { members, getMemberColor } = useMembersContext();
     const { allTasks } = useProjects();
 
     // Week navigation — start on Monday of current week
@@ -74,6 +74,8 @@ const AttendanceTab: React.FC = () => {
 
     const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
     const [filterUserId, setFilterUserId] = useState<string>('all');
+    const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+    const selectedMember = members.find(m => m.id === selectedMemberId) ?? null;
 
     const days: Date[] = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
     const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -119,7 +121,9 @@ const AttendanceTab: React.FC = () => {
     });
 
     return (
-        <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex gap-4">
+        {/* ── Left: table ── */}
+        <div className="flex-1 min-h-0 flex flex-col min-w-0">
             {/* Controls */}
             <div className="flex items-center justify-between mb-4 shrink-0">
                 <div className="flex items-center gap-2">
@@ -215,10 +219,11 @@ const AttendanceTab: React.FC = () => {
                             return (
                                 <motion.tr
                                     key={member.id}
-                                    className="border-b border-surface-100 last:border-0 hover:bg-surface-50/50 transition-colors"
+                                    className={`border-b border-surface-100 last:border-0 hover:bg-surface-50 transition-colors cursor-pointer ${selectedMemberId === member.id ? 'bg-primary-50/40' : ''}`}
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ duration: 0.25, delay: mi * 0.04, ease: [0.4, 0, 0.2, 1] }}
+                                    onClick={() => setSelectedMemberId(selectedMemberId === member.id ? null : member.id)}
                                 >
                                     {/* Member cell */}
                                     <td className="sticky left-0 z-10 bg-white px-4 py-3 border-r border-surface-100 hover:bg-surface-50/50">
@@ -306,6 +311,125 @@ const AttendanceTab: React.FC = () => {
                     </tbody>
                 </table>
             </div>
+        </div>{/* end left column */}
+
+        {/* ── Right: Member detail panel ── */}
+        <AnimatePresence>
+        {selectedMember && (() => {
+            const wl = workloadMap.get(selectedMember.id) ?? { total: 0, done: 0, inProgress: 0 };
+            const completionPct = wl.total > 0 ? Math.round((wl.done / wl.total) * 100) : 0;
+            const memberTasks = allTasks.filter(t => t.assignees.includes(selectedMember.id));
+            const color = getMemberColor(selectedMember.id);
+            return (
+                <motion.div
+                    key={selectedMember.id}
+                    initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 24 }}
+                    transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                    className="w-72 shrink-0 flex flex-col bg-white border border-surface-200 rounded-2xl overflow-hidden"
+                >
+                    {/* Header */}
+                    <div className="px-5 py-4 border-b border-surface-100 flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                            <Avatar name={selectedMember.name} color={color} size="lg" />
+                            <div>
+                                <div className="font-bold text-sm text-gray-900">{selectedMember.name}</div>
+                                <div className="text-[10px] text-gray-400">{selectedMember.designation ?? selectedMember.role}</div>
+                            </div>
+                        </div>
+                        <button onClick={() => setSelectedMemberId(null)} className="text-gray-400 hover:text-gray-600 mt-0.5 shrink-0">✕</button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto">
+                        {/* Workload */}
+                        <div className="px-5 py-4 border-b border-surface-100">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Workload</div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-gray-500">Task completion</span>
+                                <span className="text-xs font-bold text-gray-900">{completionPct}%</span>
+                            </div>
+                            <div className="h-2 bg-surface-100 rounded-full overflow-hidden mb-3">
+                                <motion.div className="h-full rounded-full bg-[#68B266]"
+                                    initial={{ width: 0 }} animate={{ width: `${completionPct}%` }}
+                                    transition={{ duration: 0.5, delay: 0.1 }} />
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { label: 'Total', value: wl.total, color: '#5030E5', bg: '#5030E510' },
+                                    { label: 'Done',  value: wl.done,  color: '#68B266', bg: '#68B26610' },
+                                    { label: 'Active',value: wl.inProgress, color: '#FFA500', bg: '#FFA50010' },
+                                ].map(s => (
+                                    <div key={s.label} className="rounded-xl p-2 text-center" style={{ background: s.bg }}>
+                                        <div className="text-base font-extrabold" style={{ color: s.color }}>{s.value}</div>
+                                        <div className="text-[9px] text-gray-400 mt-0.5">{s.label}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Day-by-day hours this week */}
+                        <div className="px-5 py-4 border-b border-surface-100">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">This Week's Hours</div>
+                            <div className="flex flex-col gap-2">
+                                {days.map((day, i) => {
+                                    const ds = toDateStr(day);
+                                    const record = recordMap.get(`${selectedMember.id}|${ds}`);
+                                    const hrs = record ? workHours(record.checkIn, record.checkOut) : null;
+                                    const meta = record ? STATUS_META[record.status] : null;
+                                    const isToday = ds === todayStr;
+                                    return (
+                                        <div key={ds} className={`flex items-center justify-between py-1.5 px-2 rounded-lg ${isToday ? 'bg-primary-50' : ''}`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[11px] font-semibold w-7 ${isToday ? 'text-primary-600' : 'text-gray-500'}`}>{dayLabels[i]}</span>
+                                                <span className={`text-[10px] ${isToday ? 'text-primary-400' : 'text-gray-400'}`}>{day.getDate()}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {meta && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: meta.bg, color: meta.text }}>{meta.label}</span>
+                                                )}
+                                                <span className="text-[11px] font-bold text-gray-700 w-12 text-right">{hrs ?? '—'}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Task list */}
+                        <div className="px-5 py-4">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Assigned Tasks</div>
+                            {memberTasks.length === 0 ? (
+                                <p className="text-xs text-gray-400 text-center py-4">No tasks assigned</p>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {memberTasks.slice(0, 10).map(task => {
+                                        const statusStyle: Record<string, { bg: string; text: string }> = {
+                                            'done':        { bg: '#68B26615', text: '#68B266' },
+                                            'in-progress': { bg: '#FFA50015', text: '#FFA500' },
+                                            'todo':        { bg: '#5030E515', text: '#5030E5' },
+                                        };
+                                        const s = statusStyle[task.status] ?? { bg: '#6B728015', text: '#6B7280' };
+                                        return (
+                                            <div key={task.id} className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.text }} />
+                                                <span className="text-[11px] text-gray-700 flex-1 truncate">{task.title}</span>
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0" style={{ background: s.bg, color: s.text }}>
+                                                    {task.status === 'in-progress' ? 'Active' : task.status === 'done' ? 'Done' : 'Todo'}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                    {memberTasks.length > 10 && (
+                                        <p className="text-[10px] text-gray-400 text-center">+{memberTasks.length - 10} more</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </motion.div>
+            );
+        })()}
+        </AnimatePresence>
+
         </div>
     );
 };
