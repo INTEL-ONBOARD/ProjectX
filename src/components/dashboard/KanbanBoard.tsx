@@ -116,6 +116,9 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const { user: authUser } = useAuth() ?? { user: null };
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const selectedTaskRef = useRef<Task | null>(null);
+  // Keep ref in sync so async callbacks always read the latest task
+  useEffect(() => { selectedTaskRef.current = selectedTask; }, [selectedTask]);
   const [detailTab, setDetailTab] = useState<'details' | 'activity'>('details');
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
@@ -135,8 +138,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [commentInput, setCommentInput] = useState('');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | 'saved' | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const lightboxRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const patchingRef = useRef(false);
   useEffect(() => {
     if (lightboxIndex !== null) lightboxRef.current?.focus();
   }, [lightboxIndex]);
@@ -267,16 +273,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   };
 
   // Keep selectedTask in sync when allTasks updates (real-time changes from other clients)
+  // Skip sync while a local patch is in-flight to prevent the change stream from
+  // briefly restoring the old value before the DB confirms the write.
   useEffect(() => {
-    if (!selectedTask) return;
+    if (!selectedTask || patchingRef.current) return;
     const fresh = allTasks.find(t => t.id === selectedTask.id);
     if (fresh) setSelectedTask(fresh);
   }, [allTasks, selectedTask?.id]);
 
   const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
-    updateTask(selectedTask.id, patch).catch(console.error);
+    patchingRef.current = true;
     setSelectedTask(prev => prev ? { ...prev, ...patch } : prev);
+    updateTask(selectedTask.id, patch)
+      .finally(() => { patchingRef.current = false; })
+      .catch(console.error);
   };
 
   const handleDelete = () => {
@@ -304,10 +315,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     const file = e.target.files?.[0];
     if (!file || !selectedTask) return;
     e.target.value = '';
-    const reader = new FileReader();
-
-    // Animate progress from 0 → 90 while reading (local file has no real progress events)
+    // Show preview immediately using object URL — same look as a real image tile
+    const previewUrl = URL.createObjectURL(file);
+    setUploadPreviewUrl(previewUrl);
     setUploadProgress(0);
+
+    const reader = new FileReader();
     let simulated = 0;
     uploadTimerRef.current = setInterval(() => {
       simulated = Math.min(simulated + Math.random() * 18, 90);
@@ -315,19 +328,30 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     }, 80);
 
     reader.onload = ev => {
-      // Stop simulation, jump to 100
       if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
       setUploadProgress(100);
       const dataUrl = ev.target?.result as string;
-      patchTask({ images: [...(selectedTask.images ?? []), dataUrl] });
-      // Show "Saved" after a short pause, then clear the tile
+      URL.revokeObjectURL(previewUrl);
+      const current = selectedTaskRef.current;
+      if (!current) return;
+      const newImages = [...(current.images ?? []), dataUrl];
+      patchingRef.current = true;
+      updateTask(current.id, { images: newImages })
+        .finally(() => { patchingRef.current = false; })
+        .catch(console.error);
       setTimeout(() => setUploadProgress('saved'), 400);
-      setTimeout(() => setUploadProgress(null), 1800);
+      setTimeout(() => {
+        setUploadProgress(null);
+        setUploadPreviewUrl(null);
+        setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
+      }, 1800);
     };
 
     reader.onerror = () => {
       if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
+      URL.revokeObjectURL(previewUrl);
       setUploadProgress(null);
+      setUploadPreviewUrl(null);
     };
 
     reader.readAsDataURL(file);
@@ -951,57 +975,86 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   </div>
 
                   {/* Image gallery */}
-                  {((selectedTask.images ?? []).length > 0 || uploadProgress !== null) && (
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      {(selectedTask.images ?? []).map((img, i) => (
-                        <div
-                          key={i}
-                          className="relative h-20"
-                          onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '1'; }}
-                          onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
-                        >
-                          <button
-                            onClick={() => setLightboxIndex(i)}
-                            className="w-full h-full rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  {(() => {
+                    const imgs = selectedTask.images ?? [];
+                    // Merge upload preview into the display list so it appears as the last image tile
+                    const displayImgs: { src: string; isUploading: boolean }[] = [
+                      ...imgs.map(src => ({ src, isUploading: false })),
+                      ...(uploadPreviewUrl && uploadProgress !== null ? [{ src: uploadPreviewUrl, isUploading: true }] : []),
+                    ];
+                    if (displayImgs.length === 0) return null;
+                    return (
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        {displayImgs.map(({ src, isUploading }, i) => (
+                          <div
+                            key={isUploading ? 'upload-tile' : i}
+                            className="relative h-20"
+                            onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn && deletingIndex !== i && !isUploading) btn.style.opacity = '1'; }}
+                            onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
                           >
-                            <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
-                          </button>
-                          <button
-                            data-del
-                            onClick={e => {
-                              e.stopPropagation();
-                              const updated = (selectedTask.images ?? []).filter((_, idx) => idx !== i);
-                              patchTask({ images: updated });
-                            }}
-                            className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center transition-opacity"
-                            style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}
-                            title="Delete image"
-                          >
-                            <Trash2 size={11} color="white" />
-                          </button>
-                        </div>
-                      ))}
-                      {uploadProgress !== null && (
-                        <div className="relative h-20 rounded-lg flex flex-col items-center justify-center gap-1.5 border"
-                          style={{ background: 'var(--bg-muted)', borderColor: 'var(--border-default)' }}>
-                          {uploadProgress === 'saved' ? (
-                            <>
-                              <Check size={18} style={{ color: '#68B266' }} />
-                              <span className="text-[11px] font-semibold" style={{ color: '#68B266' }}>Saved</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{uploadProgress}%</span>
-                              <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border-default)' }}>
-                                <div className="h-full rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%`, background: '#5030E5' }} />
+                            <button
+                              onClick={() => !isUploading && deletingIndex === null && setLightboxIndex(i)}
+                              className="w-full h-full rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                              style={{ cursor: isUploading ? 'default' : 'pointer' }}
+                            >
+                              <img src={src} alt={`Image ${i + 1}`} className="w-full h-full object-cover"
+                                style={{ opacity: deletingIndex === i || isUploading ? 0.4 : 1, transition: 'opacity 0.2s' }} />
+                            </button>
+                            {/* Delete overlay */}
+                            {deletingIndex === i && (
+                              <div className="absolute inset-0 rounded-lg flex flex-col items-center justify-center gap-1" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                                <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                                  <motion.div className="h-full rounded-full" style={{ background: '#ef4444' }} initial={{ width: '0%' }} animate={{ width: '100%' }} transition={{ duration: 0.5, ease: 'easeInOut' }} />
+                                </div>
+                                <span className="text-[10px] text-white font-medium">Deleting…</span>
                               </div>
-                              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Uploading…</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                            )}
+                            {/* Upload overlay */}
+                            {isUploading && (
+                              <div className="absolute inset-0 rounded-lg flex flex-col items-center justify-center gap-1" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                                {uploadProgress === 'saved' ? (
+                                  <>
+                                    <Check size={16} color="white" />
+                                    <span className="text-[10px] text-white font-medium">Saved</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                                      <motion.div className="h-full rounded-full" style={{ background: '#5030E5' }} initial={{ width: '0%' }} animate={{ width: `${uploadProgress}%` }} transition={{ duration: 0.1, ease: 'linear' }} />
+                                    </div>
+                                    <span className="text-[10px] text-white font-medium">Uploading…</span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                            {/* Delete button — only on saved images, not uploading */}
+                            {!isUploading && deletingIndex !== i && (
+                              <button
+                                data-del
+                                onClick={async e => {
+                                  e.stopPropagation();
+                                  setDeletingIndex(i);
+                                  const current = selectedTaskRef.current;
+                                  if (!current) { setDeletingIndex(null); return; }
+                                  const updated = (current.images ?? []).filter((_, idx) => idx !== i);
+                                  patchingRef.current = true;
+                                  setSelectedTask(prev => prev ? { ...prev, images: updated } : prev);
+                                  await updateTask(current.id, { images: updated }).catch(console.error);
+                                  setDeletingIndex(null);
+                                  setTimeout(() => { patchingRef.current = false; }, 1500);
+                                }}
+                                className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center transition-opacity"
+                                style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}
+                                title="Delete image"
+                              >
+                                <Trash2 size={11} color="white" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* ── File attachments list ── */}
                   {attachments.length > 0 && (

@@ -194,6 +194,12 @@ const TasksPage: React.FC = () => {
   }, []);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const detailFileRef = useRef<HTMLInputElement>(null);
+  const patchingRef = useRef(false);
+  const selectedTaskRef = useRef<typeof selectedTask>(null);
+  const uploadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | 'saved' | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const lightboxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -279,11 +285,40 @@ const TasksPage: React.FC = () => {
     { label: 'Pending', value: String(todoCount), trend: overdueCount > 0 ? `${overdueCount} overdue` : 'On track', trendUp: overdueCount === 0, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (todoCount / totalTasks) * 100 : 0 },
   ];
 
-  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>, cb: (url: string) => void) => {
+  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (detailFileRef.current) detailFileRef.current.value = '';
     if (!file) return;
+    // Instant blob preview
+    const previewUrl = URL.createObjectURL(file);
+    setUploadPreviewUrl(previewUrl);
+    setUploadProgress(0);
+    // Simulate progress up to 85%
+    let prog = 0;
+    uploadTimerRef.current = setInterval(() => {
+      prog = Math.min(prog + Math.random() * 12 + 4, 85);
+      setUploadProgress(Math.round(prog));
+    }, 120);
     const reader = new FileReader();
-    reader.onload = ev => cb(ev.target?.result as string);
+    reader.onload = ev => {
+      if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
+      setUploadProgress(100);
+      const dataUrl = ev.target?.result as string;
+      URL.revokeObjectURL(previewUrl);
+      const current = selectedTaskRef.current;
+      if (!current) return;
+      const newImages = [...(current.images ?? []), dataUrl];
+      patchingRef.current = true;
+      updateTask(current.id, { images: newImages })
+        .finally(() => { patchingRef.current = false; })
+        .catch(console.error);
+      setTimeout(() => setUploadProgress('saved'), 400);
+      setTimeout(() => {
+        setUploadProgress(null);
+        setUploadPreviewUrl(null);
+        setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
+      }, 1800);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -318,17 +353,25 @@ const TasksPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Keep selectedTaskRef in sync so async callbacks (image upload/delete) don't capture stale closures
+  useEffect(() => { selectedTaskRef.current = selectedTask; }, [selectedTask]);
+
   // Keep selectedTask in sync when allTasks updates (real-time changes from other clients)
+  // Skip sync while a local patch is in-flight to prevent the change stream from
+  // briefly restoring the old value before the DB confirms the write.
   useEffect(() => {
-    if (!selectedTask) return;
+    if (!selectedTask || patchingRef.current) return;
     const fresh = allTasks.find(t => t.id === selectedTask.id);
     if (fresh) setSelectedTask(fresh);
   }, [allTasks, selectedTask?.id]);
 
   const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
-    updateTask(selectedTask.id, patch).catch(console.error);
+    patchingRef.current = true;
     setSelectedTask(prev => prev ? { ...prev, ...patch } : prev);
+    updateTask(selectedTask.id, patch)
+      .finally(() => { patchingRef.current = false; })
+      .catch(console.error);
   };
 
   const handleOpenTask = (task: Task) => {
@@ -903,38 +946,85 @@ const TasksPage: React.FC = () => {
 
                     {/* Image gallery */}
                     <div className="mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
-                      {(selectedTask.images ?? []).length > 0 && (
-                        <div className="grid grid-cols-2 gap-2 mb-3">
-                          {(selectedTask.images ?? []).map((img, i) => (
-                            <div
-                              key={i}
-                              className="relative h-20"
-                              onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '1'; }}
-                              onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
-                            >
-                              <button
-                                onClick={() => setLightboxIndex(i)}
-                                className="w-full h-full rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      {(() => {
+                        const imgs = selectedTask.images ?? [];
+                        const displayImgs: { src: string; isUploading: boolean }[] = [
+                          ...imgs.map(src => ({ src, isUploading: false })),
+                          ...(uploadPreviewUrl && uploadProgress !== null ? [{ src: uploadPreviewUrl, isUploading: true }] : []),
+                        ];
+                        if (displayImgs.length === 0) return null;
+                        return (
+                          <div className="grid grid-cols-2 gap-2 mb-3">
+                            {displayImgs.map(({ src, isUploading }, i) => (
+                              <div
+                                key={isUploading ? 'upload-tile' : i}
+                                className="relative h-20"
+                                onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn && deletingIndex !== i && !isUploading) btn.style.opacity = '1'; }}
+                                onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
                               >
-                                <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
-                              </button>
-                              <button
-                                data-del
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  const updated = (selectedTask.images ?? []).filter((_, idx) => idx !== i);
-                                  patchTask({ images: updated });
-                                }}
-                                className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center transition-opacity"
-                                style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}
-                                title="Delete image"
-                              >
-                                <Trash2 size={11} color="white" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                                <button
+                                  onClick={() => !isUploading && deletingIndex === null && setLightboxIndex(i)}
+                                  className="w-full h-full rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
+                                  style={{ cursor: isUploading ? 'default' : 'pointer' }}
+                                >
+                                  <img src={src} alt={`Image ${i + 1}`} className="w-full h-full object-cover"
+                                    style={{ opacity: deletingIndex === i || isUploading ? 0.4 : 1, transition: 'opacity 0.2s' }} />
+                                </button>
+                                {/* Delete overlay */}
+                                {deletingIndex === i && (
+                                  <div className="absolute inset-0 rounded-lg flex flex-col items-center justify-center gap-1" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                                    <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                                      <motion.div className="h-full rounded-full" style={{ background: '#D8727D' }} initial={{ width: '0%' }} animate={{ width: '100%' }} transition={{ duration: 0.8, ease: 'linear' }} />
+                                    </div>
+                                    <span className="text-[10px] text-white font-medium">Deleting…</span>
+                                  </div>
+                                )}
+                                {/* Upload overlay */}
+                                {isUploading && (
+                                  <div className="absolute inset-0 rounded-lg flex flex-col items-center justify-center gap-1" style={{ background: 'rgba(0,0,0,0.55)' }}>
+                                    {uploadProgress === 'saved' ? (
+                                      <>
+                                        <Check size={16} color="white" />
+                                        <span className="text-[10px] text-white font-medium">Saved</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                                          <motion.div className="h-full rounded-full" style={{ background: '#5030E5' }} initial={{ width: '0%' }} animate={{ width: `${uploadProgress}%` }} transition={{ duration: 0.1, ease: 'linear' }} />
+                                        </div>
+                                        <span className="text-[10px] text-white font-medium">Uploading…</span>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Delete button — only on saved images, not uploading */}
+                                {!isUploading && deletingIndex !== i && (
+                                  <button
+                                    data-del
+                                    onClick={async e => {
+                                      e.stopPropagation();
+                                      setDeletingIndex(i);
+                                      const current = selectedTaskRef.current;
+                                      if (!current) { setDeletingIndex(null); return; }
+                                      const updated = (current.images ?? []).filter((_, idx) => idx !== i);
+                                      patchingRef.current = true;
+                                      setSelectedTask(prev => prev ? { ...prev, images: updated } : prev);
+                                      await updateTask(current.id, { images: updated }).catch(console.error);
+                                      setDeletingIndex(null);
+                                      setTimeout(() => { patchingRef.current = false; }, 1500);
+                                    }}
+                                    className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center"
+                                    style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}
+                                    title="Delete image"
+                                  >
+                                    <Trash2 size={11} color="white" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       <button onClick={() => detailFileRef.current?.click()}
                         className="flex items-center gap-3 px-1 py-2.5 text-sm w-full text-left transition-colors"
                         style={{ color: 'var(--text-muted)' }}
@@ -942,9 +1032,7 @@ const TasksPage: React.FC = () => {
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
                         <ImagePlus size={14} /> Upload image
                       </button>
-                      <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={e => handleImagePick(e, url => {
-                        if (selectedTask) updateTask(selectedTask.id, { images: [...(selectedTask.images ?? []), url] }).catch(console.error);
-                      })} />
+                      <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
                     </div>
 
                     {/* Stats row */}

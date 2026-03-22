@@ -219,7 +219,7 @@ const navGroups = [
 ];
 
 const SettingsPage: React.FC = () => {
-  const { currentUser, theme, setTheme: setAppTheme } = useContext(AppContext);
+  const { currentUser, setTheme: setAppTheme } = useContext(AppContext);
   const { user: authUser, logout, updatePassword } = useAuth();
   const { updateMember, members } = useMembersContext();
   const { projects, allTasks } = useProjects();
@@ -290,7 +290,7 @@ const SettingsPage: React.FC = () => {
   };
 
   // Appearance — persisted to MongoDB (in-memory fallback in mock mode)
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'coffee' | 'system'>(theme === 'coffee' ? 'coffee' : theme === 'dark' ? 'dark' : 'light');
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'coffee' | 'system'>('dark');
   const [accentColor, setAccentColor] = useState('#5030E5');
   const [timezoneValue] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const appearLoaded = useRef(false);

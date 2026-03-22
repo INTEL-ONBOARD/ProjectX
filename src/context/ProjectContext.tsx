@@ -34,6 +34,7 @@ interface ProjectContextValue {
   moveTask: (id: string, newStatus: TaskStatus) => Promise<void>;
   scrubAssignee: (memberId: string) => Promise<void>;
   loading: boolean;
+  synced: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -50,21 +51,39 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeProject, setActiveProject] = useState<string>('');
   const [projectRichData, setProjectRichData] = useState<Record<string, Partial<ProjectRichData>>>({});
   const [loading, setLoading] = useState(true);
+  const [synced, setSynced] = useState(false);
   const { user: authUser } = useAuth() ?? { user: null };
   const focusDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([api().getProjects(), api().getTasks()])
+  const fetchAll = (cancelled: { value: boolean }) => {
+    setLoading(true);
+    return Promise.all([api().getProjects(), api().getTasks()])
       .then(([prjs, tasks]) => {
+        if (cancelled.value) return;
         const typedProjects = prjs as Project[];
         const typedTasks = tasks as Task[];
         setProjects(typedProjects);
         setAllTasks(typedTasks);
         setActiveProject(typedProjects[0]?.id ?? '');
+        setLoading(false);
+        setSynced(true);
       })
-      .catch(err => console.error('[ProjectContext] Failed to load projects/tasks:', err))
-      .finally(() => setLoading(false));
+      .catch(err => {
+        if (cancelled.value) return;
+        console.error('[ProjectContext] Failed to load projects/tasks:', err);
+        // Keep loading=true so overlay stays visible until retry succeeds
+      });
+  };
+
+  useEffect(() => {
+    const cancelled = { value: false };
+    fetchAll(cancelled);
+
+    // Retry on DB reconnect (covers the case where initial load failed due to network error)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsubReconnect = (window as any).electronAPI?.onDbReconnected?.(() => {
+      fetchAll(cancelled);
+    });
 
     // Refetch whenever the window regains focus (catches changes from other windows)
     // Debounced 1000ms to prevent multiple rapid focus events from triggering redundant refetches
@@ -73,7 +92,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       focusDebounceRef.current = setTimeout(() => {
         Promise.all([api().getProjects(), api().getTasks()])
           .then(([prjs, tasks]) => {
-            if (!cancelled) {
+            if (!cancelled.value) {
               setProjects(prjs as Project[]);
               setAllTasks(tasks as Task[]);
             }
@@ -84,7 +103,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     window.addEventListener('focus', onFocus);
 
     return () => {
-      cancelled = true;
+      cancelled.value = true;
+      unsubReconnect?.();
       window.removeEventListener('focus', onFocus);
       if (focusDebounceRef.current) clearTimeout(focusDebounceRef.current);
     };
@@ -136,6 +156,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .then(([prjs, tasks]) => {
           setProjects(prjs as Project[]);
           setAllTasks(tasks as Task[]);
+          setLoading(false);
+          setSynced(true);
         })
         .catch(() => {});
     });
@@ -241,7 +263,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   return (
     <ProjectContext.Provider value={{
-      projects, allTasks, activeProject, setActiveProject, loading,
+      projects, allTasks, activeProject, setActiveProject, loading, synced,
       projectRichData, setProjectRichData,
       createProject, updateProject, deleteProject,
       createTask, updateTask, deleteTask, moveTask, scrubAssignee,

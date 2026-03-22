@@ -445,11 +445,9 @@ const SharedLayout: React.FC = () => (
 );
 
 // ── Syncing overlay (shown after login while data loads) ──────────────────────
-const SyncingOverlay: React.FC = () => {
-    const { loading } = useProjects();
-    if (!loading) return null;
-    return (
+const SyncingOverlayInner: React.FC = () => (
         <motion.div
+            key="syncing-overlay"
             className="fixed inset-0 z-[9998] flex flex-col items-center justify-center"
             style={{ background: 'var(--bg-app)' }}
             initial={{ opacity: 1 }}
@@ -500,6 +498,14 @@ const SyncingOverlay: React.FC = () => {
                 <span className="text-[11px] tracking-widest uppercase font-medium" style={{ color: 'var(--text-muted)' }}>Syncing…</span>
             </motion.div>
         </motion.div>
+);
+
+const SyncingOverlay: React.FC = () => {
+    const { synced } = useProjects();
+    return (
+        <AnimatePresence>
+            {!synced && <SyncingOverlayInner />}
+        </AnimatePresence>
     );
 };
 
@@ -675,9 +681,7 @@ const Root: React.FC = () => {
             <MainApp />
             <BugReportModal />
             <UpdateBanner />
-            <AnimatePresence>
-                <SyncingOverlay />
-            </AnimatePresence>
+            <SyncingOverlay />
             <AnimatePresence>
                 {dbDisconnected && <ReconnectingOverlay status={reconnectStatus} />}
             </AnimatePresence>
