@@ -531,7 +531,13 @@ const TeamsPage: React.FC = () => {
   const [view, setViewState] = useState<'grid' | 'list'>('grid');
   const [filter, setFilter] = useState<'all' | 'active' | 'on-hold' | 'completed' | 'live-and-support' | 'planning'>('all');
   const [filterPriority, setFilterPriority] = useState<'' | 'low' | 'medium' | 'high'>('');
-  const [sortBy, setSortBy] = useState<'name' | 'progress' | 'due'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'progress' | 'due' | 'priority' | 'status' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const handleColSort = (col: 'name' | 'progress' | 'due' | 'priority' | 'status') => {
+    if (sortBy === col && sortDir === 'desc') { setSortBy(null); setSortDir('asc'); }
+    else if (sortBy === col) setSortDir('desc');
+    else { setSortBy(col); setSortDir('asc'); }
+  };
   const [showPriorityDrop, setShowPriorityDrop] = useState(false);
   const [showSortDrop, setShowSortDrop] = useState(false);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
@@ -579,21 +585,28 @@ const TeamsPage: React.FC = () => {
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }).sort((a, b) => {
-    if (sortBy === 'name') return a.name.localeCompare(b.name);
-    if (sortBy === 'progress') {
+    if (!sortBy) return 0;
+    const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    const STATUS_ORDER: Record<string, number> = { active: 0, planning: 1, 'on-hold': 2, 'live-and-support': 3, completed: 4 };
+    let cmp = 0;
+    if (sortBy === 'name') cmp = a.name.localeCompare(b.name);
+    else if (sortBy === 'progress') {
       const pa = a.taskTotal ? Math.round((a.taskDone / a.taskTotal) * 100) : 0;
       const pb = b.taskTotal ? Math.round((b.taskDone / b.taskTotal) * 100) : 0;
-      return pb - pa;
-    }
-    if (sortBy === 'due') {
+      cmp = pa - pb;
+    } else if (sortBy === 'due') {
       const da = (a.dueDate === 'TBD' ? '' : a.dueDate) ?? '';
       const db = (b.dueDate === 'TBD' ? '' : b.dueDate) ?? '';
-      if (!da && !db) return 0;
-      if (!da) return 1;
-      if (!db) return -1;
-      return da.localeCompare(db);
+      if (!da && !db) cmp = 0;
+      else if (!da) cmp = 1;
+      else if (!db) cmp = -1;
+      else cmp = da.localeCompare(db);
+    } else if (sortBy === 'priority') {
+      cmp = (PRIORITY_ORDER[a.priority ?? ''] ?? 9) - (PRIORITY_ORDER[b.priority ?? ''] ?? 9);
+    } else if (sortBy === 'status') {
+      cmp = (STATUS_ORDER[a.status ?? ''] ?? 9) - (STATUS_ORDER[b.status ?? ''] ?? 9);
     }
-    return 0;
+    return sortDir === 'asc' ? cmp : -cmp;
   });
 
   // Helper: update rich data locally + persist to DB
@@ -786,16 +799,16 @@ const TeamsPage: React.FC = () => {
               <div ref={sortDropRef} className="relative">
                 <button
                   onClick={() => { setShowSortDrop(v => !v); setShowPriorityDrop(false); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${sortBy !== 'name' ? 'border-primary-300 bg-primary-50 text-primary-600' : 'border-surface-200 bg-surface-50 text-gray-500 hover:text-gray-700'}`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${sortBy ? 'border-primary-300 bg-primary-50 text-primary-600' : 'border-surface-200 bg-surface-50 text-gray-500 hover:text-gray-700'}`}
                 >
                   <ArrowUpDown size={11} />
-                  {sortBy === 'name' ? 'Sort' : sortBy === 'progress' ? 'Progress' : 'Due Date'}
+                  {!sortBy ? 'Sort' : sortBy === 'progress' ? 'Progress' : sortBy === 'due' ? 'Due Date' : sortBy === 'name' ? 'Name' : sortBy === 'priority' ? 'Priority' : 'Status'}
                   <ChevronDown size={10} />
                 </button>
                 {showSortDrop && (
                   <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-xl border border-surface-200 shadow-lg z-30 overflow-hidden">
-                    {([['name', 'Name (A–Z)'], ['progress', 'Progress'], ['due', 'Due Date']] as const).map(([val, label]) => (
-                      <button key={val} onClick={() => { setSortBy(val); setShowSortDrop(false); }}
+                    {([['name', 'Name (A–Z)'], ['progress', 'Progress'], ['due', 'Due Date'], ['priority', 'Priority'], ['status', 'Status']] as const).map(([val, label]) => (
+                      <button key={val} onClick={() => { handleColSort(val); setShowSortDrop(false); }}
                         className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors ${sortBy === val ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-surface-50'}`}>
                         {label}
                       </button>
@@ -805,8 +818,8 @@ const TeamsPage: React.FC = () => {
               </div>
 
               {/* Clear active filters */}
-              {(filterPriority || sortBy !== 'name') && (
-                <button onClick={() => { setFilterPriority(''); setSortBy('name'); }} className="text-[10px] text-gray-400 hover:text-gray-600 font-medium">Clear</button>
+              {(filterPriority || sortBy) && (
+                <button onClick={() => { setFilterPriority(''); setSortBy(null); setSortDir('asc'); }} className="text-[10px] text-gray-400 hover:text-gray-600 font-medium">Clear</button>
               )}
 
               <div className="flex items-center gap-1 ml-auto">
@@ -881,9 +894,30 @@ const TeamsPage: React.FC = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-surface-100 bg-surface-50">
-                          {['Project', 'Tasks', 'Progress', 'Priority', 'Status', 'Due Date', ''].map(h => (
-                            <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider first:pl-5${h === 'Due Date' ? ' whitespace-nowrap' : ''}`}>{h}</th>
-                          ))}
+                          {(['Project', 'Tasks', 'Progress', 'Priority', 'Status', 'Due Date', ''] as const).map(h => {
+                            const colMap: Record<string, 'name' | 'progress' | 'due' | 'priority' | 'status'> = {
+                              'Project': 'name', 'Progress': 'progress', 'Priority': 'priority', 'Status': 'status', 'Due Date': 'due',
+                            };
+                            const col = colMap[h];
+                            const isSortable = !!col;
+                            const isActive = sortBy === col;
+                            return (
+                              <th
+                                key={h}
+                                className={`px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider first:pl-5 select-none${h === 'Due Date' ? ' whitespace-nowrap' : ''}${isSortable ? ' cursor-pointer hover:text-gray-600' : ''} ${isActive ? 'text-primary-500' : 'text-gray-400'}`}
+                                onClick={() => isSortable && handleColSort(col)}
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  {h}
+                                  {isSortable && (
+                                    <span className="text-[9px] leading-none">
+                                      {isActive ? (sortDir === 'asc' ? '▲' : '▼') : '⬍'}
+                                    </span>
+                                  )}
+                                </span>
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody>

@@ -243,6 +243,16 @@ const TasksPage: React.FC = () => {
   // Delete confirmation state
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Sort state
+  type SortCol = 'task' | 'project' | 'priority' | 'due' | 'status';
+  const [sortCol, setSortCol] = useState<SortCol | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const handleSort = (col: SortCol) => {
+    if (sortCol === col && sortDir === 'desc') { setSortCol(null); setSortDir('asc'); }
+    else if (sortCol === col) setSortDir('desc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatusDrop, setBulkStatusDrop] = useState(false);
@@ -268,6 +278,18 @@ const TasksPage: React.FC = () => {
     if (filterAssignee && !t.assignees.includes(filterAssignee)) return false;
     return true;
   });
+
+  const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, completed: 3 };
+  const STATUS_ORDER: Record<string, number> = { 'in-progress': 0, 'todo': 1, 'ready-for-qa': 2, 'deployment-pending': 3, 'blocker': 4, 'on-hold': 5, 'done': 6 };
+  const sortedTasks = sortCol ? [...filteredTasks].sort((a, b) => {
+    let cmp = 0;
+    if (sortCol === 'task') cmp = a.title.localeCompare(b.title);
+    else if (sortCol === 'project') cmp = (a.projectId ?? '').localeCompare(b.projectId ?? '');
+    else if (sortCol === 'priority') cmp = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
+    else if (sortCol === 'due') cmp = (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999');
+    else if (sortCol === 'status') cmp = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+    return sortDir === 'asc' ? cmp : -cmp;
+  }) : filteredTasks;
 
   const doneCount = allTasks.filter(t => t.status === 'done').length;
   const todoCount = allTasks.filter(t => t.status === 'todo').length;
@@ -547,13 +569,31 @@ const TasksPage: React.FC = () => {
                       className="rounded border-gray-300"
                     />
                   </th>
-                  {['Task', 'Project', 'Priority', 'Assignees', 'Due', 'Status'].map(h => (
-                    <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-surface-50${h === 'Task' ? ' w-[35%]' : ''}`}>{h}</th>
-                  ))}
+                  {(['Task', 'Project', 'Priority', 'Assignees', 'Due', 'Status'] as const).map(h => {
+                    const col = h.toLowerCase() as SortCol | 'assignees';
+                    const isSortable = col !== 'assignees';
+                    const isActive = sortCol === col;
+                    return (
+                      <th
+                        key={h}
+                        className={`px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider bg-surface-50 select-none${h === 'Task' ? ' w-[35%]' : ''}${isSortable ? ' cursor-pointer hover:text-gray-600' : ''} ${isActive ? 'text-primary-500' : 'text-gray-400'}`}
+                        onClick={() => isSortable && handleSort(col as SortCol)}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {h}
+                          {isSortable && (
+                            <span className="text-[9px] leading-none">
+                              {isActive ? (sortDir === 'asc' ? '▲' : '▼') : '⬍'}
+                            </span>
+                          )}
+                        </span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.length === 0 && (
+                {sortedTasks.length === 0 && (
                   <tr>
                     <td colSpan={7}>
                       <EmptyState
@@ -565,7 +605,7 @@ const TasksPage: React.FC = () => {
                     </td>
                   </tr>
                 )}
-                {filteredTasks.map((task, i) => {
+                {sortedTasks.map((task, i) => {
                   const priority = priorityStyles[task.priority] ?? priorityStyles.low;
                   const status = statusStyles[task.status] ?? statusStyles.todo;
                   const project = contextProjects.find(p => p.id === task.projectId);
