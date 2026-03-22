@@ -323,7 +323,7 @@ const TasksPage: React.FC = () => {
     if (!selectedTask) return;
     const fresh = allTasks.find(t => t.id === selectedTask.id);
     if (fresh) setSelectedTask(fresh);
-  }, [allTasks]);
+  }, [allTasks, selectedTask?.id]);
 
   const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
@@ -906,7 +906,12 @@ const TasksPage: React.FC = () => {
                       {(selectedTask.images ?? []).length > 0 && (
                         <div className="grid grid-cols-2 gap-2 mb-3">
                           {(selectedTask.images ?? []).map((img, i) => (
-                            <div key={i} className="relative group h-20">
+                            <div
+                              key={i}
+                              className="relative h-20"
+                              onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '1'; }}
+                              onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
+                            >
                               <button
                                 onClick={() => setLightboxIndex(i)}
                                 className="w-full h-full rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
@@ -914,13 +919,14 @@ const TasksPage: React.FC = () => {
                                 <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
                               </button>
                               <button
+                                data-del
                                 onClick={e => {
                                   e.stopPropagation();
                                   const updated = (selectedTask.images ?? []).filter((_, idx) => idx !== i);
-                                  updateTask(selectedTask.id, { images: updated }).catch(console.error);
+                                  patchTask({ images: updated });
                                 }}
-                                className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                style={{ background: 'rgba(0,0,0,0.6)' }}
+                                className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center transition-opacity"
+                                style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}
                                 title="Delete image"
                               >
                                 <Trash2 size={11} color="white" />

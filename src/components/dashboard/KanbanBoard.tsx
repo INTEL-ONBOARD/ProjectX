@@ -134,6 +134,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentInput, setCommentInput] = useState('');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | 'saved' | null>(null);
   const lightboxRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -270,7 +271,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     if (!selectedTask) return;
     const fresh = allTasks.find(t => t.id === selectedTask.id);
     if (fresh) setSelectedTask(fresh);
-  }, [allTasks]);
+  }, [allTasks, selectedTask?.id]);
 
   const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
@@ -297,14 +298,38 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     setCommentInput('');
   };
 
+  const uploadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedTask) return;
+    e.target.value = '';
     const reader = new FileReader();
+
+    // Animate progress from 0 → 90 while reading (local file has no real progress events)
+    setUploadProgress(0);
+    let simulated = 0;
+    uploadTimerRef.current = setInterval(() => {
+      simulated = Math.min(simulated + Math.random() * 18, 90);
+      setUploadProgress(Math.round(simulated));
+    }, 80);
+
     reader.onload = ev => {
+      // Stop simulation, jump to 100
+      if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
+      setUploadProgress(100);
       const dataUrl = ev.target?.result as string;
       patchTask({ images: [...(selectedTask.images ?? []), dataUrl] });
+      // Show "Saved" after a short pause, then clear the tile
+      setTimeout(() => setUploadProgress('saved'), 400);
+      setTimeout(() => setUploadProgress(null), 1800);
     };
+
+    reader.onerror = () => {
+      if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
+      setUploadProgress(null);
+    };
+
     reader.readAsDataURL(file);
   };
 
@@ -926,10 +951,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                   </div>
 
                   {/* Image gallery */}
-                  {(selectedTask.images ?? []).length > 0 && (
+                  {((selectedTask.images ?? []).length > 0 || uploadProgress !== null) && (
                     <div className="grid grid-cols-2 gap-2 mb-4">
                       {(selectedTask.images ?? []).map((img, i) => (
-                        <div key={i} className="relative group h-20">
+                        <div
+                          key={i}
+                          className="relative h-20"
+                          onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '1'; }}
+                          onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
+                        >
                           <button
                             onClick={() => setLightboxIndex(i)}
                             className="w-full h-full rounded-lg overflow-hidden border border-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400"
@@ -937,19 +967,39 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                             <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
                           </button>
                           <button
+                            data-del
                             onClick={e => {
                               e.stopPropagation();
                               const updated = (selectedTask.images ?? []).filter((_, idx) => idx !== i);
                               patchTask({ images: updated });
                             }}
-                            className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                            style={{ background: 'rgba(0,0,0,0.6)' }}
+                            className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center transition-opacity"
+                            style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}
                             title="Delete image"
                           >
                             <Trash2 size={11} color="white" />
                           </button>
                         </div>
                       ))}
+                      {uploadProgress !== null && (
+                        <div className="relative h-20 rounded-lg flex flex-col items-center justify-center gap-1.5 border"
+                          style={{ background: 'var(--bg-muted)', borderColor: 'var(--border-default)' }}>
+                          {uploadProgress === 'saved' ? (
+                            <>
+                              <Check size={18} style={{ color: '#68B266' }} />
+                              <span className="text-[11px] font-semibold" style={{ color: '#68B266' }}>Saved</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{uploadProgress}%</span>
+                              <div className="w-3/4 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border-default)' }}>
+                                <div className="h-full rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%`, background: '#5030E5' }} />
+                              </div>
+                              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Uploading…</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
