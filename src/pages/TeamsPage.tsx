@@ -445,9 +445,6 @@ const ProjectRow: React.FC<{
         </div>
       </td>
       <td className="px-4 py-3.5">
-        <AvatarGroup names={names} colors={colors} size="sm" max={3} />
-      </td>
-      <td className="px-4 py-3.5">
         <span className="text-xs font-semibold text-gray-700">{project.taskDone}/{project.taskTotal}</span>
       </td>
       <td className="px-4 py-3.5">
@@ -537,13 +534,16 @@ const TeamsPage: React.FC = () => {
   const [sortBy, setSortBy] = useState<'name' | 'progress' | 'due'>('name');
   const [showPriorityDrop, setShowPriorityDrop] = useState(false);
   const [showSortDrop, setShowSortDrop] = useState(false);
+  const [showStatusDrop, setShowStatusDrop] = useState(false);
   const priorityDropRef = React.useRef<HTMLDivElement>(null);
   const sortDropRef = React.useRef<HTMLDivElement>(null);
+  const statusDropRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (priorityDropRef.current && !priorityDropRef.current.contains(e.target as Node)) setShowPriorityDrop(false);
       if (sortDropRef.current && !sortDropRef.current.contains(e.target as Node)) setShowSortDrop(false);
+      if (statusDropRef.current && !statusDropRef.current.contains(e.target as Node)) setShowStatusDrop(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -738,17 +738,26 @@ const TeamsPage: React.FC = () => {
                 />
               </div>
 
-              {/* Filter tabs */}
-              <div className="flex items-center bg-surface-100 rounded-xl p-1 gap-0.5">
-                {(['all', 'active', 'planning', 'on-hold', 'live-and-support', 'completed'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === f ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                  >
-                    {f === 'all' ? 'All' : f === 'on-hold' ? 'On Hold' : f === 'live-and-support' ? 'Live & Support' : f.charAt(0).toUpperCase() + f.slice(1)}
-                  </button>
-                ))}
+              {/* Status dropdown */}
+              <div ref={statusDropRef} className="relative">
+                <button
+                  onClick={() => { setShowStatusDrop(v => !v); setShowPriorityDrop(false); setShowSortDrop(false); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-colors ${filter !== 'all' ? 'border-primary-300 bg-primary-50 text-primary-600' : 'border-surface-200 bg-surface-50 text-gray-500 hover:text-gray-700'}`}
+                >
+                  <span>{filter === 'all' ? 'Status' : filter === 'on-hold' ? 'On Hold' : filter === 'live-and-support' ? 'Live & Support' : filter.charAt(0).toUpperCase() + filter.slice(1)}</span>
+                  <ChevronDown size={10} />
+                </button>
+                {showStatusDrop && (
+                  <div className="absolute left-0 top-full mt-1 w-44 bg-white rounded-xl border border-surface-200 shadow-lg z-30 overflow-hidden">
+                    {(['all', 'active', 'planning', 'on-hold', 'live-and-support', 'completed'] as const).map(f => (
+                      <button key={f} onClick={() => { setFilter(f); setShowStatusDrop(false); }}
+                        className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${filter === f ? 'bg-primary-50 text-primary-600' : 'text-gray-600 hover:bg-surface-50'}`}>
+                        {f !== 'all' && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: statusConfig[f]?.dot }} />}
+                        {f === 'all' ? 'All statuses' : f === 'on-hold' ? 'On Hold' : f === 'live-and-support' ? 'Live & Support' : f.charAt(0).toUpperCase() + f.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Priority filter */}
@@ -872,7 +881,7 @@ const TeamsPage: React.FC = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-surface-100 bg-surface-50">
-                          {['Project', 'Members', 'Tasks', 'Progress', 'Priority', 'Status', 'Due Date', ''].map(h => (
+                          {['Project', 'Tasks', 'Progress', 'Priority', 'Status', 'Due Date', ''].map(h => (
                             <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider first:pl-5${h === 'Due Date' ? ' whitespace-nowrap' : ''}`}>{h}</th>
                           ))}
                         </tr>
