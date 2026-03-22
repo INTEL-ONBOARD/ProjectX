@@ -94,7 +94,21 @@ const MessagesPage: React.FC = () => {
   const [activeId, setActiveId] = useState('');
   const activeIdRef = useRef('');
   const [chats, setChats] = useState<Record<string, Msg[]>>({});
-  const { getStatus } = usePresence();
+  const { getStatus, getLastSeen } = usePresence();
+
+  const formatLastSeen = (userId: string): string => {
+    const ls = getLastSeen(userId);
+    if (!ls) return '';
+    const diffMs = Date.now() - new Date(ls).getTime();
+    const diffMin = Math.floor(diffMs / 60_000);
+    if (diffMin < 1) return 'last seen just now';
+    if (diffMin < 60) return `last seen ${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `last seen ${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay === 1) return 'last seen yesterday';
+    return `last seen ${diffDay} days ago`;
+  };
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
@@ -610,7 +624,12 @@ const MessagesPage: React.FC = () => {
             </div>
             <div className="flex-1">
               <div className="font-bold text-sm text-gray-900">{activeMember?.name ?? '—'}</div>
-              <div className="text-xs text-gray-400">{activeMember?.designation ?? ''} · <span style={{ color: statusColor[getStatus(activeMember?.id ?? '')] }}>{statusLabel[getStatus(activeMember?.id ?? '')]}</span></div>
+              <div className="text-xs text-gray-400">
+                {activeMember?.designation ?? ''} · <span style={{ color: statusColor[getStatus(activeMember?.id ?? '')] }}>{statusLabel[getStatus(activeMember?.id ?? '')]}</span>
+                {getStatus(activeMember?.id ?? '') === 'offline' && activeMember?.id && formatLastSeen(activeMember.id) && (
+                  <span className="text-gray-400"> · {formatLastSeen(activeMember.id)}</span>
+                )}
+              </div>
             </div>
             {/* Action icons */}
             <div className="flex items-center gap-1">

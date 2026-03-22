@@ -7,6 +7,7 @@ import { useMembersContext } from '../context/MembersContext';
 import { useRolePerms } from '../context/RolePermsContext';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../context/AuthContext';
+import { usePresence } from '../context/PresenceContext';
 import { User } from '../types';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
@@ -315,6 +316,21 @@ const UsersTab: React.FC = () => {
     const { members, getMemberColor, removeMember, refetchMembers } = useMembersContext();
     const { roles } = useRoles();
     const { showToast } = useToast();
+    const { getStatus, getLastSeen } = usePresence();
+
+    const formatLastSeen = (userId: string): string => {
+        const ls = getLastSeen(userId);
+        if (!ls) return '';
+        const diffMs = Date.now() - new Date(ls).getTime();
+        const diffMin = Math.floor(diffMs / 60_000);
+        if (diffMin < 1) return 'just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        const diffHr = Math.floor(diffMin / 60);
+        if (diffHr < 24) return `${diffHr}h ago`;
+        const diffDay = Math.floor(diffHr / 24);
+        if (diffDay === 1) return 'yesterday';
+        return `${diffDay}d ago`;
+    };
     const [drawerMember, setDrawerMember] = useState<User | null>(null);
     const [drawerSection, setDrawerSection] = useState<'profile' | 'role' | 'activity' | 'attendance'>('profile');
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -428,7 +444,17 @@ const UsersTab: React.FC = () => {
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-1.5">
                                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[status] }} />
-                                                <span className="text-xs font-medium" style={{ color: statusColor[status] }}>{statusLabel[status]}</span>
+                                                <div>
+                                                    <span className="text-xs font-medium" style={{ color: statusColor[status] }}>{statusLabel[status]}</span>
+                                                    {(() => {
+                                                        const ps = getStatus(member.id);
+                                                        const ls = formatLastSeen(member.id);
+                                                        if (ps === 'online') return <div className="text-[10px] text-green-500 font-medium">Online now</div>;
+                                                        if (ps === 'away') return <div className="text-[10px] text-orange-400 font-medium">Away</div>;
+                                                        if (ls) return <div className="text-[10px] text-gray-400">last seen {ls}</div>;
+                                                        return null;
+                                                    })()}
+                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>

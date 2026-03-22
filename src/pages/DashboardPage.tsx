@@ -28,7 +28,21 @@ const DashboardPage: React.FC = () => {
   const { attendanceRecords, selectedWeekStart } = useContext(AppContext);
   const { allTasks } = useProjects();
   const { members, getMemberColor } = useMembersContext();
-  const { getStatus } = usePresence();
+  const { getStatus, getLastSeen } = usePresence();
+
+  const formatLastSeen = (userId: string): string => {
+    const ls = getLastSeen(userId);
+    if (!ls) return '';
+    const diffMs = Date.now() - new Date(ls).getTime();
+    const diffMin = Math.floor(diffMs / 60_000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay === 1) return 'yesterday';
+    return `${diffDay}d ago`;
+  };
   const todoTasks = allTasks.filter(t => t.status === 'todo');
   const doneTasks = allTasks.filter(t => t.status === 'done');
   const inProgressTasks = allTasks.filter(t => t.status === 'in-progress');
@@ -278,6 +292,12 @@ const DashboardPage: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold text-gray-900 truncate">{member.name}</div>
                     <div className="text-[10px] text-gray-400 truncate">{member.designation ?? ''}</div>
+                    {(() => {
+                      const ps = getStatus(member.id);
+                      const ls = formatLastSeen(member.id);
+                      if (ps === 'offline' && ls) return <div className="text-[10px] text-gray-400">last seen {ls}</div>;
+                      return null;
+                    })()}
                   </div>
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor[getStatus(member.id)] }} />
                 </div>

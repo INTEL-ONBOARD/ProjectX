@@ -27,7 +27,8 @@ export const usePresence = () => {
     // getStatus reads fresh lastSeenMap on every render (tick forces re-render every 2 s)
     const getStatus = (userId: string): 'online' | 'away' | 'offline' =>
         getPresenceStatus(lastSeenMap[userId]);
-    return { getStatus };
+    const getLastSeen = (userId: string): string | null => lastSeenMap[userId] ?? null;
+    return { getStatus, getLastSeen };
 };
 
 export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
