@@ -98,7 +98,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
         <AnimatePresence>
             {task && (
                 <motion.div
-                    className="fixed inset-0 top-16 bg-black/50 flex items-center justify-center z-50"
+                    className="fixed inset-0 top-16 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}

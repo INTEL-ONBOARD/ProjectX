@@ -380,7 +380,12 @@ const MembersPage: React.FC = () => {
       <AnimatePresence>
         {selectedMember && (
           <motion.div className="fixed inset-0 top-16 z-50 flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="flex-1 bg-black/30" onClick={() => setSelectedMember(null)} />
+            <motion.div
+              className="flex-1 cursor-pointer"
+              style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setSelectedMember(null)}
+            />
             <motion.div
               className="w-[420px] bg-white h-full overflow-y-auto border-l border-surface-200 flex flex-col"
               initial={{ x: 420 }} animate={{ x: 0 }} exit={{ x: 420 }}

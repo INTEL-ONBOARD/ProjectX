@@ -128,7 +128,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
 
   return (
     <motion.div
-      className="fixed inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-50 px-4"
+      className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-50 px-4"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
     >

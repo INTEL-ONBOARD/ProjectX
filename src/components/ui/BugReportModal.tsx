@@ -60,7 +60,7 @@ const BugReportModal: React.FC = () => {
           <>
             {/* Backdrop */}
             <motion.div
-              className="fixed inset-0 top-16 z-50 bg-black/30 backdrop-blur-[2px]"
+              className="fixed inset-0 top-16 z-50 bg-black/40 backdrop-blur-[2px]"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={handleClose}

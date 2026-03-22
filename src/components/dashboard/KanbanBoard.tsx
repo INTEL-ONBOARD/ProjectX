@@ -544,7 +544,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
               setShowAssigneePicker(false);
             }}
           >
-            <div className="flex-1" onClick={() => setSelectedTask(null)} />
+            <motion.div
+              className="flex-1 cursor-pointer"
+              style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)' }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setSelectedTask(null)}
+            />
             <motion.div
               className="w-[460px] h-full overflow-y-auto flex flex-col border-l shrink-0 relative"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border-default)' }}

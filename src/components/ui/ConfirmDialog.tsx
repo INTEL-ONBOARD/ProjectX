@@ -15,7 +15,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Confirm', 
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           onClick={onCancel}
         >
