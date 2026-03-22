@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, TrendingUp, CheckCircle, AlertCircle, Calendar, LogIn, LogOut, Coffee, Trash2, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { format, startOfWeek, addDays as dateFnsAddDays } from 'date-fns';
@@ -7,7 +7,10 @@ import { Avatar } from '../components/ui/Avatar';
 import { AppContext, AttendanceRecord } from '../context/AppContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useAuth } from '../context/AuthContext';
+import { useProjects } from '../context/ProjectContext';
 import { downloadCsv } from '../utils/exportCsv';
+import AttendanceMemberModal from '../components/modals/AttendanceMemberModal';
+import { User } from '../types';
 
 function addDays(dateStr: string, n: number): string {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -295,6 +298,8 @@ const TodaySessionCard: React.FC = () => {
 const AttendancePage: React.FC = () => {
     const { attendanceRecords, selectedWeekStart, setSelectedWeekStart, currentUser, deleteAttendanceRecord } = useContext(AppContext);
     const { members: allMembers, getMemberColor } = useMembersContext();
+    const { allTasks } = useProjects();
+    const [selectedMember, setSelectedMember] = useState<User | null>(null);
 
     const isAdmin = currentUser?.role === 'admin';
     const members = isAdmin
@@ -369,6 +374,7 @@ const AttendancePage: React.FC = () => {
     };
 
     return (
+    <>
   <motion.div
     className="flex-1 flex flex-col overflow-hidden px-8 bg-white"
     initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -455,9 +461,10 @@ const AttendancePage: React.FC = () => {
                 return (
                   <motion.tr
                     key={member.id}
-                    className="border-b border-surface-100 hover:bg-surface-50 transition-colors"
+                    className="border-b border-surface-100 hover:bg-surface-50 transition-colors cursor-pointer"
                     initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.35, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
+                    onClick={() => setSelectedMember(member)}
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -470,7 +477,7 @@ const AttendancePage: React.FC = () => {
                         <td key={days[di]} className="px-3 py-3 text-center">
                             {isAdmin && status !== undefined ? (
                                 <button
-                                    onClick={() => deleteAttendanceRecord(member.id, WEEK_DATES[di])}
+                                    onClick={(e) => { e.stopPropagation(); deleteAttendanceRecord(member.id, WEEK_DATES[di]); }}
                                     className="group relative w-5 h-5 rounded-full mx-auto flex items-center justify-center"
                                     title="Delete record"
                                 >
@@ -542,6 +549,20 @@ const AttendancePage: React.FC = () => {
       </div>
     </div>
   </motion.div>
+
+      <AnimatePresence>
+        {selectedMember && (
+          <AttendanceMemberModal
+            member={selectedMember}
+            weekDates={WEEK_DATES}
+            attendanceRecords={attendanceRecords}
+            tasks={allTasks}
+            getMemberColor={getMemberColor}
+            onClose={() => setSelectedMember(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
     );
 };
 

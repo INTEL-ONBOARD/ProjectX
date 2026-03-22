@@ -222,7 +222,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateTask = async (id: string, changes: Partial<Omit<Task, 'id'>>) => {
     const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
-    const updated = await api().updateTask(id, { ...changes, ...actorMeta }) as Task | null;
+
+    // Stamp completedAt the first time status transitions to 'done'
+    const existingTask = allTasks.find(t => t.id === id);
+    const isCompletingNow = changes.status === 'done' && existingTask?.status !== 'done';
+    const completedAt = isCompletingNow && !existingTask?.completedAt
+      ? new Date().toISOString()
+      : undefined;
+
+    const finalChanges = {
+      ...changes,
+      ...(completedAt ? { completedAt } : {}),
+      ...actorMeta,
+    };
+
+    const updated = await api().updateTask(id, finalChanges) as Task | null;
     if (updated) {
       setAllTasks(prev => prev.map(t => t.id === id ? updated : t));
     } else {

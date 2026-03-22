@@ -92,6 +92,7 @@ export interface Task {
     subtasks?: Subtask[];
     estimatedMinutes?: number;
     timeEntries?: TimeEntry[];
+    completedAt?: string;   // ISO date string — stamped when status first set to 'done'
 }
 
 export interface Comment {
