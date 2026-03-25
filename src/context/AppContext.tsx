@@ -137,7 +137,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 if (!prefs) return;
                 if (prefs.theme) setThemeState(prefs.theme);
                 if (typeof prefs.sidebarCollapsed === 'boolean') setSidebarCollapsedState(prefs.sidebarCollapsed);
-                if (prefs.selectedWeekStart) setSelectedWeekStartState(prefs.selectedWeekStart);
             })
             .catch((err: unknown) => console.error('[AppContext] Failed to load user prefs:', err))
             .finally(() => setPrefLoadedFor(currentUser.id));
@@ -196,11 +195,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     if (!exists) return [...prev, doc!];
                     // Skip no-op update caused by our own optimistic write reflecting back from the change stream
                     const current = prev.find(r => r.id === doc!.id)!;
-                    if (
-                        current.checkIn === doc!.checkIn &&
-                        current.checkOut === doc!.checkOut &&
-                        (current.breakSessions?.length ?? 0) === (doc!.breakSessions?.length ?? 0)
-                    ) return prev;
+                    if (JSON.stringify(current) === JSON.stringify(doc!)) return prev;
                     return prev.map(r => r.id === doc!.id ? doc! : r);
                 });
             } else if (op === 'delete') {

@@ -577,7 +577,7 @@ function startAttendanceStream() {
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
                 if (d)
-                    mainWindow.webContents.send('data:attendance:changed', { op, doc: safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }) });
+                    mainWindow.webContents.send('data:attendance:changed', { op, doc: safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] }) });
             }
             else if (op === 'delete') {
                 mainWindow.webContents.send('data:attendance:changed', { op, id: change.documentKey?._id?.toString() });
@@ -1473,11 +1473,11 @@ function registerDbHandlers() {
         return true;
     });
     // Attendance
-    handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map((d) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null }))));
+    handle('db:attendance:getAll', async () => safe((await AttendanceModel.find().lean()).map((d) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] }))));
     handle('db:attendance:set', async (_e, record) => {
         const recordId = `${record.userId}-${record.date}`;
-        const d = await AttendanceModel.findOneAndUpdate({ recordId }, { recordId, ...record }, { upsert: true, returnDocument: 'after' }).lean();
-        return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null });
+        const d = await AttendanceModel.findOneAndUpdate({ recordId }, { $set: { recordId, ...record } }, { upsert: true, returnDocument: 'after' }).lean();
+        return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] });
     });
     handle('db:attendance:delete', async (_e, userId, date) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
     // Messages

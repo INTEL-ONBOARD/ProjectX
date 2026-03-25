@@ -179,12 +179,15 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                     const dateStr = toISODate(date);
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedDate;
+                    const hasAttendance = attendanceRecords.some(
+                        r => r.userId === currentUser.id && r.date === dateStr && !!r.checkIn
+                    );
                     return (
                         <button
                             key={dateStr}
                             onClick={() => { setSelectedDate(dateStr); setSelectedWeekStart(getMonday(dateStr)); }}
                             className={`
-                                w-7 h-7 mx-auto rounded-md text-[11px] font-medium transition-colors
+                                relative w-7 h-7 mx-auto rounded-md text-[11px] font-medium transition-colors
                                 ${isSelected ? 'bg-primary-500 text-white' : ''}
                                 ${!isSelected && isToday ? 'ring-2 ring-primary-300 text-primary-600' : ''}
                                 ${!isSelected && !isToday && isCurrentMonth ? 'text-gray-700 hover:bg-surface-100' : ''}
@@ -192,6 +195,9 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                             `}
                         >
                             {date.getDate()}
+                            {hasAttendance && (
+                                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#68B266]" />
+                            )}
                         </button>
                     );
                 })}
