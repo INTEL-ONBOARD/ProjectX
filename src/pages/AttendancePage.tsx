@@ -105,9 +105,6 @@ const TodaySessionCard: React.FC = () => {
     r => r.userId === currentUser.id && r.date === todayDate
   ) ?? null;
 
-  // ── Weekend guard — no punch-in on Sat/Sun ──────────────────────────────────
-  const isWeekend = (() => { const d = new Date(todayDate + 'T00:00:00'); return d.getDay() === 0 || d.getDay() === 6; })();
-
   // ── Derive state ────────────────────────────────────────────────────────────
   type SessionState = 'NOT_STARTED' | 'WORKING' | 'ON_BREAK' | 'DONE';
   const state: SessionState = (() => {
@@ -257,7 +254,7 @@ const TodaySessionCard: React.FC = () => {
       </div>
 
       {/* Action buttons */}
-      {state === 'NOT_STARTED' && !isWeekend && (
+      {state === 'NOT_STARTED' && (
         <button
           onClick={handlePunchIn}
           disabled={saving}
@@ -266,11 +263,6 @@ const TodaySessionCard: React.FC = () => {
         >
           <LogIn size={15} /> Punch In
         </button>
-      )}
-      {state === 'NOT_STARTED' && isWeekend && (
-        <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center text-gray-400">
-          Weekend — no attendance
-        </div>
       )}
 
       {state === 'WORKING' && (
