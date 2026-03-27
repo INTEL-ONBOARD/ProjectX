@@ -231,7 +231,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAllTasks(prev => prev.map(t => t.projectId === id ? { ...t, projectId: undefined } : t));
   };
 
-  const createTask = async (taskData: Omit<Task, 'id'> & { projectId?: string }) => {
+  const createTask = async (taskData: Omit<Task, 'id'> & { projectId?: string }): Promise<void> => {
     const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
     const newTask = await api().createTask({ ...taskData, ...actorMeta }) as Task;
     setAllTasks(prev => prev.some(t => t.id === newTask.id) ? prev : [...prev, newTask]);

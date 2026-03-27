@@ -268,9 +268,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         // Attachments
         getAttachments:   (taskId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:attachments:getByTask', taskId),
-        pickAttachments:  (taskId: string): Promise<unknown[]>                      => ipcRenderer.invoke('db:attachments:pick', taskId),
-        deleteAttachment: (attachId: string): Promise<boolean>                      => ipcRenderer.invoke('db:attachments:delete', attachId),
-        openAttachment:   (filePath: string): Promise<boolean>                      => ipcRenderer.invoke('db:attachments:open', filePath),
+        pickAttachments:      (taskId: string): Promise<unknown[]>                     => ipcRenderer.invoke('db:attachments:pick', taskId),
+        pickForStaging:       (): Promise<unknown[]>                                  => ipcRenderer.invoke('db:attachments:pickForStaging'),
+        saveAttachments:      (taskId: string, filePaths: string[]): Promise<unknown[]> => ipcRenderer.invoke('db:attachments:savePaths', taskId, filePaths),
+        deleteAttachment:  (attachId: string): Promise<boolean>                     => ipcRenderer.invoke('db:attachments:delete', attachId),
+        openAttachment:    (filePath: string): Promise<boolean>                     => ipcRenderer.invoke('db:attachments:open', filePath),
 
         // Task Templates
         getTemplates:   (): Promise<unknown[]>                                       => ipcRenderer.invoke('db:templates:getAll'),

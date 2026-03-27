@@ -1279,6 +1279,43 @@ function registerDbHandlers() {
         await shell.openPath(filePath);
         return true;
     });
+    handle('db:attachments:pickForStaging', async () => {
+        const { dialog } = await import('electron');
+        const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
+        if (result.canceled || !result.filePaths.length) return [];
+        const fs = await import('fs');
+        const path = await import('path');
+        const staged: any[] = [];
+        for (const src of result.filePaths) {
+            try {
+                const stat = await fs.promises.stat(src);
+                staged.push({ name: path.basename(src), path: src, size: stat.size });
+            } catch (_) {}
+        }
+        return staged;
+    });
+    handle('db:attachments:savePaths', async (_e, taskId: string, filePaths: string[]) => {
+        if (!filePaths || filePaths.length === 0) return [];
+        const { app: eApp } = await import('electron');
+        const fs = await import('fs');
+        const path = await import('path');
+        const destDir = path.join(eApp.getPath('userData'), 'attachments', taskId);
+        await fs.promises.mkdir(destDir, { recursive: true });
+        const saved: any[] = [];
+        let counter = 0;
+        for (const src of filePaths) {
+            try {
+                const name = path.basename(src);
+                const dest = path.join(destDir, `${Date.now()}_${counter++}_${name}`);
+                await fs.promises.copyFile(src, dest);
+                const stat = await fs.promises.stat(dest);
+                const doc = await AttachmentModel.create({ attachId: randomUUID(), taskId, name, filePath: dest, size: stat.size, uploadedAt: new Date().toISOString() });
+                await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
+                saved.push({ id: doc.attachId, taskId, name, filePath: dest, size: stat.size, uploadedAt: doc.uploadedAt });
+            } catch (_) {}
+        }
+        return safe(saved);
+    });
 
     // Task Templates
     handle('db:templates:getAll', async () => {

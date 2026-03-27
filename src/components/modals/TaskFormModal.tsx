@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare, Tag, RefreshCw, Link, ArrowRight, ArrowLeft, Check } from 'lucide-react';
+import { X, ChevronDown, Search, Calendar, Flag, Layers, AlignLeft, CheckSquare, Tag, RefreshCw, Link, ArrowRight, ArrowLeft, Check, ImagePlus } from 'lucide-react';
 import { Task, TaskStatus, TaskType, TaskTemplate } from '../../types';
 
 const dbApi = () => (window as any).electronAPI.db;
@@ -53,6 +53,8 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [showAssigneeDrop, setShowAssigneeDrop] = useState(false);
   const assigneeDropRef = useRef<HTMLDivElement>(null);
+  const [stagedImages, setStagedImages] = useState<string[]>(initial?.images ?? []);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const status: TaskStatus = initial?.status ?? defaultStatus ?? 'todo';
   const isEdit = !!initial?.id;
@@ -109,8 +111,9 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
         blockedBy,
         comments: initial?.comments ?? 0,
         files: initial?.files ?? 0,
-        images: initial?.images ?? [],
+        images: stagedImages,
       });
+      setLoading(false);
       onClose();
     } catch (err) {
       console.error('[TaskFormModal] Failed to save task:', err);
@@ -459,7 +462,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                     </label>
                     <textarea value={description} onChange={e => setDescription(e.target.value)}
                       placeholder="Add notes or context…"
-                      rows={4}
+                      rows={3}
                       className="w-full rounded-xl px-3 py-2.5 text-xs resize-none focus:outline-none leading-relaxed transition-all"
                       style={{
                         background: 'var(--bg-muted)',
@@ -469,6 +472,58 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                       onFocus={e => e.currentTarget.style.borderColor = '#5030E5'}
                       onBlur={e => e.currentTarget.style.borderColor = 'var(--border-default)'}
                     />
+                  </div>
+
+                  {/* Images */}
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                      <ImagePlus size={10} /> Images
+                    </label>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={e => {
+                        const files = Array.from(e.target.files ?? []);
+                        e.target.value = '';
+                        files.forEach(file => {
+                          const reader = new FileReader();
+                          reader.onload = ev => {
+                            const dataUrl = ev.target?.result as string;
+                            if (dataUrl) setStagedImages(prev => [...prev, dataUrl]);
+                          };
+                          reader.readAsDataURL(file);
+                        });
+                      }}
+                    />
+                    {stagedImages.length > 0 && (
+                      <div className="grid grid-cols-3 gap-1.5 mb-2">
+                        {stagedImages.map((src, i) => (
+                          <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '1' }}>
+                            <img src={src} alt="" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setStagedImages(prev => prev.filter((_, idx) => idx !== i))}
+                              className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                              style={{ background: 'rgba(0,0,0,0.6)' }}
+                            >
+                              <X size={9} color="white" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-colors"
+                      style={{ background: 'var(--bg-muted)', color: 'var(--text-subtle)', border: '1.5px dashed var(--border-strong)' }}
+                    >
+                      <ImagePlus size={11} />
+                      {stagedImages.length > 0 ? 'Add more images' : 'Add images'}
+                    </button>
                   </div>
                 </motion.div>
               )}
