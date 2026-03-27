@@ -116,26 +116,25 @@ const DashboardPage: React.FC = () => {
 
   return (
   <motion.div
-    className="flex-1 flex flex-col overflow-hidden bg-[#F8F9FB]"
+    className="flex-1 flex flex-col overflow-hidden bg-surface-50"
     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
   >
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Header ── */}
-      <div className="px-8 pt-7 pb-4 shrink-0 bg-[#F8F9FB]">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-medium text-gray-400 mb-0.5">Home / Dashboard</p>
-            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Dashboard</h1>
-          </div>
-          <motion.button
-            onClick={() => navigate('/reports')}
-            className="flex items-center gap-2 bg-primary-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-primary-600 transition-colors shadow-sm"
-            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-          >
-            <Plus size={14} /> New Report
-          </motion.button>
-        </div>
+      <div className="px-8 pt-7 pb-4 shrink-0 bg-surface-50">
+        <PageHeader
+          title="Dashboard"
+          actions={
+            <motion.button
+              onClick={() => navigate('/reports')}
+              className="flex items-center gap-2 bg-primary-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-primary-600 transition-colors shadow-sm"
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            >
+              <Plus size={14} /> New Report
+            </motion.button>
+          }
+        />
       </div>
 
       {/* ── Scrollable body ── */}
@@ -180,13 +179,13 @@ const DashboardPage: React.FC = () => {
           {/* Today's Digest */}
           <motion.div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-100">
               <div>
                 <h2 className="text-sm font-bold text-gray-900">Today's Digest</h2>
                 <p className="text-[10px] text-gray-400">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
               </div>
             </div>
-            <div className="grid grid-cols-4 divide-x divide-gray-50 px-0">
+            <div className="grid grid-cols-4 divide-x divide-surface-100 px-0">
               {[
                 { label: 'Completed', value: todayDigest.completedToday, icon: CheckSquare, color: '#10B981', bg: '#10B98110' },
                 { label: 'Moved',     value: todayDigest.movedToday,     icon: Clock,        color: '#0EA5E9', bg: '#0EA5E910' },
@@ -241,7 +240,7 @@ const DashboardPage: React.FC = () => {
                 const ps = getStatus(member.id);
                 const ls = formatLastSeen(member.id);
                 return (
-                  <div key={member.id} className="flex items-center gap-2.5 py-2 border-b border-gray-50 last:border-0">
+                  <div key={member.id} className="flex items-center gap-2.5 py-2 border-b border-surface-100 last:border-0">
                     <div className="relative shrink-0">
                       <Avatar name={member.name} color={color} size="sm" />
                       <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white" style={{ background: statusColor[ps] }} />
@@ -265,7 +264,7 @@ const DashboardPage: React.FC = () => {
           {/* Needs Attention */}
           <motion.div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.25 }}>
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-100">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-gray-900">Needs Attention</h2>
                 {needsAttention.length > 0 && (
@@ -290,7 +289,7 @@ const DashboardPage: React.FC = () => {
                 }[item.reason];
                 const Icon = meta.icon;
                 return (
-                  <div key={item.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
+                  <div key={item.id} className="flex items-center gap-3 py-3 border-b border-surface-100 last:border-0">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
                       <Icon size={12} style={{ color: meta.color }} />
                     </div>
@@ -319,14 +318,14 @@ const DashboardPage: React.FC = () => {
           {/* Upcoming Tasks */}
           <motion.div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.3 }}>
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-100">
               <h2 className="text-sm font-bold text-gray-900">Upcoming Tasks</h2>
               <button onClick={() => navigate('/tasks')} className="text-[11px] text-primary-500 font-semibold hover:text-primary-700">View all →</button>
             </div>
             <div className="px-5 py-1">
               {todoTasks.slice(0, 8).map((task, i) => (
                 <motion.div key={task.id}
-                  className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0"
+                  className="flex items-center gap-3 py-3 border-b border-surface-100 last:border-0"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                   transition={{ duration: 0.2, delay: 0.3 + i * 0.04 }}>
                   <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-primary-400" />

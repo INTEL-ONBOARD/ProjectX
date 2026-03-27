@@ -63,13 +63,20 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     useEffect(() => {
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI?.onMemberChanged) return;
-        const unsub = electronAPI.onMemberChanged((_: unknown, payload: { op: string; doc?: any }) => {
-            const { op, doc } = payload;
+        const unsub = electronAPI.onMemberChanged((_: unknown, payload: { op: string; doc?: any; id?: string }) => {
+            const { op, doc, id } = payload;
             if ((op === 'update' || op === 'replace' || op === 'insert') && doc?.id) {
                 const ls = doc.lastSeen ?? null;
                 setLastSeenMap(prev => {
                     if (prev[doc.id] === ls) return prev;
                     return { ...prev, [doc.id]: ls };
+                });
+            } else if (op === 'delete' && id) {
+                setLastSeenMap(prev => {
+                    if (!(id in prev)) return prev;
+                    const next = { ...prev };
+                    delete next[id];
+                    return next;
                 });
             }
         });

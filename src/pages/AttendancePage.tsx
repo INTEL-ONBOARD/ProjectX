@@ -22,7 +22,10 @@ function addDays(dateStr: string, n: number): string {
     return `${yr}-${mo}-${dy}`;
 }
 
-const TODAY_DATE = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(); // local "YYYY-MM-DD"
+function getTodayDate(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const StuckSessionBanner: React.FC = () => {
   const { currentUser, attendanceRecords, setAttendanceRecord } = useContext(AppContext);
@@ -34,7 +37,7 @@ const StuckSessionBanner: React.FC = () => {
   const stuck = attendanceRecords
     .filter(r =>
       r.userId === currentUser.id &&
-      r.date < TODAY_DATE &&
+      r.date < getTodayDate() &&
       r.checkIn &&
       !r.checkOut
     )
@@ -90,12 +93,20 @@ const TodaySessionCard: React.FC = () => {
   const { currentUser, attendanceRecords, setAttendanceRecord } = useContext(AppContext);
   const [now, setNow] = React.useState(Date.now());
   const [saving, setSaving] = React.useState(false);
+  // Re-derive todayDate from `now` so it updates at midnight without a full remount
+  const todayDate = React.useMemo(() => {
+    const d = new Date(now);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, [now]);
 
   if (!currentUser) return null;
 
   const todayRecord = attendanceRecords.find(
-    r => r.userId === currentUser.id && r.date === TODAY_DATE
+    r => r.userId === currentUser.id && r.date === todayDate
   ) ?? null;
+
+  // ── Weekend guard — no punch-in on Sat/Sun ──────────────────────────────────
+  const isWeekend = (() => { const d = new Date(todayDate + 'T00:00:00'); return d.getDay() === 0 || d.getDay() === 6; })();
 
   // ── Derive state ────────────────────────────────────────────────────────────
   type SessionState = 'NOT_STARTED' | 'WORKING' | 'ON_BREAK' | 'DONE';
@@ -114,8 +125,10 @@ const TodaySessionCard: React.FC = () => {
 
   // ── Timer ───────────────────────────────────────────────────────────────────
   React.useEffect(() => {
-    if (state !== 'WORKING' && state !== 'ON_BREAK') return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    // Always tick at 1s when working/on-break (for the live timer)
+    // When done/not-started, tick once per minute just to catch the midnight date rollover
+    const interval = (state === 'WORKING' || state === 'ON_BREAK') ? 1000 : 60_000;
+    const id = setInterval(() => setNow(Date.now()), interval);
     return () => clearInterval(id);
   }, [state, todayRecord]);
 
@@ -167,12 +180,12 @@ const TodaySessionCard: React.FC = () => {
   const handlePunchIn = () => act(async () => {
     // Guard: if already clocked in, do nothing (prevents double-click from overwriting punch-in time and wiping breaks)
     if (state !== 'NOT_STARTED') return;
-    const existing = attendanceRecords.find(r => r.userId === currentUser.id && r.date === TODAY_DATE);
+    const existing = attendanceRecords.find(r => r.userId === currentUser.id && r.date === todayDate);
     const { id: _id, ...existingRest } = existing ?? { id: '' };
     await setAttendanceRecord({
       ...existingRest,
       userId: currentUser.id,
-      date: TODAY_DATE,
+      date: todayDate,
       status: 'present',
       checkIn: new Date().toISOString(),
       breakSessions: [],
@@ -244,7 +257,7 @@ const TodaySessionCard: React.FC = () => {
       </div>
 
       {/* Action buttons */}
-      {state === 'NOT_STARTED' && (
+      {state === 'NOT_STARTED' && !isWeekend && (
         <button
           onClick={handlePunchIn}
           disabled={saving}
@@ -253,6 +266,11 @@ const TodaySessionCard: React.FC = () => {
         >
           <LogIn size={15} /> Punch In
         </button>
+      )}
+      {state === 'NOT_STARTED' && isWeekend && (
+        <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center text-gray-400">
+          Weekend — no attendance
+        </div>
       )}
 
       {state === 'WORKING' && (
@@ -301,6 +319,15 @@ const AttendancePage: React.FC = () => {
     const { allTasks } = useProjects();
     const [selectedMember, setSelectedMember] = useState<User | null>(null);
 
+    // Auto-correct stale week: if selectedWeekStart is not the current week's Monday, reset it live
+    React.useEffect(() => {
+        const correctMonday = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+        if (selectedWeekStart !== correctMonday) {
+            setSelectedWeekStart(correctMonday);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const isAdmin = currentUser?.role === 'admin';
     const members = isAdmin
         ? allMembers
@@ -311,8 +338,8 @@ const AttendancePage: React.FC = () => {
     const handleNextWeek = () => setSelectedWeekStart(addDays(selectedWeekStart, 7));
     const isCurrentWeek = format(weekStart, 'yyyy-MM-dd') === format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-    const WEEK_DATES = [0, 1, 2, 3, 4].map(i => addDays(selectedWeekStart, i));
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const WEEK_DATES = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(selectedWeekStart, i));
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     const rateStyles: Record<string, { bg: string; text: string }> = {
         '100%': { bg: 'bg-[#83C29D33]', text: 'text-[#68B266]' },

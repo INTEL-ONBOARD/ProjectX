@@ -43,13 +43,20 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     useEffect(() => {
         let cancelled = false;
+        let focusTimer: ReturnType<typeof setTimeout> | null = null;
         loadRoles();
 
-        const onFocus = () => { dbApi().getRoles().then((docs: RoleDoc[]) => { if (!cancelled) setRoles(docs); }).catch(() => {}); };
+        const onFocus = () => {
+            if (focusTimer) clearTimeout(focusTimer);
+            focusTimer = setTimeout(() => {
+                dbApi().getRoles().then((docs: RoleDoc[]) => { if (!cancelled) setRoles(docs); }).catch(() => {});
+            }, 300);
+        };
         window.addEventListener('focus', onFocus);
 
         return () => {
             cancelled = true;
+            if (focusTimer) clearTimeout(focusTimer);
             window.removeEventListener('focus', onFocus);
         };
     }, [loadRoles]);
@@ -59,8 +66,10 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
+        let cancelled = false;
         const unsub = electronAPI.onRoleChanged?.((_: unknown, payload: { op: string; doc?: RoleDoc; id?: string }) => {
-            const { op, doc } = payload;
+            if (cancelled) return;
+            const { op, doc, id } = payload;
             if (op === 'insert') {
                 setRoles(prev => prev.some(r => r.appId === doc!.appId) ? prev : [...prev, doc!]);
             } else if (op === 'update' || op === 'replace') {
@@ -69,14 +78,18 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     return exists ? prev.map(r => r.appId === doc!.appId ? doc! : r) : [...prev, doc!];
                 });
             } else if (op === 'delete') {
-                dbApi().getRoles().then((docs: RoleDoc[]) => setRoles(docs)).catch(() => {});
+                if (id) {
+                    setRoles(prev => prev.filter(r => r.appId !== id));
+                } else {
+                    dbApi().getRoles().then((docs: RoleDoc[]) => { if (!cancelled) setRoles(docs); }).catch(() => {});
+                }
             }
         });
         // Fix 7: refetch after DB reconnect
         const unsubReconnect = electronAPI.onDbReconnected?.(() => {
-            dbApi().getRoles().then((docs: RoleDoc[]) => setRoles(docs)).catch(() => {});
+            dbApi().getRoles().then((docs: RoleDoc[]) => { if (!cancelled) setRoles(docs); }).catch(() => {});
         });
-        return () => { unsub?.(); unsubReconnect?.(); };
+        return () => { cancelled = true; unsub?.(); unsubReconnect?.(); };
     }, []);
 
     const addRole = useCallback((role: RoleDoc) => {

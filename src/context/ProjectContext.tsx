@@ -115,10 +115,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI) return;
+    let cancelled = false;
 
     const unsubProject = electronAPI.onProjectChanged?.((_: unknown, payload: { op: string; doc?: Project; id?: string }) => {
+      if (cancelled) return;
       console.log('[ProjectContext] onProjectChanged received:', payload.op, payload.doc?.id ?? payload.id);
-      const { op, doc } = payload;
+      const { op, doc, id } = payload;
       if (op === 'insert') {
         setProjects(prev => prev.some(p => p.id === doc!.id) ? prev : [...prev, doc!]);
       } else if (op === 'update' || op === 'replace') {
@@ -127,17 +129,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           return exists ? prev.map(p => p.id === doc!.id ? doc! : p) : [...prev, doc!];
         });
       } else if (op === 'delete') {
-        // For deletes the stream gives _id not appId — refetch to stay in sync
-        api().getProjects().then((prjs: Project[]) => {
-          setProjects(prjs);
-          setActiveProject(ap => prjs.some(p => p.id === ap) ? ap : (prjs[0]?.id ?? ''));
-        }).catch(() => {});
+        if (id) {
+          setProjects(prev => {
+            const remaining = prev.filter(p => p.id !== id);
+            setActiveProject(ap => ap === id ? (remaining[0]?.id ?? '') : ap);
+            return remaining;
+          });
+        } else {
+          // Fallback: id missing, refetch
+          api().getProjects().then((prjs: Project[]) => {
+            if (cancelled) return;
+            setProjects(prjs);
+            setActiveProject(ap => prjs.some(p => p.id === ap) ? ap : (prjs[0]?.id ?? ''));
+          }).catch(() => {});
+        }
       }
     });
 
     const unsubTask = electronAPI.onTaskChanged?.((_: unknown, payload: { op: string; doc?: Task; id?: string }) => {
+      if (cancelled) return;
       console.log('[ProjectContext] onTaskChanged received:', payload.op, payload.doc?.id ?? payload.id);
-      const { op, doc } = payload;
+      const { op, doc, id } = payload;
       if (op === 'insert') {
         setAllTasks(prev => prev.some(t => t.id === doc!.id) ? prev : [...prev, doc!]);
       } else if (op === 'update' || op === 'replace') {
@@ -146,7 +158,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           return exists ? prev.map(t => t.id === doc!.id ? doc! : t) : [...prev, doc!];
         });
       } else if (op === 'delete') {
-        api().getTasks().then((tasks: Task[]) => setAllTasks(tasks)).catch(() => {});
+        if (id) {
+          setAllTasks(prev => prev.filter(t => t.id !== id));
+        } else {
+          api().getTasks().then((tasks: Task[]) => { if (!cancelled) setAllTasks(tasks); }).catch(() => {});
+        }
       }
     });
 
@@ -154,6 +170,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const unsubReconnect = electronAPI.onDbReconnected?.(() => {
       Promise.all([api().getProjects(), api().getTasks()])
         .then(([prjs, tasks]) => {
+          if (cancelled) return;
           setProjects(prjs as Project[]);
           setAllTasks(tasks as Task[]);
           setLoading(false);
@@ -162,7 +179,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .catch(() => {});
     });
 
-    return () => { unsubProject?.(); unsubTask?.(); unsubReconnect?.(); };
+    return () => { cancelled = true; unsubProject?.(); unsubTask?.(); unsubReconnect?.(); };
   }, []);
 
   // Load project rich data and keep it live via change stream

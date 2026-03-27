@@ -208,8 +208,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const api = (window as any).electronAPI;
         if (!api?.onNotificationChanged) return;
+        let cancelled = false;
 
         const unsub = api.onNotificationChanged((_: unknown, payload: { op: string; doc?: AppNotification; id?: string }) => {
+            if (cancelled) return;
             const { op, doc, id } = payload;
             if (op === 'delete') {
                 setNotifications(prev => prev.filter(n => n.id !== id));
@@ -220,12 +222,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 // Another device created a notification — add if not already present
                 setNotifications(prev => prev.some(n => n.id === doc.id) ? prev : [doc, ...prev]);
             } else if (op === 'update' || op === 'replace') {
-                // e.g. read-state changed on another device
-                setNotifications(prev => prev.map(n => n.id === doc.id ? doc : n));
+                // e.g. read-state changed on another device — only update if something changed
+                setNotifications(prev => {
+                    const existing = prev.find(n => n.id === doc.id);
+                    if (!existing) return [doc, ...prev];
+                    if (existing.read === doc.read && existing.seenAt === doc.seenAt) return prev;
+                    return prev.map(n => n.id === doc.id ? doc : n);
+                });
             }
         });
 
-        return () => unsub?.();
+        return () => { cancelled = true; unsub?.(); };
     }, [user?.id]);
 
     const unreadCount = notifications.filter(n => !n.read).length;

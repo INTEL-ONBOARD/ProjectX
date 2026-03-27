@@ -314,18 +314,21 @@ const SettingsPage: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI) return;
+    let cancelled = false;
     const unsubNotif = electronAPI.onNotifPrefChanged?.((_: unknown, payload: { doc?: NotifPrefs & { userId: string } }) => {
+      if (cancelled) return;
       if (payload.doc?.userId === currentUser.id) {
         setNotifications(prev => ({ ...prev, ...payload.doc }));
       }
     });
     const unsubAppear = electronAPI.onAppearancePrefChanged?.((_: unknown, payload: { doc?: AppearPrefs & { userId: string } }) => {
+      if (cancelled) return;
       if (payload.doc?.userId === currentUser.id) {
         if (payload.doc.themeMode) setThemeMode(payload.doc.themeMode);
         if (payload.doc.accentColor) { setAccentColor(payload.doc.accentColor); applyAccentColor(payload.doc.accentColor); }
       }
     });
-    return () => { unsubNotif?.(); unsubAppear?.(); };
+    return () => { cancelled = true; unsubNotif?.(); unsubAppear?.(); };
   }, [currentUser?.id]);
 
   // Security

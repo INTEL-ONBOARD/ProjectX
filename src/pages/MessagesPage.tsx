@@ -292,7 +292,9 @@ const MessagesPage: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const electronAPI = (window as any).electronAPI;
     if (!electronAPI) return;
+    let cancelled = false;
     const unsub = electronAPI.onConvMetaChanged?.((_: unknown, payload: { op: string; doc?: { userId: string; peerId: string; pinned: boolean; starred: boolean; archived: boolean } }) => {
+      if (cancelled) return;
       const { op, doc } = payload;
       if (op === 'delete' || !doc || doc.userId !== currentUserId) return;
       const { peerId, pinned, starred, archived } = doc;
@@ -300,7 +302,7 @@ const MessagesPage: React.FC = () => {
       setStarredIds(prev => starred ? (prev.includes(peerId) ? prev : [...prev, peerId]) : prev.filter(x => x !== peerId));
       setArchivedIds(prev => { const next = new Set(prev); archived ? next.add(peerId) : next.delete(peerId); return next; });
     });
-    return () => { unsub?.(); };
+    return () => { cancelled = true; unsub?.(); };
   }, [currentUserId]);
 
   const totalUnread = conversations.reduce((sum, m) => {

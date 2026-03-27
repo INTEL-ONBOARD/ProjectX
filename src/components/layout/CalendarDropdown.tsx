@@ -100,6 +100,9 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
     const nowISO = () => new Date().toISOString();
 
     function clockIn() {
+        // Guard: don't allow future dates or weekends
+        const selDay = new Date(selectedDate + 'T00:00:00').getDay();
+        if (selectedDate > todayStr || selDay === 0 || selDay === 6) return;
         // Guard: don't overwrite an existing active session (handles stale-closure race)
         if (isClockedIn && !isClockedOut) return;
         const base = currentRecord ?? { userId: currentUser!.id, date: selectedDate, status: 'present' as const };
@@ -179,19 +182,24 @@ const CalendarDropdown: React.FC<CalendarDropdownProps> = ({ onClose }) => {
                     const dateStr = toISODate(date);
                     const isToday = dateStr === todayStr;
                     const isSelected = dateStr === selectedDate;
+                    const isFuture = dateStr > todayStr;
+                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                    const isDisabled = isFuture || isWeekend;
                     const hasAttendance = attendanceRecords.some(
                         r => r.userId === currentUser.id && r.date === dateStr && !!r.checkIn
                     );
                     return (
                         <button
                             key={dateStr}
-                            onClick={() => { setSelectedDate(dateStr); setSelectedWeekStart(getMonday(dateStr)); }}
+                            disabled={isDisabled}
+                            onClick={() => { if (!isDisabled) { setSelectedDate(dateStr); setSelectedWeekStart(getMonday(dateStr)); } }}
                             className={`
                                 relative w-7 h-7 mx-auto rounded-md text-[11px] font-medium transition-colors
-                                ${isSelected ? 'bg-primary-500 text-white' : ''}
-                                ${!isSelected && isToday ? 'ring-2 ring-primary-300 text-primary-600' : ''}
-                                ${!isSelected && !isToday && isCurrentMonth ? 'text-gray-700 hover:bg-surface-100' : ''}
-                                ${!isSelected && !isCurrentMonth ? 'text-gray-300 hover:bg-surface-50' : ''}
+                                ${isDisabled ? 'text-gray-300 cursor-not-allowed opacity-40' : ''}
+                                ${!isDisabled && isSelected ? 'bg-primary-500 text-white' : ''}
+                                ${!isDisabled && !isSelected && isToday ? 'ring-2 ring-primary-300 text-primary-600' : ''}
+                                ${!isDisabled && !isSelected && !isToday && isCurrentMonth ? 'text-gray-700 hover:bg-surface-100' : ''}
+                                ${!isDisabled && !isSelected && !isCurrentMonth ? 'text-gray-300 hover:bg-surface-50' : ''}
                             `}
                         >
                             {date.getDate()}

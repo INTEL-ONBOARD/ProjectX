@@ -37,7 +37,7 @@ function formatTime(iso: string | undefined): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const PRIORITY_COLORS: Record<string, string> = {
   high: 'bg-red-100 text-red-600',
@@ -65,9 +65,10 @@ const AttendanceMemberModal: React.FC<Props> = ({
     return { date, label: DAY_LABELS[i], record, hours, doneTasks };
   });
 
-  // Stats
-  const workingDays = weekDates.length; // 5
-  const presentDays = dayData.filter(d =>
+  // Stats — only count Mon–Fri (first 5 days) as working days
+  const workingDayData = dayData.slice(0, 5);
+  const workingDays = 5;
+  const presentDays = workingDayData.filter(d =>
     d.record && ['present', 'wfh', 'half-day'].includes(d.record.status)
   ).length;
   const attendanceRate = Math.round((presentDays / workingDays) * 100);

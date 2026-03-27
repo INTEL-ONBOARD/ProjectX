@@ -132,6 +132,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Reset to defaults before loading the new user's prefs to avoid showing previous user's theme
         setThemeState('dark');
         setSidebarCollapsedState(false);
+        // Always reset week to current week on login — never restore a stale saved week
+        setSelectedWeekStartState(currentWeekMonday());
         prefsApi().get(currentUser.id)
             .then((prefs: { theme?: 'light' | 'dark' | 'coffee'; sidebarCollapsed?: boolean; selectedWeekStart?: string | null } | null) => {
                 if (!prefs) return;
@@ -145,17 +147,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Load org from MongoDB on mount
     useEffect(() => {
         let cancelled = false;
+        let focusTimer: ReturnType<typeof setTimeout> | null = null;
         dbApi().getOrg()
             .then((o: Organization | null) => { if (o) setOrg(o); })
             .catch((err: unknown) => console.error('[AppContext] Failed to load org:', err));
 
         const onFocus = () => {
-            dbApi().getOrg().then((o: Organization | null) => { if (!cancelled && o) setOrg(o); }).catch(() => {});
+            if (focusTimer) clearTimeout(focusTimer);
+            focusTimer = setTimeout(() => {
+                dbApi().getOrg().then((o: Organization | null) => { if (!cancelled && o) setOrg(o); }).catch(() => {});
+            }, 300);
         };
         window.addEventListener('focus', onFocus);
 
         return () => {
             cancelled = true;
+            if (focusTimer) clearTimeout(focusTimer);
             window.removeEventListener('focus', onFocus);
         };
     }, []);
@@ -163,46 +170,74 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Load attendance from MongoDB on mount
     useEffect(() => {
         let cancelled = false;
+        let focusTimer: ReturnType<typeof setTimeout> | null = null;
+
         dbApi().getAttendance()
             .then((docs: AttendanceRecord[]) => {
-                if (docs && docs.length > 0) setAttendanceRecords(docs);
+                if (!cancelled) setAttendanceRecords(docs ?? []);
             })
             .catch((err: unknown) => console.error('[AppContext] Failed to load attendance records:', err));
 
+        // Debounced focus refetch — waits 300ms after focus to avoid overlapping requests
         const onFocus = () => {
-            dbApi().getAttendance().then((docs: AttendanceRecord[]) => { if (!cancelled && docs) setAttendanceRecords(docs); }).catch(() => {});
+            if (focusTimer) clearTimeout(focusTimer);
+            focusTimer = setTimeout(() => {
+                if (cancelled) return;
+                dbApi().getAttendance()
+                    .then((docs: AttendanceRecord[]) => { if (!cancelled) setAttendanceRecords(docs ?? []); })
+                    .catch((err: unknown) => console.error('[AppContext] Focus refetch failed:', err));
+            }, 300);
         };
         window.addEventListener('focus', onFocus);
 
         return () => {
             cancelled = true;
+            if (focusTimer) clearTimeout(focusTimer);
             window.removeEventListener('focus', onFocus);
         };
     }, []);
 
     // Real-time sync for attendance
     useEffect(() => {
+        let cancelled = false;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
         const unsub = electronAPI.onAttendanceChanged?.((_: unknown, payload: { op: string; doc?: AttendanceRecord; id?: string }) => {
-            const { op, doc } = payload;
+            if (cancelled) return;
+            const { op, doc, id } = payload;
             if (op === 'insert') {
-                setAttendanceRecords(prev => prev.some(r => r.id === doc!.id) ? prev : [...prev, doc!]);
+                if (!doc) return;
+                setAttendanceRecords(prev => prev.some(r => r.id === doc.id) ? prev : [...prev, doc]);
             } else if (op === 'update' || op === 'replace') {
+                if (!doc) return;
                 setAttendanceRecords(prev => {
-                    const exists = prev.some(r => r.id === doc!.id);
-                    if (!exists) return [...prev, doc!];
-                    // Skip no-op update caused by our own optimistic write reflecting back from the change stream
-                    const current = prev.find(r => r.id === doc!.id)!;
-                    if (JSON.stringify(current) === JSON.stringify(doc!)) return prev;
-                    return prev.map(r => r.id === doc!.id ? doc! : r);
+                    const exists = prev.some(r => r.id === doc.id);
+                    if (!exists) return [...prev, doc];
+                    // Echo suppression: compare only the fields we care about, not full object
+                    // (JSON.stringify is unreliable due to field ordering and timestamp precision)
+                    const current = prev.find(r => r.id === doc.id)!;
+                    const sameCheckIn  = current.checkIn  === doc.checkIn;
+                    const sameCheckOut = current.checkOut === doc.checkOut;
+                    const sameStatus   = current.status   === doc.status;
+                    const sameBreaks   = JSON.stringify(current.breakSessions ?? []) === JSON.stringify(doc.breakSessions ?? []);
+                    if (sameCheckIn && sameCheckOut && sameStatus && sameBreaks) return prev;
+                    return prev.map(r => r.id === doc.id ? doc : r);
                 });
             } else if (op === 'delete') {
-                dbApi().getAttendance().then((docs: AttendanceRecord[]) => setAttendanceRecords(docs)).catch(() => {});
+                if (id) {
+                    // Use the recordId sent from main process to remove directly — no refetch needed
+                    setAttendanceRecords(prev => prev.filter(r => r.id !== id));
+                } else {
+                    // Fallback: id missing, refetch to stay consistent
+                    console.warn('[AppContext] delete op missing id, refetching');
+                    dbApi().getAttendance()
+                        .then((docs: AttendanceRecord[]) => { if (!cancelled) setAttendanceRecords(docs ?? []); })
+                        .catch((err: unknown) => console.error('[AppContext] Delete refetch failed:', err));
+                }
             }
         });
-        return () => { unsub?.(); };
+        return () => { cancelled = true; unsub?.(); };
     }, []);
 
     // Real-time sync for org
@@ -210,7 +245,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
+        let cancelled = false;
         const unsub = electronAPI.onOrgChanged?.((_: unknown, payload: { op: string; doc?: Organization }) => {
+            if (cancelled) return;
             if (payload.doc) setOrg(payload.doc);
         });
         // Fix 7: refetch after DB reconnect
@@ -219,10 +256,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 .then((o: Organization | null) => { if (o) setOrg(o); })
                 .catch(() => {});
             dbApi().getAttendance()
-                .then((docs: AttendanceRecord[]) => { if (docs?.length) setAttendanceRecords(docs); })
-                .catch(() => {});
+                .then((docs: AttendanceRecord[]) => { if (docs) setAttendanceRecords(docs); })
+                .catch((err: unknown) => console.error('[AppContext] Reconnect attendance refetch failed:', err));
         });
-        return () => { unsub?.(); unsubReconnect?.(); };
+        return () => { cancelled = true; unsub?.(); unsubReconnect?.(); };
     }, []);
 
     // Apply theme to DOM and sync Windows title bar color
@@ -257,11 +294,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const setSelectedWeekStart = useCallback((date: string) => {
         setSelectedWeekStartState(date);
-        if (currentUser) {
-            prefsApi().set({ userId: currentUser.id, selectedWeekStart: date })
-                .catch((err: unknown) => console.error('[AppContext] Failed to save week start:', err));
-        }
-    }, [currentUser]);
+    }, []);
 
     const setAttendanceRecord = useCallback((record: Omit<AttendanceRecord, 'id'>): Promise<void> => {
         const id = `${record.userId}-${record.date}`;

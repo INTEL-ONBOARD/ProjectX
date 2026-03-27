@@ -163,19 +163,25 @@ const OrganizationPage: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
-        const unsub = electronAPI.onDeptChanged?.((_: unknown, payload: { op: string; doc?: { id: string; name: string; color: string; memberIds: string[] } }) => {
-            const { op, doc } = payload;
+        let cancelled = false;
+        const unsub = electronAPI.onDeptChanged?.((_: unknown, payload: { op: string; doc?: { id: string; name: string; color: string; memberIds: string[] }; id?: string }) => {
+            if (cancelled) return;
+            const { op, doc, id } = payload;
             if (op === 'insert') {
                 if (doc) setDeptRoster(prev => prev.some(d => d.id === doc.id) ? prev : [...prev, { ...doc, icon: FolderKanban }]);
             } else if (op === 'update' || op === 'replace') {
                 if (doc) setDeptRoster(prev => prev.map(d => d.id === doc.id ? { ...doc, icon: FolderKanban } : d));
             } else if (op === 'delete') {
-                dbApi().getDepts().then((docs: Array<{ id: string; name: string; color: string; memberIds: string[] }>) => {
-                    setDeptRoster(docs.map(d => ({ id: d.id, name: d.name, color: d.color, memberIds: d.memberIds, icon: FolderKanban })));
-                }).catch(() => {});
+                if (id) {
+                    setDeptRoster(prev => prev.filter(d => d.id !== id));
+                } else {
+                    dbApi().getDepts().then((docs: Array<{ id: string; name: string; color: string; memberIds: string[] }>) => {
+                        if (!cancelled) setDeptRoster(docs.map(d => ({ id: d.id, name: d.name, color: d.color, memberIds: d.memberIds, icon: FolderKanban })));
+                    }).catch(() => {});
+                }
             }
         });
-        return () => { unsub?.(); };
+        return () => { cancelled = true; unsub?.(); };
     }, []);
 
     // Real-time sync for auth users list (OrganizationPage users tab)
@@ -184,17 +190,23 @@ const OrganizationPage: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
+        let cancelled = false;
         const unsub = electronAPI.onAuthUserChanged?.((_: unknown, payload: { op: string; doc?: AuthUserRow; id?: string }) => {
-            const { op, doc } = payload;
+            if (cancelled) return;
+            const { op, doc, id } = payload;
             if (op === 'insert') {
                 if (doc) setAuthUsers(prev => prev.some(u => u.id === doc.id) ? prev : [...prev, doc]);
             } else if (op === 'update' || op === 'replace') {
                 if (doc) setAuthUsers(prev => prev.map(u => u.id === doc.id ? doc : u));
             } else if (op === 'delete') {
-                authApi().getAll().then((users: AuthUserRow[]) => setAuthUsers(users)).catch(() => {});
+                if (id) {
+                    setAuthUsers(prev => prev.filter(u => u.id !== id));
+                } else {
+                    authApi().getAll().then((users: AuthUserRow[]) => { if (!cancelled) setAuthUsers(users); }).catch(() => {});
+                }
             }
         });
-        return () => { unsub?.(); };
+        return () => { cancelled = true; unsub?.(); };
     }, [isAdmin]);
 
     const metrics = [

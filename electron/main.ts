@@ -375,15 +375,16 @@ function startMessageStream(): void {
     if (messageStream) { try { messageStream.close(); } catch (_) {} messageStream = null; }
     try {
         // Fix 3: watch all operations so reactions and soft-deletes propagate to other clients
-        messageStream = (MessageModel as any).watch([], { fullDocument: 'updateLookup' });
+        messageStream = (MessageModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('message', messageStream);
         messageStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             const d = change.fullDocument;
-            if (!d) return;
             if (op === 'insert') {
-                mainWindow.webContents.send('msg:new', toMsgFrontend(d));
+                if (!d) return;
+                try { win.webContents.send('msg:new', toMsgFrontend(d)); } catch (sendErr: any) { console.error('[changeStream:message] send error:', sendErr.message); }
                 // System notification — only fire on the machine where the recipient is logged in
                 const recipientId: string = d.toId;
                 if (activeUserId && recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
@@ -395,7 +396,11 @@ function startMessageStream(): void {
                     }).catch(() => {});
                 }
             } else if (op === 'update' || op === 'replace') {
-                mainWindow.webContents.send('msg:updated', toMsgFrontend(d));
+                if (!d) return;
+                try { win.webContents.send('msg:updated', toMsgFrontend(d)); } catch (sendErr: any) { console.error('[changeStream:message] send error:', sendErr.message); }
+            } else if (op === 'delete') {
+                const recordId = change.fullDocumentBeforeChange?.msgId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:message:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:message] send error:', sendErr.message); }
             }
         });
         messageStream.on('error', (err: any) => {
@@ -403,9 +408,10 @@ function startMessageStream(): void {
             try { messageStream.close(); } catch (_) {}
             messageStream = null;
             // Fix 2: restart only this stream, not all streams
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
             setTimeout(() => {
                 if (mongoose.connection.readyState === 1) startMessageStream();
-            }, 5000);
+            }, jitter);
         });
         console.log('[changeStream] message stream started');
     } catch (err: any) {
@@ -418,25 +424,27 @@ function startProjectStream(): void {
     if (!windowReady) return; // Fix 1
     if (projectStream) { try { projectStream.close(); } catch (_) {} projectStream = null; }
     try {
-        projectStream = (ProjectModel as any).watch([], { fullDocument: 'updateLookup' });
+        projectStream = (ProjectModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('project', projectStream);
         projectStream.on('change', (change: any) => {
             console.log('[changeStream:project] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:project:changed', { op, doc: safe(toProject(d)) });
+                if (d) try { win.webContents.send('data:project:changed', { op, doc: safe(toProject(d)) }); } catch (sendErr: any) { console.error('[changeStream:project] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                const id = change.documentKey?._id?.toString();
-                mainWindow.webContents.send('data:project:changed', { op, id });
+                const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:project:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:project] send error:', sendErr.message); }
             }
         });
         projectStream.on('error', (err: any) => {
             console.error('[changeStream:project] error:', err.message);
             try { projectStream.close(); } catch (_) {}
             projectStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startProjectStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startProjectStream(); }, jitter);
         });
         console.log('[changeStream] project stream started');
     } catch (err: any) {
@@ -448,25 +456,27 @@ function startTaskStream(): void {
     if (!windowReady) return;
     if (taskStream) { try { taskStream.close(); } catch (_) {} taskStream = null; }
     try {
-        taskStream = (TaskModel as any).watch([], { fullDocument: 'updateLookup' });
+        taskStream = (TaskModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('task', taskStream);
         taskStream.on('change', (change: any) => {
             console.log('[changeStream:task] RAW CHANGE:', change.operationType, JSON.stringify(change.documentKey));
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:task:changed', { op, doc: safe(toTask(d)) });
+                if (d) try { win.webContents.send('data:task:changed', { op, doc: safe(toTask(d)) }); } catch (sendErr: any) { console.error('[changeStream:task] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                const id = change.documentKey?._id?.toString();
-                mainWindow.webContents.send('data:task:changed', { op, id });
+                const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:task:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:task] send error:', sendErr.message); }
             }
         });
         taskStream.on('error', (err: any) => {
             console.error('[changeStream:task] error:', err.message);
             try { taskStream.close(); } catch (_) {}
             taskStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startTaskStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startTaskStream(); }, jitter);
         });
         console.log('[changeStream] task stream started');
     } catch (err: any) {
@@ -478,24 +488,26 @@ function startMemberStream(): void {
     if (!windowReady) return;
     if (memberStream) { try { memberStream.close(); } catch (_) {} memberStream = null; }
     try {
-        memberStream = (UserModel as any).watch([], { fullDocument: 'updateLookup' });
+        memberStream = (UserModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('member', memberStream);
         memberStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:member:changed', { op, doc: safe(toUser(d)) });
+                if (d) try { win.webContents.send('data:member:changed', { op, doc: safe(toUser(d)) }); } catch (sendErr: any) { console.error('[changeStream:member] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                const id = change.documentKey?._id?.toString();
-                mainWindow.webContents.send('data:member:changed', { op, id });
+                const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:member:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:member] send error:', sendErr.message); }
             }
         });
         memberStream.on('error', (err: any) => {
             console.error('[changeStream:member] error:', err.message);
             try { memberStream.close(); } catch (_) {}
             memberStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startMemberStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startMemberStream(); }, jitter);
         });
         console.log('[changeStream] member stream started');
     } catch (err: any) {
@@ -507,23 +519,40 @@ function startAttendanceStream(): void {
     if (!windowReady) return;
     if (attendanceStream) { try { attendanceStream.close(); } catch (_) {} attendanceStream = null; }
     try {
-        attendanceStream = (AttendanceModel as any).watch([], { fullDocument: 'updateLookup' });
+        attendanceStream = (AttendanceModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('attendance', attendanceStream);
         attendanceStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            // Capture reference once — prevents race where mainWindow is destroyed between check and send
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:attendance:changed', { op, doc: safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] }) });
+                if (d) {
+                    try {
+                        win.webContents.send('data:attendance:changed', { op, doc: safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] }) });
+                    } catch (sendErr: any) {
+                        console.error('[changeStream:attendance] send error:', sendErr.message);
+                    }
+                }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:attendance:changed', { op, id: change.documentKey?._id?.toString() });
+                // Send recordId (userId-date format) not MongoDB _id, so frontend can match by its own id scheme
+                const recordId = change.fullDocumentBeforeChange?.recordId ?? change.documentKey?._id?.toString();
+                console.log('[changeStream:attendance] delete op, recordId:', recordId);
+                try {
+                    win.webContents.send('data:attendance:changed', { op, id: recordId });
+                } catch (sendErr: any) {
+                    console.error('[changeStream:attendance] send error on delete:', sendErr.message);
+                }
             }
         });
         attendanceStream.on('error', (err: any) => {
             console.error('[changeStream:attendance] error:', err.message);
             try { attendanceStream.close(); } catch (_) {}
             attendanceStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startAttendanceStream(); }, 5000);
+            // Jitter between 4-7s to avoid thundering herd when multiple streams restart simultaneously
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAttendanceStream(); }, jitter);
         });
         console.log('[changeStream] attendance stream started');
     } catch (err: any) {
@@ -535,23 +564,26 @@ function startProjectRichStream(): void {
     if (!windowReady) return;
     if (projectRichStream) { try { projectRichStream.close(); } catch (_) {} projectRichStream = null; }
     try {
-        projectRichStream = (ProjectRichModel as any).watch([], { fullDocument: 'updateLookup' });
+        projectRichStream = (ProjectRichModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('projectRich', projectRichStream);
         projectRichStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:projectrich:changed', { op, doc: safe(toProjectRich(d)) });
+                if (d) try { win.webContents.send('data:projectrich:changed', { op, doc: safe(toProjectRich(d)) }); } catch (sendErr: any) { console.error('[changeStream:projectrich] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:projectrich:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.projectId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:projectrich:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:projectrich] send error:', sendErr.message); }
             }
         });
         projectRichStream.on('error', (err: any) => {
             console.error('[changeStream:projectrich] error:', err.message);
             try { projectRichStream.close(); } catch (_) {}
             projectRichStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startProjectRichStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startProjectRichStream(); }, jitter);
         });
         console.log('[changeStream] projectRich stream started');
     } catch (err: any) {
@@ -563,23 +595,26 @@ function startRolePermsStream(): void {
     if (!windowReady) return;
     if (rolePermsStream) { try { rolePermsStream.close(); } catch (_) {} rolePermsStream = null; }
     try {
-        rolePermsStream = (RolePermsModel as any).watch([], { fullDocument: 'updateLookup' });
+        rolePermsStream = (RolePermsModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('rolePerms', rolePermsStream);
         rolePermsStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:roleperms:changed', { op, doc: safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] }) });
+                if (d) try { win.webContents.send('data:roleperms:changed', { op, doc: safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] }) }); } catch (sendErr: any) { console.error('[changeStream:roleperms] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:roleperms:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.role ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:roleperms:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:roleperms] send error:', sendErr.message); }
             }
         });
         rolePermsStream.on('error', (err: any) => {
             console.error('[changeStream:roleperms] error:', err.message);
             try { rolePermsStream.close(); } catch (_) {}
             rolePermsStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startRolePermsStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startRolePermsStream(); }, jitter);
         });
         console.log('[changeStream] rolePerms stream started');
     } catch (err: any) {
@@ -591,23 +626,26 @@ function startRolesStream(): void {
     if (!windowReady) return;
     if (rolesStream) { try { rolesStream.close(); } catch (_) {} rolesStream = null; }
     try {
-        rolesStream = (RoleModel as any).watch([], { fullDocument: 'updateLookup' });
+        rolesStream = (RoleModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('roles', rolesStream);
         rolesStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:role:changed', { op, doc: safe(toRole(d)) });
+                if (d) try { win.webContents.send('data:role:changed', { op, doc: safe(toRole(d)) }); } catch (sendErr: any) { console.error('[changeStream:roles] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:role:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:role:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:roles] send error:', sendErr.message); }
             }
         });
         rolesStream.on('error', (err: any) => {
             console.error('[changeStream:roles] error:', err.message);
             try { rolesStream.close(); } catch (_) {}
             rolesStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startRolesStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startRolesStream(); }, jitter);
         });
         console.log('[changeStream] roles stream started');
     } catch (err: any) {
@@ -619,24 +657,26 @@ function startOrgStream(): void {
     if (!windowReady) return;
     if (orgStream) { try { orgStream.close(); } catch (_) {} orgStream = null; }
     try {
-        orgStream = (OrgModel as any).watch([], { fullDocument: 'updateLookup' });
+        orgStream = (OrgModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('org', orgStream);
         orgStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:org:changed', { op, doc: safe(toOrg(d)) });
+                if (d) try { win.webContents.send('data:org:changed', { op, doc: safe(toOrg(d)) }); } catch (sendErr: any) { console.error('[changeStream:org] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                const id = change.documentKey?._id?.toString();
-                mainWindow.webContents.send('data:org:changed', { op, id });
+                const recordId = change.fullDocumentBeforeChange?.orgId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:org:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:org] send error:', sendErr.message); }
             }
         });
         orgStream.on('error', (err: any) => {
             console.error('[changeStream:org] error:', err.message);
             try { orgStream.close(); } catch (_) {}
             orgStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startOrgStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startOrgStream(); }, jitter);
         });
         console.log('[changeStream] org stream started');
     } catch (err: any) {
@@ -651,18 +691,20 @@ function startNotifPrefStream(): void {
         notifPrefStream = (NotifPrefModel as any).watch([], { fullDocument: 'updateLookup' });
         registerStream('notifPref', notifPrefStream);
         notifPrefStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:notifpref:changed', { op, doc: safe(toNotifPref(d)) });
+                if (d) try { win.webContents.send('data:notifpref:changed', { op, doc: safe(toNotifPref(d)) }); } catch (sendErr: any) { console.error('[changeStream:notifpref] send error:', sendErr.message); }
             }
         });
         notifPrefStream.on('error', (err: any) => {
             console.error('[changeStream:notifpref] error:', err.message);
             try { notifPrefStream.close(); } catch (_) {}
             notifPrefStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startNotifPrefStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startNotifPrefStream(); }, jitter);
         });
         console.log('[changeStream] notifPref stream started');
     } catch (err: any) {
@@ -677,18 +719,20 @@ function startAppearancePrefStream(): void {
         appearancePrefStream = (AppearancePrefModel as any).watch([], { fullDocument: 'updateLookup' });
         registerStream('appearancePref', appearancePrefStream);
         appearancePrefStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:appearancepref:changed', { op, doc: safe(toAppearancePref(d)) });
+                if (d) try { win.webContents.send('data:appearancepref:changed', { op, doc: safe(toAppearancePref(d)) }); } catch (sendErr: any) { console.error('[changeStream:appearancepref] send error:', sendErr.message); }
             }
         });
         appearancePrefStream.on('error', (err: any) => {
             console.error('[changeStream:appearancepref] error:', err.message);
             try { appearancePrefStream.close(); } catch (_) {}
             appearancePrefStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startAppearancePrefStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAppearancePrefStream(); }, jitter);
         });
         console.log('[changeStream] appearancePref stream started');
     } catch (err: any) {
@@ -700,23 +744,26 @@ function startConvMetaStream(): void {
     if (!windowReady) return;
     if (convMetaStream) { try { convMetaStream.close(); } catch (_) {} convMetaStream = null; }
     try {
-        convMetaStream = (ConvMetaModel as any).watch([], { fullDocument: 'updateLookup' });
+        convMetaStream = (ConvMetaModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('convMeta', convMetaStream);
         convMetaStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:convmeta:changed', { op, doc: safe(toConvMeta(d)) });
+                if (d) try { win.webContents.send('data:convmeta:changed', { op, doc: safe(toConvMeta(d)) }); } catch (sendErr: any) { console.error('[changeStream:convmeta] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:convmeta:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.convId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:convmeta:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:convmeta] send error:', sendErr.message); }
             }
         });
         convMetaStream.on('error', (err: any) => {
             console.error('[changeStream:convmeta] error:', err.message);
             try { convMetaStream.close(); } catch (_) {}
             convMetaStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startConvMetaStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startConvMetaStream(); }, jitter);
         });
         console.log('[changeStream] convMeta stream started');
     } catch (err: any) {
@@ -728,23 +775,26 @@ function startDeptStream(): void {
     if (!windowReady) return;
     if (deptStream) { try { deptStream.close(); } catch (_) {} deptStream = null; }
     try {
-        deptStream = (DeptModel as any).watch([], { fullDocument: 'updateLookup' });
+        deptStream = (DeptModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('dept', deptStream);
         deptStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:dept:changed', { op, doc: safe(toDept(d)) });
+                if (d) try { win.webContents.send('data:dept:changed', { op, doc: safe(toDept(d)) }); } catch (sendErr: any) { console.error('[changeStream:dept] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:dept:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.deptId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:dept:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:dept] send error:', sendErr.message); }
             }
         });
         deptStream.on('error', (err: any) => {
             console.error('[changeStream:dept] error:', err.message);
             try { deptStream.close(); } catch (_) {}
             deptStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startDeptStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startDeptStream(); }, jitter);
         });
         console.log('[changeStream] dept stream started');
     } catch (err: any) {
@@ -756,23 +806,26 @@ function startAuthUserStream(): void {
     if (!windowReady) return;
     if (authUserStream) { try { authUserStream.close(); } catch (_) {} authUserStream = null; }
     try {
-        authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'off' });
+        authUserStream = (AuthUserModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('authUser', authUserStream);
         authUserStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:authuser:changed', { op, doc: safe(toAuthUser(d)) });
+                if (d) try { win.webContents.send('data:authuser:changed', { op, doc: safe(toAuthUser(d)) }); } catch (sendErr: any) { console.error('[changeStream:authuser] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:authuser:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:authuser:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:authuser] send error:', sendErr.message); }
             }
         });
         authUserStream.on('error', (err: any) => {
             console.error('[changeStream:authuser] error:', err.message);
             try { authUserStream.close(); } catch (_) {}
             authUserStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startAuthUserStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAuthUserStream(); }, jitter);
         });
         console.log('[changeStream] authUser stream started');
     } catch (err: any) {
@@ -785,23 +838,26 @@ function startNotificationStream(): void {
     if (!windowReady) return;
     if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
     try {
-        notificationStream = (NotificationModel as any).watch([], { fullDocument: 'updateLookup' });
+        notificationStream = (NotificationModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('notification', notificationStream);
         notificationStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:notification:changed', { op, doc: safe(toNotif(d)) });
+                if (d) try { win.webContents.send('data:notification:changed', { op, doc: safe(toNotif(d)) }); } catch (sendErr: any) { console.error('[changeStream:notification] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:notification:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.notifId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:notification:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:notification] send error:', sendErr.message); }
             }
         });
         notificationStream.on('error', (err: any) => {
             console.error('[changeStream:notification] error:', err.message);
             try { notificationStream.close(); } catch (_) {}
             notificationStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startNotificationStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startNotificationStream(); }, jitter);
         });
         console.log('[changeStream] notification stream started');
     } catch (err: any) {
@@ -813,23 +869,26 @@ function startCommentStream(): void {
     if (!windowReady) return;
     if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
     try {
-        commentStream = (CommentModel as any).watch([], { fullDocument: 'updateLookup' });
+        commentStream = (CommentModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('comment', commentStream);
         commentStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:comment:changed', { op, doc: safe({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt }) });
+                if (d) try { win.webContents.send('data:comment:changed', { op, doc: safe({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt }) }); } catch (sendErr: any) { console.error('[changeStream:comment] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:comment:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.commentId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:comment:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:comment] send error:', sendErr.message); }
             }
         });
         commentStream.on('error', (err: any) => {
             console.error('[changeStream:comment] error:', err.message);
             try { commentStream.close(); } catch (_) {}
             commentStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startCommentStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startCommentStream(); }, jitter);
         });
         console.log('[changeStream] comment stream started');
     } catch (err: any) {
@@ -841,23 +900,26 @@ function startAttachmentStream(): void {
     if (!windowReady) return;
     if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
     try {
-        attachmentStream = (AttachmentModel as any).watch([], { fullDocument: 'updateLookup' });
+        attachmentStream = (AttachmentModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
         registerStream('attachment', attachmentStream);
         attachmentStream.on('change', (change: any) => {
-            if (!mainWindow || mainWindow.isDestroyed()) return;
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) mainWindow.webContents.send('data:attachment:changed', { op, doc: safe({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt }) });
+                if (d) try { win.webContents.send('data:attachment:changed', { op, doc: safe({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt }) }); } catch (sendErr: any) { console.error('[changeStream:attachment] send error:', sendErr.message); }
             } else if (op === 'delete') {
-                mainWindow.webContents.send('data:attachment:changed', { op, id: change.documentKey?._id?.toString() });
+                const recordId = change.fullDocumentBeforeChange?.attachId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:attachment:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:attachment] send error:', sendErr.message); }
             }
         });
         attachmentStream.on('error', (err: any) => {
             console.error('[changeStream:attachment] error:', err.message);
             try { attachmentStream.close(); } catch (_) {}
             attachmentStream = null;
-            setTimeout(() => { if (mongoose.connection.readyState === 1) startAttachmentStream(); }, 5000);
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startAttachmentStream(); }, jitter);
         });
         console.log('[changeStream] attachment stream started');
     } catch (err: any) {

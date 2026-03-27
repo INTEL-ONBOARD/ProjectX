@@ -129,7 +129,9 @@ const AppearanceLoader: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const electronAPI = (window as any).electronAPI;
         if (!electronAPI) return;
+        let cancelled = false;
         const unsub = electronAPI.onAppearancePrefChanged?.((_: unknown, payload: { doc?: { userId: string; themeMode: 'light'|'dark'|'coffee'|'system'; accentColor: string } }) => {
+            if (cancelled) return;
             const doc = payload.doc;
             if (!doc || doc.userId !== authUser.id) return;
             const palette = ACCENT_PALETTES[doc.accentColor];
@@ -146,7 +148,7 @@ const AppearanceLoader: React.FC = () => {
                 setTheme(doc.themeMode);
             }
         });
-        return () => { unsub?.(); };
+        return () => { cancelled = true; unsub?.(); };
     }, [authUser?.id, setTheme]);
     return null;
 };

@@ -29,6 +29,7 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const electronAPI = (window as any).electronAPI;
     let cancelled = false;
+    let focusTimer: ReturnType<typeof setTimeout> | null = null;
     const subs: { unsub?: () => void; unsubReconnect?: () => void } = {};
 
     const fetchAll = () => api().getMembers().then((docs: User[]) => { if (!cancelled) setMembers(docs as User[]); }).catch(() => {});
@@ -40,7 +41,8 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setMembers(docs as User[]);
         if (!electronAPI) return;
         subs.unsub = electronAPI.onMemberChanged?.((_: unknown, payload: { op: string; doc?: User; id?: string }) => {
-          const { op, doc } = payload;
+          if (cancelled) return;
+          const { op, doc, id } = payload;
           if (op === 'insert') {
             setMembers(prev => prev.some(m => m.id === doc!.id) ? prev : [...prev, doc!]);
           } else if (op === 'update' || op === 'replace') {
@@ -49,7 +51,11 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return exists ? prev.map(m => m.id === doc!.id ? doc! : m) : [...prev, doc!];
             });
           } else if (op === 'delete') {
-            fetchAll();
+            if (id) {
+              setMembers(prev => prev.filter(m => m.id !== id));
+            } else {
+              fetchAll();
+            }
           }
         });
       })
@@ -57,12 +63,16 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     subs.unsubReconnect = electronAPI?.onDbReconnected?.(() => { fetchAll(); });
 
-    // Refetch whenever the window regains focus (catches changes from other windows)
-    const onFocus = () => fetchAll();
+    // Debounced focus refetch — waits 300ms after focus to avoid overlapping requests
+    const onFocus = () => {
+      if (focusTimer) clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => { fetchAll(); }, 300);
+    };
     window.addEventListener('focus', onFocus);
 
     return () => {
       cancelled = true;
+      if (focusTimer) clearTimeout(focusTimer);
       window.removeEventListener('focus', onFocus);
       subs.unsub?.();
       subs.unsubReconnect?.();
