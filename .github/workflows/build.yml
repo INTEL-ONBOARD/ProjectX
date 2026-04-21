@@ -107,13 +107,13 @@ jobs:
       - name: Inject .env for packaged app (Unix)
         if: runner.os != 'Windows'
         run: |
-          printf 'MONGODB_URI=mongodb+srv://Vercel-Admin-posm-system:teMhup-toghez-4qinqy@posm-system.fcceiki.mongodb.net/projectm?retryWrites=true&w=majority&appName=posm-system\n' > .env
+          printf 'MONGODB_URI=mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority\n' > .env
 
       - name: Inject .env for packaged app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Set-Content -Path .env -Value 'MONGODB_URI=mongodb+srv://Vercel-Admin-posm-system:teMhup-toghez-4qinqy@posm-system.fcceiki.mongodb.net/projectm?retryWrites=true&w=majority&appName=posm-system' -NoNewline
+          Set-Content -Path .env -Value 'MONGODB_URI=mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority' -NoNewline
 
       - name: Build Vite (web assets)
         env:
