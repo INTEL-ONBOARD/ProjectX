@@ -1040,9 +1040,15 @@ async function connectDB() {
     if (!uri) {
         throw new Error('MONGODB_URI environment variable is required');
     }
-    // Reduced serverSelectionTimeoutMS from 30s → 8s so failed attempts surface faster
-    // and the retry loop can kick in sooner after internet is restored
-    const opts = { serverSelectionTimeoutMS: 8000, connectTimeoutMS: 10000, socketTimeoutMS: 45000 };
+    // Be more tolerant of transient Atlas route/TLS delays.
+    const opts = {
+        serverSelectionTimeoutMS: 30000,
+        connectTimeoutMS: 30000,
+        socketTimeoutMS: 90000,
+        maxPoolSize: 20,
+        minPoolSize: 1,
+        maxIdleTimeMS: 60000,
+    };
 
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
@@ -1073,12 +1079,28 @@ async function connectDB() {
 
 // Wraps ipcMain.handle so every handler has a consistent try/catch — unhandled
 // DB errors won't crash the renderer as an uncaught rejection.
+const QUIET_TRANSIENT_IPC_CHANNELS = new Set(['db:presence:heartbeat', 'db:members:getAll']);
+
+function isTransientMongoError(err: any): boolean {
+    const name = String(err?.name ?? '');
+    const msg = String(err?.message ?? err ?? '');
+    const labels = err?.errorLabelSet;
+
+    if (/Mongo(Network|ServerSelection)Error/.test(name)) return true;
+    if (/secureConnect.*timed out|server monitor timeout|ReplicaSetNoPrimary|connection pool .* was cleared/i.test(msg)) return true;
+    if (labels && typeof labels.has === 'function' && (labels.has('RetryableError') || labels.has('SystemOverloadedError') || labels.has('ResetPool'))) return true;
+    return false;
+}
+
 function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
     ipcMain.handle(channel, async (_e, ...args) => {
         try {
             return await fn(_e, ...args);
         } catch (err: any) {
-            console.error(`[ipc:${channel}] error:`, err?.message ?? err);
+            const shouldSuppress = QUIET_TRANSIENT_IPC_CHANNELS.has(channel) && isTransientMongoError(err);
+            if (!shouldSuppress) {
+                console.error(`[ipc:${channel}] error:`, err?.message ?? err);
+            }
             throw err; // re-throw so the renderer receives a rejected promise
         }
     });
@@ -1374,8 +1396,15 @@ function registerDbHandlers() {
     });
     handle('db:members:remove', async (_e, id: string) => { await requireAdmin(); await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
     handle('db:presence:heartbeat', async (_e, userId: string) => {
-        await UserModel.updateOne({ appId: userId }, { lastSeen: new Date() });
-        return true;
+        // Presence is best-effort: avoid surfacing transient network outages as hard UI errors.
+        if (mongoose.connection.readyState !== 1) return false;
+        try {
+            await UserModel.updateOne({ appId: userId }, { lastSeen: new Date() });
+            return true;
+        } catch (err: any) {
+            if (isTransientMongoError(err)) return false;
+            throw err;
+        }
     });
 
     // Attendance
