@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, AlignLeft, Check, Circle } from 'lucide-react';
+import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, AlignLeft, Check, Circle, Loader2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AvatarGroup } from '../components/ui/Avatar';
@@ -162,7 +162,7 @@ function DependencyGraph({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (
 const TasksPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { projects: contextProjects, allTasks, createTask, updateTask, deleteTask, moveTask } = useProjects();
+  const { projects: contextProjects, allTasks, createTask, updateTask, deleteTask, moveTask, loading, synced } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const { user: authUser } = useAuth() ?? { user: null };
   const [activeTab, setActiveTab] = useState(0);
@@ -229,6 +229,7 @@ const TasksPage: React.FC = () => {
   const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
   const priorityFilterRef = useRef<HTMLDivElement>(null);
   const assigneeFilterRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -256,6 +257,11 @@ const TasksPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatusDrop, setBulkStatusDrop] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const tasksInitialLoading = loading && !synced;
+
+  useEffect(() => {
+    tableScrollRef.current?.scrollTo({ top: 0 });
+  }, [activeTab, viewMode, filterPriority, filterAssignee, searchQuery, sortCol, sortDir, tasksInitialLoading]);
 
   const totalTasks = allTasks.length;
 
@@ -418,15 +424,15 @@ const TasksPage: React.FC = () => {
           <PageHeader
             eyebrow="Home / Tasks"
             title="Tasks"
-            description={`${totalTasks} tasks across ${contextProjects.length} projects`}
+            description={tasksInitialLoading ? 'Loading tasks...' : `${totalTasks} tasks across ${contextProjects.length} projects`}
             actions={
               <>
                 <motion.button
-                  onClick={() => contextProjects.length > 0 && setShowTaskForm(true)}
-                  className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-colors ${contextProjects.length > 0 ? 'bg-primary-500 text-white hover:bg-primary-600' : 'bg-surface-200 text-gray-400 cursor-not-allowed'}`}
-                  whileHover={{ scale: contextProjects.length > 0 ? 1.02 : 1 }}
-                  whileTap={{ scale: contextProjects.length > 0 ? 0.98 : 1 }}
-                  title={contextProjects.length === 0 ? 'Create a project first' : undefined}
+                  onClick={() => !tasksInitialLoading && contextProjects.length > 0 && setShowTaskForm(true)}
+                  className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl transition-colors ${!tasksInitialLoading && contextProjects.length > 0 ? 'bg-primary-500 text-white hover:bg-primary-600' : 'bg-surface-200 text-gray-400 cursor-not-allowed'}`}
+                  whileHover={{ scale: !tasksInitialLoading && contextProjects.length > 0 ? 1.02 : 1 }}
+                  whileTap={{ scale: !tasksInitialLoading && contextProjects.length > 0 ? 0.98 : 1 }}
+                  title={tasksInitialLoading ? 'Tasks are loading' : contextProjects.length === 0 ? 'Create a project first' : undefined}
                 >
                   <Plus size={16} /> New Task
                 </motion.button>
@@ -533,36 +539,48 @@ const TasksPage: React.FC = () => {
                 )}
               </div>
             </div>
-            {/* Tabs */}
-            <div className="px-5 pt-3">
-              <div className="flex gap-1 bg-surface-100 rounded-lg p-1 mb-3 w-fit">
-                {tabs.map((t, i) => {
-                  const s = tabStatusMap[i];
-                  const count = s === null ? totalTasks : allTasks.filter(task => task.status === s).length;
-                  return (
-                    <button key={t} onClick={() => { setActiveTab(i); setViewMode('list'); }} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === i && viewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                      {t} ({count})
-                    </button>
-                  );
-                })}
-                <button
-                  onClick={() => setViewMode('deps')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${viewMode === 'deps' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Dependencies
-                </button>
+            {!tasksInitialLoading && (
+              <div className="px-5 pt-3">
+                <div className="flex gap-1 bg-surface-100 rounded-lg p-1 mb-3 w-fit">
+                  {tabs.map((t, i) => {
+                    const s = tabStatusMap[i];
+                    const count = s === null ? totalTasks : allTasks.filter(task => task.status === s).length;
+                    return (
+                      <button key={t} onClick={() => { setActiveTab(i); setViewMode('list'); }} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === i && viewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                        {t} ({count})
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setViewMode('deps')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${viewMode === 'deps' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Dependencies
+                  </button>
+                </div>
               </div>
-            </div>
-            {viewMode === 'deps' && (
+            )}
+            {tasksInitialLoading ? (
+              <div className="flex-1 min-h-0 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-primary-500/10 flex items-center justify-center">
+                    <Loader2 size={24} className="text-primary-500 animate-spin" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-gray-700">Loading tasks</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Fetching the latest task board data...</p>
+                  </div>
+                </div>
+              </div>
+            ) : viewMode === 'deps' ? (
               <div className="flex-1 overflow-y-auto min-h-0">
                 <DependencyGraph tasks={filteredTasks} onTaskClick={handleOpenTask} />
               </div>
-            )}
-            {viewMode === 'list' && <div className="flex-1 overflow-y-auto min-h-0">
+            ) : viewMode === 'list' && <div ref={tableScrollRef} className="flex-1 overflow-y-auto min-h-0">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-surface-100">
-                  <th className="px-4 py-3 w-8 bg-surface-50">
+                  <th className="sticky top-0 z-10 px-4 py-3 w-8 bg-surface-50 border-b border-surface-100">
                     <input type="checkbox"
                       checked={selectedIds.size === filteredTasks.length && filteredTasks.length > 0}
                       onChange={e => setSelectedIds(e.target.checked ? new Set(filteredTasks.map(t => t.id)) : new Set())}
@@ -576,7 +594,7 @@ const TasksPage: React.FC = () => {
                     return (
                       <th
                         key={h}
-                        className={`px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider bg-surface-50 select-none${h === 'Task' ? ' w-[35%]' : ''}${isSortable ? ' cursor-pointer hover:text-gray-600' : ''} ${isActive ? 'text-primary-500' : 'text-gray-400'}`}
+                        className={`sticky top-0 z-10 px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider bg-surface-50 border-b border-surface-100 select-none${h === 'Task' ? ' w-[35%]' : ''}${isSortable ? ' cursor-pointer hover:text-gray-600' : ''} ${isActive ? 'text-primary-500' : 'text-gray-400'}`}
                         onClick={() => isSortable && handleSort(col as SortCol)}
                       >
                         <span className="inline-flex items-center gap-1">
