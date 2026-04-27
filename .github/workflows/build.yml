@@ -106,14 +106,29 @@ jobs:
 
       - name: Inject .env for packaged app (Unix)
         if: runner.os != 'Windows'
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
-          printf 'MONGODB_URI=mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority\n' > .env
+          if [ -z "$MONGODB_URI" ]; then
+            echo "::error::GitHub secret MONGODB_URI is required for packaged app builds"
+            exit 1
+          fi
+          printf 'MONGODB_URI=%s\n' "$MONGODB_URI" > .env
 
       - name: Inject .env for packaged app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
-          Set-Content -Path .env -Value 'MONGODB_URI=mongodb+srv://Vercel-Admin-atlas-bole-drum:VdbAV9Wt4XDKbNgs@atlas-bole-drum.81ktiub.mongodb.net/projectm?retryWrites=true&w=majority' -NoNewline
+          if ([string]::IsNullOrWhiteSpace($env:MONGODB_URI)) {
+            Write-Error 'GitHub secret MONGODB_URI is required for packaged app builds'
+            exit 1
+          }
+          Set-Content -Path .env -Value "MONGODB_URI=$env:MONGODB_URI" -NoNewline
+
+      - name: Compile Electron main/preload
+        run: npm run electron:compile
 
       - name: Build Vite (web assets)
         env:
