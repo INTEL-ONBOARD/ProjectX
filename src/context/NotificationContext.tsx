@@ -48,6 +48,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const seenRefIds = useRef<Set<string>>(new Set());
     // Fix 4: gate generate() behind a state variable so the useEffect dep array can track it
     const [notifsReady, setNotifsReady] = useState(false);
+    const notificationTaskSignature = React.useMemo(() => {
+        return allTasks
+            .map(task => [
+                task.id,
+                task.status,
+                task.dueDate ?? '',
+                task.assignees.join(','),
+            ].join('|'))
+            .sort()
+            .join('||');
+    }, [allTasks]);
 
     // Load persisted notifications for current user on login
     const loadNotifs = useCallback(async () => {
@@ -129,7 +140,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             await Promise.all(pending);
         };
         generate();
-    }, [allTasks, user?.id, notifsReady]);
+    }, [allTasks, notificationTaskSignature, user?.id, notifsReady]);
 
     // Catch-up: create new_message notifications for unread messages received while app was closed
     useEffect(() => {

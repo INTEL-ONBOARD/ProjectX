@@ -237,7 +237,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
             }
         });
-        return () => { cancelled = true; unsub?.(); };
+        const unsubDeleted = electronAPI.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+            if (cancelled || payload.entity !== 'attendance') return;
+            setAttendanceRecords(prev => prev.filter(r => r.id !== payload.id));
+        });
+        return () => { cancelled = true; unsub?.(); unsubDeleted?.(); };
     }, []);
 
     // Real-time sync for org
@@ -261,6 +265,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         });
         return () => { cancelled = true; unsub?.(); unsubReconnect?.(); };
     }, []);
+
+    useEffect(() => {
+        if (!currentUser?.id) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const electronAPI = (window as any).electronAPI;
+        if (!electronAPI?.onUserPrefChanged) return;
+        let cancelled = false;
+
+        const unsub = electronAPI.onUserPrefChanged((_: unknown, payload: {
+            op: string;
+            doc?: { userId: string; theme?: 'light' | 'dark' | 'coffee'; sidebarCollapsed?: boolean };
+            id?: string;
+        }) => {
+            if (cancelled) return;
+            const doc = payload.doc;
+            if (!doc || doc.userId !== currentUser.id) return;
+            if (doc.theme) setThemeState(doc.theme);
+            if (typeof doc.sidebarCollapsed === 'boolean') setSidebarCollapsedState(doc.sidebarCollapsed);
+        });
+
+        return () => { cancelled = true; unsub?.(); };
+    }, [currentUser?.id]);
 
     // Apply theme to DOM and sync Windows title bar color
     useEffect(() => {

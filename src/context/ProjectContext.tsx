@@ -33,6 +33,7 @@ interface ProjectContextValue {
   updateTask: (id: string, changes: Partial<Omit<Task, 'id'>>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   moveTask: (id: string, newStatus: TaskStatus) => Promise<void>;
+  reorderTasks: (columns: Array<{ status: TaskStatus; taskIds: string[] }>) => Promise<void>;
   scrubAssignee: (memberId: string) => Promise<void>;
   loading: boolean;
   synced: boolean;
@@ -190,7 +191,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
-    return () => { cancelled = true; unsubProject?.(); unsubTask?.(); };
+    const unsubDeleted = electronAPI.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+      if (cancelled) return;
+      if (payload.entity === 'project') {
+        setProjects(prev => {
+          const remaining = prev.filter(p => p.id !== payload.id);
+          setActiveProject(ap => ap === payload.id ? (remaining[0]?.id ?? '') : ap);
+          return remaining;
+        });
+      } else if (payload.entity === 'task') {
+        setAllTasks(prev => prev.filter(t => t.id !== payload.id));
+      } else if (payload.entity === 'projectrich') {
+        setProjectRichData(prev => {
+          if (!(payload.id in prev)) return prev;
+          const next = { ...prev };
+          delete next[payload.id];
+          return next;
+        });
+      }
+    });
+
+    return () => { cancelled = true; unsubProject?.(); unsubTask?.(); unsubDeleted?.(); };
   }, []);
 
   // Load project rich data and keep it live via change stream
@@ -250,6 +271,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateTask = async (id: string, changes: Partial<Omit<Task, 'id'>>) => {
     const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
+    const previousTasks = allTasks;
 
     // Stamp completedAt the first time status transitions to 'done'
     const existingTask = allTasks.find(t => t.id === id);
@@ -264,17 +286,30 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       ...actorMeta,
     };
 
-    const updated = await api().updateTask(id, finalChanges) as Task | null;
-    if (updated) {
-      setAllTasks(prev => prev.map(t => t.id === id ? updated : t));
-    } else {
-      console.warn('[ProjectContext] updateTask: API returned null for task', id, '— keeping existing state unchanged');
+    const optimisticChanges = {
+      ...changes,
+      ...(completedAt ? { completedAt } : {}),
+    };
+
+    setAllTasks(prev => prev.map(t => t.id === id ? { ...t, ...optimisticChanges } : t));
+
+    try {
+      const updated = await api().updateTask(id, finalChanges) as Task | null;
+      if (updated) {
+        setAllTasks(prev => prev.map(t => t.id === id ? updated : t));
+      } else {
+        console.warn('[ProjectContext] updateTask: API returned null for task', id, '— rolling back optimistic change');
+        setAllTasks(previousTasks);
+      }
+    } catch (error) {
+      setAllTasks(previousTasks);
+      throw error;
     }
   };
 
   const deleteTask = async (id: string) => {
-    await api().deleteTask(id);
-    // Compute affected tasks before mutating state, using functional updater to avoid stale closure
+    const previousTasks = allTasks;
+
     setAllTasks(prev => {
       const affected = prev.filter(t => t.id !== id && t.blockedBy?.includes(id));
       // Persist the blockedBy removal for each affected task (fire-and-forget)
@@ -286,15 +321,85 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .filter(t => t.id !== id)
         .map(t => t.blockedBy?.includes(id) ? { ...t, blockedBy: t.blockedBy.filter(b => b !== id) } : t);
     });
+
+    try {
+      await api().deleteTask(id);
+    } catch (error) {
+      setAllTasks(previousTasks);
+      throw error;
+    }
   };
 
   const moveTask = async (id: string, newStatus: TaskStatus) => {
     const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
-    const moved = await api().moveTask(id, newStatus, actorMeta.actorId, actorMeta.actorName) as Task | null;
-    if (moved) {
-      setAllTasks(prev => prev.map(t => t.id === id ? moved : t));
-    } else {
-      setAllTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    const previousTasks = allTasks;
+
+    setAllTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+
+    try {
+      const moved = await api().moveTask(id, newStatus, actorMeta.actorId, actorMeta.actorName) as Task | null;
+      if (moved) {
+        setAllTasks(prev => prev.map(t => t.id === id ? moved : t));
+      }
+    } catch (error) {
+      setAllTasks(previousTasks);
+      throw error;
+    }
+  };
+
+  const reorderTasks = async (columns: Array<{ status: TaskStatus; taskIds: string[] }>) => {
+    const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
+    const orderByTaskId = new Map<string, { status: TaskStatus; order: number }>();
+    const previousTasks = allTasks;
+
+    for (const column of columns) {
+      column.taskIds.forEach((taskId, order) => {
+        orderByTaskId.set(taskId, { status: column.status, order });
+      });
+    }
+
+    setAllTasks(prev => prev.map(task => {
+      const next = orderByTaskId.get(task.id);
+      if (!next) return task;
+      if (task.status === next.status && (task.order ?? 0) === next.order) return task;
+      return { ...task, status: next.status, order: next.order };
+    }));
+
+    try {
+      const db = api();
+      if (typeof db.reorderTasks === 'function') {
+        try {
+          await db.reorderTasks({
+            projectId: activeProject,
+            columns,
+            actorId: actorMeta.actorId,
+            actorName: actorMeta.actorName,
+          });
+          return;
+        } catch (batchError) {
+          const message = String((batchError as Error)?.message ?? batchError);
+          if (!/No handler registered.*db:tasks:reorder/i.test(message)) {
+            throw batchError;
+          }
+        }
+      }
+
+      const fallbackUpdates: Promise<unknown>[] = [];
+      for (const [taskId, next] of orderByTaskId.entries()) {
+        const current = previousTasks.find(task => task.id === taskId);
+        if (!current) continue;
+        if (current.status === next.status && (current.order ?? 0) === next.order) continue;
+        fallbackUpdates.push(db.updateTask(taskId, {
+          status: next.status,
+          order: next.order,
+          actorId: actorMeta.actorId,
+          actorName: actorMeta.actorName,
+        }));
+      }
+      await Promise.all(fallbackUpdates);
+    } catch (error) {
+      setAllTasks(previousTasks);
+      throw error;
     }
   };
 
@@ -308,7 +413,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       projects, allTasks, activeProject, setActiveProject, loading, synced,
       projectRichData, setProjectRichData,
       createProject, updateProject, deleteProject,
-      createTask, updateTask, deleteTask, moveTask, scrubAssignee,
+      createTask, updateTask, deleteTask, moveTask, reorderTasks, scrubAssignee,
     }}>
       {children}
     </ProjectContext.Provider>

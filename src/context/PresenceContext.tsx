@@ -52,11 +52,18 @@ export const PresenceProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
     refreshRef.current = refresh;
 
-    // Poll every 3 s — guaranteed accurate regardless of change stream delivery
     useEffect(() => {
         refreshRef.current(); // seed immediately on mount
-        const id = setInterval(() => refreshRef.current(), 3_000);
-        return () => clearInterval(id);
+        const electronAPI = (window as any).electronAPI;
+        const onFocus = () => refreshRef.current();
+        window.addEventListener('focus', onFocus);
+        const unsubReconnect = electronAPI?.onDbReconnected?.(() => refreshRef.current());
+        const unsubConnected = electronAPI?.onDbConnected?.(() => refreshRef.current());
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            unsubReconnect?.();
+            unsubConnected?.();
+        };
     }, []);
 
     // Change stream listener for instant updates

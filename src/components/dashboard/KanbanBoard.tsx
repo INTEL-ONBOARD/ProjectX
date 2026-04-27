@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { DndContext, rectIntersection, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { DndContext, rectIntersection, DragEndEvent, DragOverEvent, DragStartEvent, DragOverlay, PointerSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -14,6 +14,7 @@ import { useMembersContext } from '../../context/MembersContext';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar, AvatarGroup } from '../ui/Avatar';
 import KanbanColumn from './KanbanColumn';
+import TaskCard from './TaskCard';
 import TaskFormModal from '../modals/TaskFormModal';
 import NewProjectModal from '../modals/NewProjectModal';
 const TODAY = new Date().toISOString().split('T')[0];
@@ -110,8 +111,114 @@ interface KanbanBoardProps {
   viewMode?: 'grid' | 'list';
 }
 
+type BoardColumnsState = Record<TaskStatus, string[]>;
+
+const BOARD_COLUMNS: { title: string; status: TaskStatus; dotColor: string; lineColor: string }[] = [
+  { title: 'To Do',               status: 'todo',               dotColor: '#94A3B8', lineColor: '#94A3B8' },
+  { title: 'In Progress',         status: 'in-progress',        dotColor: '#FFA500', lineColor: '#FFA500' },
+  { title: 'Ready for QA',        status: 'ready-for-qa',       dotColor: '#30C5E5', lineColor: '#30C5E5' },
+  { title: 'Deployment Pending',  status: 'deployment-pending', dotColor: '#9C27B0', lineColor: '#9C27B0' },
+  { title: 'Blocker',             status: 'blocker',            dotColor: '#D8727D', lineColor: '#D8727D' },
+  { title: 'On Hold',             status: 'on-hold',            dotColor: '#EAB308', lineColor: '#EAB308' },
+  { title: 'Done',                status: 'done',               dotColor: '#8BC34A', lineColor: '#8BC34A' },
+];
+
+function createEmptyBoardColumns(): BoardColumnsState {
+  return {
+    todo: [],
+    'in-progress': [],
+    'ready-for-qa': [],
+    'deployment-pending': [],
+    blocker: [],
+    'on-hold': [],
+    done: [],
+  };
+}
+
+function deriveBoardColumns(tasks: Task[], projectId: string): BoardColumnsState {
+  const next = createEmptyBoardColumns();
+  const sorted = tasks
+    .filter(task => task.projectId === projectId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const task of sorted) {
+    next[task.status].push(task.id);
+  }
+
+  return next;
+}
+
+function findTaskStatus(columns: BoardColumnsState, taskId: string): TaskStatus | null {
+  return BOARD_COLUMNS.find(column => columns[column.status].includes(taskId))?.status ?? null;
+}
+
+function moveBoardTask(columns: BoardColumnsState, activeId: string, overId: string): BoardColumnsState {
+  const sourceStatus = findTaskStatus(columns, activeId);
+  if (!sourceStatus) return columns;
+
+  const targetStatus = overId.startsWith('col-')
+    ? (overId.slice(4) as TaskStatus)
+    : findTaskStatus(columns, overId);
+
+  if (!targetStatus) return columns;
+
+  const sourceItems = columns[sourceStatus];
+  const targetItems = columns[targetStatus];
+  const sourceIndex = sourceItems.indexOf(activeId);
+
+  if (sourceIndex === -1) return columns;
+
+  if (sourceStatus === targetStatus) {
+    if (overId.startsWith('col-')) {
+      const endIndex = sourceItems.length - 1;
+      if (sourceIndex === endIndex) return columns;
+      return { ...columns, [sourceStatus]: arrayMove(sourceItems, sourceIndex, endIndex) };
+    }
+
+    const targetIndex = targetItems.indexOf(overId);
+    if (targetIndex === -1 || targetIndex === sourceIndex) return columns;
+    return { ...columns, [sourceStatus]: arrayMove(sourceItems, sourceIndex, targetIndex) };
+  }
+
+  const nextSource = sourceItems.filter(id => id !== activeId);
+  const insertionIndex = overId.startsWith('col-')
+    ? targetItems.length
+    : targetItems.indexOf(overId);
+
+  if (insertionIndex === -1) return columns;
+
+  const nextTarget = [...targetItems];
+  nextTarget.splice(insertionIndex, 0, activeId);
+
+  return {
+    ...columns,
+    [sourceStatus]: nextSource,
+    [targetStatus]: nextTarget,
+  };
+}
+
+function sameBoardColumns(left: BoardColumnsState, right: BoardColumnsState): boolean {
+  return BOARD_COLUMNS.every(({ status }) => {
+    const leftIds = left[status];
+    const rightIds = right[status];
+    return leftIds.length === rightIds.length && leftIds.every((id, index) => id === rightIds[index]);
+  });
+}
+
+function placeTaskInStatus(columns: BoardColumnsState, taskId: string, status: TaskStatus): BoardColumnsState {
+  const currentStatus = findTaskStatus(columns, taskId);
+  if (currentStatus === status) return columns;
+
+  const next = createEmptyBoardColumns();
+  for (const column of BOARD_COLUMNS) {
+    next[column.status] = columns[column.status].filter(id => id !== taskId);
+  }
+  next[status] = [...next[status], taskId];
+  return next;
+}
+
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode = 'grid' }) => {
-  const { allTasks, moveTask, updateTask, deleteTask, createTask, createProject, projects, activeProject } = useProjects();
+  const { allTasks, moveTask, reorderTasks, updateTask, deleteTask, createTask, createProject, projects, activeProject } = useProjects();
   const { members, getMemberColor } = useMembersContext();
   const { user: authUser } = useAuth() ?? { user: null };
 
@@ -142,7 +249,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const lightboxRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const patchingRef = useRef(false);
   useEffect(() => {
     if (lightboxIndex !== null) lightboxRef.current?.focus();
   }, [lightboxIndex]);
@@ -152,6 +258,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const [showNewProject, setShowNewProject] = useState(false);
+  const [boardColumns, setBoardColumns] = useState<BoardColumnsState>(createEmptyBoardColumns);
+  const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [awaitingRealtimeCommit, setAwaitingRealtimeCommit] = useState(false);
+  const boardColumnsRef = useRef<BoardColumnsState>(createEmptyBoardColumns());
+  const lastOverIdRef = useRef<string | null>(null);
+  const lastActiveProjectRef = useRef(activeProject);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -161,55 +274,134 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     return () => window.removeEventListener('open-new-task', handler);
   }, []);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const canonicalBoardColumns = useMemo(
+    () => deriveBoardColumns(allTasks, activeProject),
+    [allTasks, activeProject],
+  );
+
+  const projectTaskMap = useMemo(() => {
+    const map = new Map<string, Task>();
+    allTasks
+      .filter(task => task.projectId === activeProject)
+      .forEach(task => map.set(task.id, task));
+    return map;
+  }, [allTasks, activeProject]);
+
+  const applyTaskFilters = useCallback((task: Task) => {
+    if (!filters) return true;
+    if (filters.priority !== 'all' && task.priority !== filters.priority) return false;
+    if (filters.assignees.length > 0 && !filters.assignees.some(id => task.assignees.includes(id))) return false;
+    if (filters.dueDateFilter === 'today' && task.dueDate !== TODAY) return false;
+    if (filters.dueDateFilter === 'week' && (!task.dueDate || task.dueDate < WEEK_START || task.dueDate > WEEK_END)) return false;
+    if (filters.dueDateFilter === 'overdue' && (task.dueDate === undefined || task.dueDate >= TODAY || task.status === 'done')) return false;
+    return true;
+  }, [filters]);
+
+  useEffect(() => {
+    if (!dragging) {
+      setBoardColumns(canonicalBoardColumns);
+    }
+  }, [canonicalBoardColumns, dragging]);
+
+  useEffect(() => {
+    boardColumnsRef.current = boardColumns;
+  }, [boardColumns]);
+
+  useEffect(() => {
+    const electronAPI = (window as any).electronAPI;
+    if (!electronAPI?.onTaskReordered) return;
+
+    const unsub = electronAPI.onTaskReordered((_: unknown, payload: {
+      projectId: string;
+      columns: Array<{ status: TaskStatus; taskIds: string[] }>;
+    }) => {
+      if (payload.projectId !== activeProject) return;
+      const nextColumns = createEmptyBoardColumns();
+      for (const column of payload.columns ?? []) {
+        nextColumns[column.status] = [...column.taskIds];
+      }
+      setBoardColumns(nextColumns);
+      setAwaitingRealtimeCommit(false);
+    });
+
+    return () => unsub?.();
+  }, [activeProject]);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setDragging(true);
+    setActiveDragTaskId(String(event.active.id));
+    lastOverIdRef.current = null;
+  }, []);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
-
-    const activeTask = allTasks.find(t => t.id === active.id);
-    if (!activeTask) return;
-
-    // over.id can be:
-    //   "col-{status}"  — dropped on the column droppable (empty column or column bg)
-    //   a task id       — dropped on top of another task
+    const activeId = String(active.id);
     const overId = String(over.id);
-    const targetCol =
-      overId.startsWith('col-')
-        ? columns.find(c => `col-${c.status}` === overId)
-        : columns.find(c => allTasks.some(t => t.id === overId && t.status === c.status));
-
-    if (!targetCol) return;
-    if (active.id === over.id) return;
-
-    const targetStatus = targetCol.status;
-
-    // If the task is moving to a different column, update its status first
-    if (activeTask.status !== targetStatus) {
-      await moveTask(activeTask.id, targetStatus).catch(console.error);
+    if (activeId !== overId) {
+      lastOverIdRef.current = overId;
     }
 
-    // Reorder within the target column using ALL tasks (not filtered) to preserve order of hidden tasks
-    const targetColTasks = allTasks
-      .map(t => t.id === activeTask.id ? { ...t, status: targetStatus } : t)
-      .filter(t => t.status === targetStatus && t.projectId === activeProject)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const oldIndex = targetColTasks.findIndex(t => t.id === active.id);
-    const overIndex = targetColTasks.findIndex(t => t.id === over.id);
+    setBoardColumns(prev => {
+      const next = moveBoardTask(prev, activeId, overId);
+      boardColumnsRef.current = next;
+      return sameBoardColumns(prev, next) ? prev : next;
+    });
+  }, []);
 
-    if (oldIndex !== -1 && overIndex !== -1 && oldIndex !== overIndex) {
-      const reordered = arrayMove(targetColTasks, oldIndex, overIndex);
-      for (let i = 0; i < reordered.length; i++) {
-        if (reordered[i].order !== i) {
-          await updateTask(reordered[i].id, { order: i });
-        }
-      }
-    } else if (oldIndex !== -1 && overIndex === -1) {
-      // Dropped onto the column droppable itself — place at end
-      const newOrder = targetColTasks.length - 1;
-      if (activeTask.order !== newOrder) {
-        await updateTask(activeTask.id, { order: newOrder });
-      }
+  const resetDragState = useCallback(() => {
+    setDragging(false);
+    setActiveDragTaskId(null);
+    lastOverIdRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (lastActiveProjectRef.current === activeProject) return;
+    lastActiveProjectRef.current = activeProject;
+    setAwaitingRealtimeCommit(false);
+    resetDragState();
+    setBoardColumns(canonicalBoardColumns);
+  }, [activeProject, canonicalBoardColumns, resetDragState]);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || !activeProject) {
+      setBoardColumns(canonicalBoardColumns);
+      setAwaitingRealtimeCommit(false);
+      resetDragState();
+      return;
     }
-  };
+
+    const activeId = String(active.id);
+    const rawOverId = String(over.id);
+    const overId = rawOverId === activeId ? lastOverIdRef.current : rawOverId;
+    const currentColumns = boardColumnsRef.current;
+    const nextColumns = sameBoardColumns(canonicalBoardColumns, currentColumns) && overId
+      ? moveBoardTask(currentColumns, activeId, overId)
+      : currentColumns;
+    const changed = !sameBoardColumns(canonicalBoardColumns, nextColumns);
+
+    setBoardColumns(nextColumns);
+    resetDragState();
+
+    if (!changed) {
+      setAwaitingRealtimeCommit(false);
+      return;
+    }
+
+    setAwaitingRealtimeCommit(true);
+    try {
+      await reorderTasks(BOARD_COLUMNS.map(column => ({
+        status: column.status,
+        taskIds: nextColumns[column.status],
+      })));
+      setAwaitingRealtimeCommit(false);
+    } catch (error) {
+      console.error(error);
+      setAwaitingRealtimeCommit(false);
+      setBoardColumns(canonicalBoardColumns);
+    }
+  }, [activeProject, canonicalBoardColumns, reorderTasks, resetDragState]);
 
   useEffect(() => {
     if (!selectedTask) return;
@@ -254,7 +446,14 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
         setAttachments(prev => prev.filter(a => a.id !== id));
       }
     });
-    return () => { unsubComment(); unsubAttachment(); };
+    const unsubDeleted = eApi.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+      if (payload.entity === 'comment') {
+        setComments(prev => prev.filter(c => c.id !== payload.id));
+      } else if (payload.entity === 'attachment') {
+        setAttachments(prev => prev.filter(a => a.id !== payload.id));
+      }
+    });
+    return () => { unsubComment(); unsubAttachment(); unsubDeleted?.(); };
   }, [selectedTask?.id]);
 
   const openTask = (task: Task) => {
@@ -272,22 +471,60 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     setDetailTab('details');
   };
 
-  // Keep selectedTask in sync when allTasks updates (real-time changes from other clients)
-  // Skip sync while a local patch is in-flight to prevent the change stream from
-  // briefly restoring the old value before the DB confirms the write.
+  // Keep selectedTask in sync when allTasks updates, including local optimistic edits
+  // and real-time changes from other clients.
   useEffect(() => {
-    if (!selectedTask || patchingRef.current) return;
+    if (!selectedTask) return;
     const fresh = allTasks.find(t => t.id === selectedTask.id);
     if (fresh) setSelectedTask(fresh);
   }, [allTasks, selectedTask?.id]);
 
   const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
-    patchingRef.current = true;
+    const previous = selectedTask;
     setSelectedTask(prev => prev ? { ...prev, ...patch } : prev);
     updateTask(selectedTask.id, patch)
-      .finally(() => { patchingRef.current = false; })
-      .catch(console.error);
+      .catch(error => {
+        console.error(error);
+        setSelectedTask(previous);
+      });
+  };
+
+  const changeSelectedTaskStatus = (nextStatus: TaskStatus) => {
+    if (!selectedTask) return;
+    const previous = selectedTask;
+    setShowStatusDrop(false);
+    if (previous.status === nextStatus) return;
+
+    setSelectedTask(prev => prev ? { ...prev, status: nextStatus } : prev);
+    setBoardColumns(prev => {
+      const next = placeTaskInStatus(prev, previous.id, nextStatus);
+      boardColumnsRef.current = next;
+      return next;
+    });
+    moveTask(previous.id, nextStatus).catch(error => {
+      console.error(error);
+      setSelectedTask(previous);
+      setBoardColumns(canonicalBoardColumns);
+    });
+  };
+
+  const toggleSelectedTaskTimer = () => {
+    if (!selectedTask || !authUser) return;
+    const now = new Date().toISOString();
+    const entries = selectedTask.timeEntries ?? [];
+    const activeEntry = entries.find(entry => entry.userId === authUser.id && !entry.endedAt);
+    const nextEntries = activeEntry
+      ? entries.map(entry => entry.id === activeEntry.id ? { ...entry, endedAt: now } : entry)
+      : [
+          ...entries,
+          {
+            id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `time-${Date.now()}`,
+            userId: authUser.id,
+            startedAt: now,
+          },
+        ];
+    patchTask({ timeEntries: nextEntries });
   };
 
   const handleDelete = () => {
@@ -299,14 +536,37 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const handleAddComment = async () => {
     if (!commentInput.trim() || !selectedTask || !authUser) return;
-    const newComment = await dbApi().addComment({
-      taskId: selectedTask.id,
+    const taskId = selectedTask.id;
+    const text = commentInput.trim();
+    const tempId = `local-${Date.now()}`;
+    const optimisticComment: Comment = {
+      id: tempId,
+      taskId,
       authorId: authUser.id,
       authorName: authUser.name,
-      text: commentInput.trim(),
-    }) as Comment;
-    setComments(prev => prev.some(c => c.id === newComment.id) ? prev : [...prev, newComment]);
+      text,
+      createdAt: new Date().toISOString(),
+    };
+
+    setComments(prev => [...prev, optimisticComment]);
     setCommentInput('');
+
+    try {
+      const newComment = await dbApi().addComment({
+        taskId,
+        authorId: authUser.id,
+        authorName: authUser.name,
+        text,
+      }) as Comment;
+      setComments(prev => {
+        const withoutTemp = prev.filter(c => c.id !== tempId);
+        return withoutTemp.some(c => c.id === newComment.id) ? withoutTemp : [...withoutTemp, newComment];
+      });
+    } catch (error) {
+      console.error(error);
+      setComments(prev => prev.filter(c => c.id !== tempId));
+      setCommentInput(text);
+    }
   };
 
   const uploadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -335,16 +595,16 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
       const current = selectedTaskRef.current;
       if (!current) return;
       const newImages = [...(current.images ?? []), dataUrl];
-      patchingRef.current = true;
-      updateTask(current.id, { images: newImages })
-        .finally(() => { patchingRef.current = false; })
-        .catch(console.error);
-      setTimeout(() => setUploadProgress('saved'), 400);
+      setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
+      updateTask(current.id, { images: newImages }).catch(error => {
+        console.error(error);
+        setSelectedTask(current);
+      });
+      setUploadProgress('saved');
       setTimeout(() => {
         setUploadProgress(null);
         setUploadPreviewUrl(null);
-        setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
-      }, 1800);
+      }, 400);
     };
 
     reader.onerror = () => {
@@ -357,33 +617,17 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     reader.readAsDataURL(file);
   };
 
-  const applyFilters = (tasks: Task[]): Task[] => {
-    if (!filters) return tasks;
-    return tasks.filter(t => {
-      if (filters.priority !== 'all' && t.priority !== filters.priority) return false;
-      if (filters.assignees.length > 0 && !filters.assignees.some(id => t.assignees.includes(id))) return false;
-      if (filters.dueDateFilter === 'today' && t.dueDate !== TODAY) return false;
-      if (filters.dueDateFilter === 'week' && (!t.dueDate || t.dueDate < WEEK_START || t.dueDate > WEEK_END)) return false;
-      if (filters.dueDateFilter === 'overdue' && (t.dueDate === undefined || t.dueDate >= TODAY || t.status === 'done')) return false;
-      return true;
-    });
-  };
-
-  const columns: { title: string; status: TaskStatus; dotColor: string; lineColor: string }[] = [
-    { title: 'To Do',               status: 'todo',               dotColor: '#94A3B8', lineColor: '#94A3B8' },
-    { title: 'In Progress',         status: 'in-progress',        dotColor: '#FFA500', lineColor: '#FFA500' },
-    { title: 'Ready for QA',        status: 'ready-for-qa',       dotColor: '#30C5E5', lineColor: '#30C5E5' },
-    { title: 'Deployment Pending',  status: 'deployment-pending', dotColor: '#9C27B0', lineColor: '#9C27B0' },
-    { title: 'Blocker',             status: 'blocker',            dotColor: '#D8727D', lineColor: '#D8727D' },
-    { title: 'On Hold',             status: 'on-hold',            dotColor: '#EAB308', lineColor: '#EAB308' },
-    { title: 'Done',                status: 'done',               dotColor: '#8BC34A', lineColor: '#8BC34A' },
-  ];
-
   const currentStatus = selectedTask ? (selectedTask.status) : 'todo';
   const currentStatusStyle = statusStyles[currentStatus];
   const proj = selectedTask ? projects.find(p => p.id === selectedTask.projectId) : null;
-
-  const projectTasks = applyFilters(allTasks.filter(t => t.projectId === activeProject));
+  const activeTimeEntry = selectedTask && authUser
+    ? (selectedTask.timeEntries ?? []).find(entry => entry.userId === authUser.id && !entry.endedAt)
+    : null;
+  const projectTasks = useMemo(
+    () => Array.from(projectTaskMap.values()).filter(applyTaskFilters),
+    [applyTaskFilters, projectTaskMap],
+  );
+  const activeDragTask = activeDragTaskId ? projectTaskMap.get(activeDragTaskId) ?? null : null;
 
 
   if (projects.length === 0) {
@@ -437,8 +681,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          {columns.map(col => {
-            const colTasks = projectTasks.filter(t => t.status === col.status);
+          {BOARD_COLUMNS.map(col => {
+            const colTasks = projectTasks
+              .filter(t => t.status === col.status)
+              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             if (colTasks.length === 0) return null;
             return (
               <div key={col.status} className="mb-6">
@@ -494,11 +740,29 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 0.3 }}
       >
-        <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={(args) => {
+            const pointerHits = pointerWithin(args);
+            const taskHits = pointerHits.filter(hit => !String(hit.id).startsWith('col-'));
+            if (taskHits.length > 0) return taskHits;
+            return pointerHits.length > 0 ? pointerHits : rectIntersection(args);
+          }}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => {
+            setBoardColumns(canonicalBoardColumns);
+            setAwaitingRealtimeCommit(false);
+            resetDragState();
+          }}
+        >
           <div className="flex gap-6 h-full">
-            {columns.map((col, index) => {
-              const colTasks = applyFilters(allTasks.filter(t => t.status === col.status && t.projectId === activeProject));
-              const sortedTasks = [...colTasks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            {BOARD_COLUMNS.map((col, index) => {
+              const sortedTasks = boardColumns[col.status]
+                .map(taskId => projectTaskMap.get(taskId))
+                .filter((task): task is Task => !!task)
+                .filter(applyTaskFilters);
               return (
                 <KanbanColumn
                   key={col.status}
@@ -517,6 +781,21 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
             {/* Right-edge spacer so last column has breathing room */}
             <div className="shrink-0 w-8 h-full" />
           </div>
+          <DragOverlay>
+            {activeDragTask ? (
+              <div className="w-[310px] max-w-[380px] rotate-[0.5deg]">
+                <TaskCard
+                  task={activeDragTask}
+                  index={0}
+                  onClick={() => {}}
+                  onMoveTask={() => {}}
+                  dragging
+                  disableIntroAnimation
+                  todayMode={todayMode}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       </motion.div>
       )}
@@ -677,9 +956,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                                 return (
                                   <button key={s}
                                     onClick={() => {
-                                      moveTask(selectedTask.id, s).catch(console.error);
-                                      setSelectedTask(prev => prev ? { ...prev, status: s } : prev);
-                                      setShowStatusDrop(false);
+                                      changeSelectedTaskStatus(s);
                                     }}
                                     className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold transition-colors"
                                     style={{ color: st.color, background: isActive ? st.bgColor : 'transparent' }}
@@ -904,13 +1181,17 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Track time</span>
                       </div>
                       <button
+                        onClick={toggleSelectedTaskTimer}
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
-                        style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}
+                        style={{
+                          background: activeTimeEntry ? 'rgba(216,114,125,0.12)' : 'var(--bg-hover)',
+                          color: activeTimeEntry ? '#D8727D' : 'var(--text-secondary)',
+                        }}
                         onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-active)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = activeTimeEntry ? 'rgba(216,114,125,0.12)' : 'var(--bg-hover)'}
                       >
                         <Play size={11} style={{ color: 'var(--text-muted)' }} />
-                        Start
+                        {activeTimeEntry ? 'Stop' : 'Start'}
                       </button>
                     </div>
                   </div>
@@ -1042,11 +1323,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                                   const current = selectedTaskRef.current;
                                   if (!current) { setDeletingIndex(null); return; }
                                   const updated = (current.images ?? []).filter((_, idx) => idx !== i);
-                                  patchingRef.current = true;
                                   setSelectedTask(prev => prev ? { ...prev, images: updated } : prev);
-                                  await updateTask(current.id, { images: updated }).catch(console.error);
+                                  await updateTask(current.id, { images: updated }).catch(error => {
+                                    console.error(error);
+                                    setSelectedTask(current);
+                                  });
                                   setDeletingIndex(null);
-                                  setTimeout(() => { patchingRef.current = false; }, 1500);
                                 }}
                                 className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center transition-opacity"
                                 style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}
@@ -1076,7 +1358,19 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                             <button onClick={() => dbApi().openAttachment(a.filePath)} style={{ color: 'var(--text-subtle)' }} className="hover:text-primary-500 transition-colors">
                               <Download size={13} />
                             </button>
-                            <button onClick={async () => { await dbApi().deleteAttachment(a.id); setAttachments(prev => prev.filter(x => x.id !== a.id)); }} style={{ color: 'var(--text-subtle)' }} className="hover:text-red-500 transition-colors">
+                            <button
+                              onClick={async () => {
+                                setAttachments(prev => prev.filter(x => x.id !== a.id));
+                                try {
+                                  await dbApi().deleteAttachment(a.id);
+                                } catch (error) {
+                                  console.error(error);
+                                  setAttachments(prev => prev.some(x => x.id === a.id) ? prev : [...prev, a]);
+                                }
+                              }}
+                              style={{ color: 'var(--text-subtle)' }}
+                              className="hover:text-red-500 transition-colors"
+                            >
                               <Trash2 size={13} />
                             </button>
                           </div>

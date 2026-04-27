@@ -61,9 +61,13 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
       })
       .catch((err: unknown) => console.error('[MembersContext] Failed to load members:', err));
 
-    subs.unsubReconnect = electronAPI?.onDbReconnected?.(() => { fetchAll(); });
+        subs.unsubReconnect = electronAPI?.onDbReconnected?.(() => { fetchAll(); });
+        const unsubDeleted = electronAPI?.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+          if (cancelled || payload.entity !== 'member') return;
+          setMembers(prev => prev.filter(m => m.id !== payload.id));
+        });
 
-    // Debounced focus refetch — waits 300ms after focus to avoid overlapping requests
+        // Debounced focus refetch — waits 300ms after focus to avoid overlapping requests
     const onFocus = () => {
       if (focusTimer) clearTimeout(focusTimer);
       focusTimer = setTimeout(() => { fetchAll(); }, 300);
@@ -76,6 +80,7 @@ export const MembersProvider: React.FC<{ children: React.ReactNode }> = ({ child
       window.removeEventListener('focus', onFocus);
       subs.unsub?.();
       subs.unsubReconnect?.();
+      unsubDeleted?.();
     };
   }, []);
 

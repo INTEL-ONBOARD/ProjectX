@@ -253,6 +253,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         // where the initial recompute fires before MongoDB is ready and fails silently)
         const unsubConnected   = api?.onDbConnected?.(() => recompute());
         const unsubReconnected = api?.onDbReconnected?.(() => recompute());
+        const unsubUpdated     = api?.onMessageUpdated?.(() => recompute());
 
         // Increment badge in real-time when a new message arrives while away from messages page
         const unsub = api?.onNewMessage?.((_: unknown, msg: { from: string; to: string }) => {
@@ -260,9 +261,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             setUnreadMsgCount(prev => prev + 1);
         });
 
-        return () => { clearTimeout(timer); unsub?.(); unsubConnected?.(); unsubReconnected?.(); };
+        return () => { clearTimeout(timer); unsub?.(); unsubUpdated?.(); unsubConnected?.(); unsubReconnected?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, onMessagesPage]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        const api = (window as any).electronAPI;
+        if (!api?.onUserPrefChanged) return;
+        const unsub = api.onUserPrefChanged((_: unknown, payload: { doc?: { userId: string; navOrder?: string[] } }) => {
+            if (payload.doc?.userId === user.id && payload.doc.navOrder?.length) {
+                setNavOrder(payload.doc.navOrder);
+            }
+        });
+        return () => unsub?.();
+    }, [user?.id]);
 
     return (
         <>

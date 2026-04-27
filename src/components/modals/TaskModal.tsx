@@ -74,7 +74,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                 setAttachments(prev => prev.filter(a => a.id !== id));
             }
         });
-        return () => { unsubComment(); unsubAttachment(); };
+        const unsubDeleted = eApi.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+            if (payload.entity === 'comment') {
+                setComments(prev => prev.filter(c => c.id !== payload.id));
+            } else if (payload.entity === 'attachment') {
+                setAttachments(prev => prev.filter(a => a.id !== payload.id));
+            }
+        });
+        return () => { unsubComment(); unsubAttachment(); unsubDeleted?.(); };
     }, [task?.id]);
 
     const assigneeNames = task?.assignees.map(

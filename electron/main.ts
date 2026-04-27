@@ -221,6 +221,22 @@ const CommentSchema = new Schema({
 CommentSchema.index({ taskId: 1, createdAt: -1 });
 const CommentModel = mongoose.model('Comment', CommentSchema);
 
+const TaskReorderEventSchema = new Schema({
+    eventId:   { type: String, required: true, unique: true },
+    projectId: { type: String, required: true },
+    columns:   { type: Schema.Types.Mixed, required: true },
+    createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 },
+});
+const TaskReorderEventModel = mongoose.model('TaskReorderEvent', TaskReorderEventSchema);
+
+const DeletionEventSchema = new Schema({
+    eventId:    { type: String, required: true, unique: true },
+    entity:     { type: String, required: true },
+    recordId:   { type: String, required: true },
+    createdAt:  { type: Date, default: Date.now, expires: 60 * 60 * 24 * 7 },
+});
+const DeletionEventModel = mongoose.model('DeletionEvent', DeletionEventSchema);
+
 const AttachmentSchema = new Schema({
     attachId:   { type: String, required: true, unique: true },
     taskId:     { type: String, required: true },
@@ -359,6 +375,10 @@ let authUserStream: any = null;
 let notificationStream: any = null;
 let commentStream: any = null;
 let attachmentStream: any = null;
+let userPrefStream: any = null;
+let templateStream: any = null;
+let deletionEventStream: any = null;
+let taskReorderEventStream: any = null;
 
 // Per-user system notification setting (userId → enabled). Loaded lazily from DB.
 const systemNotifsEnabled = new Map<string, boolean>();
@@ -927,6 +947,136 @@ function startAttachmentStream(): void {
     }
 }
 
+function startUserPrefStream(): void {
+    if (!windowReady) return;
+    if (userPrefStream) { try { userPrefStream.close(); } catch (_) {} userPrefStream = null; }
+    try {
+        userPrefStream = (UserPrefModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
+        registerStream('userPref', userPrefStream);
+        userPrefStream.on('change', (change: any) => {
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d) try { win.webContents.send('data:userpref:changed', { op, doc: safe(toUserPref(d)) }); } catch (sendErr: any) { console.error('[changeStream:userpref] send error:', sendErr.message); }
+            } else if (op === 'delete') {
+                const recordId = change.fullDocumentBeforeChange?.userId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:userpref:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:userpref] send error:', sendErr.message); }
+            }
+        });
+        userPrefStream.on('error', (err: any) => {
+            console.error('[changeStream:userpref] error:', err.message);
+            try { userPrefStream.close(); } catch (_) {}
+            userPrefStream = null;
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startUserPrefStream(); }, jitter);
+        });
+        console.log('[changeStream] userPref stream started');
+    } catch (err: any) {
+        console.error('[changeStream:userpref] failed to start:', err.message);
+    }
+}
+
+function startTemplateStream(): void {
+    if (!windowReady) return;
+    if (templateStream) { try { templateStream.close(); } catch (_) {} templateStream = null; }
+    try {
+        templateStream = (TaskTemplateModel as any).watch([], { fullDocument: 'updateLookup', fullDocumentBeforeChange: 'whenAvailable' });
+        registerStream('template', templateStream);
+        templateStream.on('change', (change: any) => {
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
+            const op = change.operationType;
+            if (op === 'insert' || op === 'update' || op === 'replace') {
+                const d = change.fullDocument;
+                if (d) {
+                    try {
+                        win.webContents.send('data:template:changed', { op, doc: safe({ id: d.templateId, name: d.name, priority: d.priority, taskType: d.taskType, description: d.description, assignees: d.assignees, projectId: d.projectId }) });
+                    } catch (sendErr: any) {
+                        console.error('[changeStream:template] send error:', sendErr.message);
+                    }
+                }
+            } else if (op === 'delete') {
+                const recordId = change.fullDocumentBeforeChange?.templateId ?? change.documentKey?._id?.toString();
+                try { win.webContents.send('data:template:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:template] send error:', sendErr.message); }
+            }
+        });
+        templateStream.on('error', (err: any) => {
+            console.error('[changeStream:template] error:', err.message);
+            try { templateStream.close(); } catch (_) {}
+            templateStream = null;
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startTemplateStream(); }, jitter);
+        });
+        console.log('[changeStream] template stream started');
+    } catch (err: any) {
+        console.error('[changeStream:template] failed to start:', err.message);
+    }
+}
+
+function startDeletionEventStream(): void {
+    if (!windowReady) return;
+    if (deletionEventStream) { try { deletionEventStream.close(); } catch (_) {} deletionEventStream = null; }
+    try {
+        deletionEventStream = (DeletionEventModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('deletionEvent', deletionEventStream);
+        deletionEventStream.on('change', (change: any) => {
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
+            if (change.operationType !== 'insert') return;
+            const d = change.fullDocument;
+            if (!d) return;
+            try { win.webContents.send('data:deleted', { entity: d.entity, id: d.recordId, createdAt: d.createdAt }); } catch (sendErr: any) { console.error('[changeStream:deleted] send error:', sendErr.message); }
+        });
+        deletionEventStream.on('error', (err: any) => {
+            console.error('[changeStream:deleted] error:', err.message);
+            try { deletionEventStream.close(); } catch (_) {}
+            deletionEventStream = null;
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startDeletionEventStream(); }, jitter);
+        });
+        console.log('[changeStream] deletionEvent stream started');
+    } catch (err: any) {
+        console.error('[changeStream:deleted] failed to start:', err.message);
+    }
+}
+
+function startTaskReorderEventStream(): void {
+    if (!windowReady) return;
+    if (taskReorderEventStream) { try { taskReorderEventStream.close(); } catch (_) {} taskReorderEventStream = null; }
+    try {
+        taskReorderEventStream = (TaskReorderEventModel as any).watch([], { fullDocument: 'updateLookup' });
+        registerStream('taskReorderEvent', taskReorderEventStream);
+        taskReorderEventStream.on('change', (change: any) => {
+            const win = mainWindow;
+            if (!win || win.isDestroyed()) return;
+            if (change.operationType !== 'insert') return;
+            const d = change.fullDocument;
+            if (!d) return;
+            try {
+                win.webContents.send('data:task:reordered', {
+                    projectId: d.projectId,
+                    columns: d.columns,
+                    createdAt: d.createdAt,
+                });
+            } catch (sendErr: any) {
+                console.error('[changeStream:taskReordered] send error:', sendErr.message);
+            }
+        });
+        taskReorderEventStream.on('error', (err: any) => {
+            console.error('[changeStream:taskReordered] error:', err.message);
+            try { taskReorderEventStream.close(); } catch (_) {}
+            taskReorderEventStream = null;
+            const jitter = 4000 + Math.floor(Math.random() * 3000);
+            setTimeout(() => { if (mongoose.connection.readyState === 1) startTaskReorderEventStream(); }, jitter);
+        });
+        console.log('[changeStream] taskReorderEvent stream started');
+    } catch (err: any) {
+        console.error('[changeStream:taskReordered] failed to start:', err.message);
+    }
+}
+
 // Coordinator — starts all data streams (each restarts itself on error independently)
 function startDataStreams(): void {
     for (const [, stream] of activeStreams) {
@@ -950,6 +1100,10 @@ function startDataStreams(): void {
     startNotificationStream();
     startCommentStream();
     startAttachmentStream();
+    startUserPrefStream();
+    startTemplateStream();
+    startDeletionEventStream();
+    startTaskReorderEventStream();
 }
 
 async function ensureDefaultData() {
@@ -1092,10 +1246,10 @@ function isTransientMongoError(err: any): boolean {
     return false;
 }
 
-function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
+function handle(channel: string, fn: (...args: any[]) => any | Promise<any>) {
     ipcMain.handle(channel, async (_e, ...args) => {
         try {
-            return await fn(_e, ...args);
+            return await Promise.resolve(fn(_e, ...args));
         } catch (err: any) {
             const shouldSuppress = QUIET_TRANSIENT_IPC_CHANNELS.has(channel) && isTransientMongoError(err);
             if (!shouldSuppress) {
@@ -1103,6 +1257,24 @@ function handle(channel: string, fn: (...args: any[]) => Promise<any>) {
             }
             throw err; // re-throw so the renderer receives a rejected promise
         }
+    });
+}
+
+async function emitDeletionEvent(entity: string, recordId: string): Promise<void> {
+    await DeletionEventModel.create({
+        eventId: randomUUID(),
+        entity,
+        recordId,
+        createdAt: new Date(),
+    });
+}
+
+async function emitTaskReorderEvent(projectId: string, columns: Array<{ status: string; taskIds: string[] }>): Promise<void> {
+    await TaskReorderEventModel.create({
+        eventId: randomUUID(),
+        projectId,
+        columns,
+        createdAt: new Date(),
     });
 }
 
@@ -1128,7 +1300,17 @@ function registerDbHandlers() {
         const d = await ProjectModel.findOneAndUpdate({ appId: id }, { $set: safeChanges }, { returnDocument: 'after' }).lean();
         return d ? safe(toProject(d)) : null;
     });
-    handle('db:projects:delete', async (_e, id: string) => { await requireAdmin(); await ProjectModel.deleteOne({ appId: id }); await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } }); await ProjectRichModel.deleteOne({ projectId: id }); return true; });
+    handle('db:projects:delete', async (_e, id: string) => {
+        await requireAdmin();
+        await ProjectModel.deleteOne({ appId: id });
+        await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: '' } });
+        await ProjectRichModel.deleteOne({ projectId: id });
+        await Promise.all([
+            emitDeletionEvent('project', id),
+            emitDeletionEvent('projectrich', id),
+        ]);
+        return true;
+    });
 
     // Tasks
     handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
@@ -1225,7 +1407,7 @@ function registerDbHandlers() {
         }
         return safe(toTask(updatedObj));
     });
-    handle('db:tasks:delete', async (_e, id: string) => { await TaskModel.deleteOne({ appId: id }); return true; });
+    handle('db:tasks:delete', async (_e, id: string) => { await TaskModel.deleteOne({ appId: id }); await emitDeletionEvent('task', id); return true; });
     handle('db:tasks:move', async (_e, id: string, newStatus: string, actorId?: string, actorName?: string) => {
         const current = await TaskModel.findOne({ appId: id }).lean();
         if (!current) return null;
@@ -1245,6 +1427,56 @@ function registerDbHandlers() {
         );
         return updated ? safe(toTask(updated.toObject())) : null;
     });
+    handle('db:tasks:reorder', async (_e, payload: {
+        projectId: string;
+        columns: Array<{ status: string; taskIds: string[] }>;
+        actorId?: string;
+        actorName?: string;
+    }) => {
+        const actor = {
+            actorId: payload.actorId ?? 'system',
+            actorName: payload.actorName ?? 'System',
+        };
+        const ts = new Date().toISOString();
+        const bulkOps: any[] = [];
+        const allTaskIds = Array.from(new Set((payload.columns ?? []).flatMap(column => column.taskIds)));
+        const currentDocs = allTaskIds.length > 0
+            ? await TaskModel.find({ appId: { $in: allTaskIds } }).lean()
+            : [];
+        const currentById = new Map(currentDocs.map((doc: any) => [doc.appId, doc]));
+        for (const column of payload.columns ?? []) {
+            for (let index = 0; index < column.taskIds.length; index++) {
+                const taskId = column.taskIds[index];
+                const current = currentById.get(taskId);
+                if (!current) continue;
+                const updateDoc: any = { $set: { order: index } };
+                if (current.status !== column.status) {
+                    updateDoc.$set.status = column.status;
+                    updateDoc.$push = {
+                        activity: {
+                            id: randomUUID(),
+                            type: 'status_changed',
+                            ...actor,
+                            timestamp: ts,
+                            from: current.status,
+                            to: column.status,
+                        },
+                    };
+                }
+                bulkOps.push({
+                    updateOne: {
+                        filter: { appId: taskId },
+                        update: updateDoc,
+                    },
+                });
+            }
+        }
+        if (bulkOps.length > 0) {
+            await TaskModel.bulkWrite(bulkOps, { ordered: false });
+        }
+        await emitTaskReorderEvent(payload.projectId, payload.columns ?? []);
+        return true;
+    });
     handle('db:tasks:scrubAssignee', async (_e, memberId: string) => { await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } }); return true; });
 
     // Comments
@@ -1260,6 +1492,7 @@ function registerDbHandlers() {
     handle('db:comments:delete', async (_e, commentId: string) => {
         const doc = await CommentModel.findOneAndDelete({ commentId }).lean();
         if (doc) await TaskModel.updateOne({ appId: (doc as any).taskId }, { $inc: { comments: -1 } });
+        await emitDeletionEvent('comment', commentId);
         return true;
     });
 
@@ -1295,6 +1528,7 @@ function registerDbHandlers() {
             try { await fs.promises.unlink((doc as any).filePath); } catch (_) {}
             await TaskModel.updateOne({ appId: (doc as any).taskId }, { $inc: { files: -1 } });
         }
+        await emitDeletionEvent('attachment', attachId);
         return true;
     });
     handle('db:attachments:open', async (_e, filePath: string) => {
@@ -1350,6 +1584,7 @@ function registerDbHandlers() {
     });
     handle('db:templates:delete', async (_e, id: string) => {
         await TaskTemplateModel.deleteOne({ templateId: id });
+        await emitDeletionEvent('template', id);
         return true;
     });
 
@@ -1394,7 +1629,7 @@ function registerDbHandlers() {
         await AuthUserModel.findOneAndUpdate({ appId: id }, { role });
         return safe(toUser(d));
     });
-    handle('db:members:remove', async (_e, id: string) => { await requireAdmin(); await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); return true; });
+    handle('db:members:remove', async (_e, id: string) => { await requireAdmin(); await UserModel.deleteOne({ appId: id }); await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } }); await emitDeletionEvent('member', id); return true; });
     handle('db:presence:heartbeat', async (_e, userId: string) => {
         // Presence is best-effort: avoid surfacing transient network outages as hard UI errors.
         if (mongoose.connection.readyState !== 1) return false;
@@ -1414,7 +1649,7 @@ function registerDbHandlers() {
         const d = await AttendanceModel.findOneAndUpdate({ recordId }, { $set: { recordId, ...record } }, { upsert: true, returnDocument: 'after' }).lean() as any;
         return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] });
     });
-    handle('db:attendance:delete', async (_e, userId: string, date: string) => { await AttendanceModel.deleteOne({ recordId: `${userId}-${date}` }); return true; });
+    handle('db:attendance:delete', async (_e, userId: string, date: string) => { const recordId = `${userId}-${date}`; await AttendanceModel.deleteOne({ recordId }); await emitDeletionEvent('attendance', recordId); return true; });
 
     // Messages
     handle('db:messages:getBetween', async (_e, userId: string, peerId: string) => {
@@ -1450,10 +1685,17 @@ function registerDbHandlers() {
     });
     handle('db:messages:unread-counts', async (_: any, userId: string) => {
         const counts: Record<string, number> = {};
-        const convMetas = await ConvMetaModel.find({ userId });
-        await Promise.all(convMetas.map(async (c: any) => {
-            counts[c.peerId] = await MessageModel.countDocuments({
-                fromId: c.peerId, toId: userId, read: false, deleted: { $ne: true }
+        const [convMetas, unreadSenders] = await Promise.all([
+            ConvMetaModel.find({ userId }).lean(),
+            MessageModel.distinct('fromId', { toId: userId, read: false, deleted: { $ne: true } }),
+        ]);
+        const peerIds = new Set<string>([
+            ...convMetas.map((c: any) => String(c.peerId)),
+            ...unreadSenders.map((id: unknown) => String(id)),
+        ]);
+        await Promise.all(Array.from(peerIds).map(async (peerId) => {
+            counts[peerId] = await MessageModel.countDocuments({
+                fromId: peerId, toId: userId, read: false, deleted: { $ne: true }
             });
         }));
         return counts;
@@ -1474,7 +1716,7 @@ function registerDbHandlers() {
     handle('db:depts:getAll', async () => safe((await DeptModel.find().lean()).map(toDept)));
     handle('db:depts:create', async (_e, dept: object) => { const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept }); return safe(toDept(d.toObject())); });
     handle('db:depts:update', async (_e, id: string, changes: object) => { const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { returnDocument: 'after' }).lean(); return d ? safe(toDept(d)) : null; });
-    handle('db:depts:delete', async (_e, id: string) => { await DeptModel.deleteOne({ deptId: id }); return true; });
+    handle('db:depts:delete', async (_e, id: string) => { await DeptModel.deleteOne({ deptId: id }); await emitDeletionEvent('dept', id); return true; });
 
     // Project rich data
     handle('db:projectrich:getAll', async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
@@ -1485,6 +1727,7 @@ function registerDbHandlers() {
     });
     handle('db:projectrich:delete', async (_e, projectId: string) => {
         await ProjectRichModel.deleteOne({ projectId });
+        await emitDeletionEvent('projectrich', projectId);
         return true;
     });
 
@@ -1663,12 +1906,14 @@ function registerDbHandlers() {
         if (!role) throw new Error('Role not found.');
         if (role.name === 'admin') throw new Error('Cannot delete the admin role.');
         await RoleModel.deleteOne({ appId: data.appId });
+        await emitDeletionEvent('role', data.appId);
         return safe({ ok: true });
     });
 
     handle('db:roleperms:delete', async (_e, data: { roleName: string }) => {
         await requireAdmin();
         await RolePermsModel.deleteOne({ role: data.roleName });
+        await emitDeletionEvent('roleperms', data.roleName);
         return safe({ ok: true });
     });
 
@@ -1773,7 +2018,7 @@ function setupAutoUpdater() {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
     // App is distributed without Apple code signing — skip signature validation
-    autoUpdater.verifyUpdateCodeSignature = false;
+    (autoUpdater as any).verifyUpdateCodeSignature = false;
     autoUpdater.on('checking-for-update', () => mainWindow?.webContents.send('update:checking'));
     autoUpdater.on('update-available', (info) => mainWindow?.webContents.send('update:available', { version: info.version, releaseDate: info.releaseDate, releaseNotes: info.releaseNotes }));
     autoUpdater.on('update-not-available', () => mainWindow?.webContents.send('update:not-available'));
@@ -2009,6 +2254,10 @@ app.on('before-quit', () => {
     if (notificationStream) { try { notificationStream.close(); } catch (_) {} notificationStream = null; }
     if (commentStream) { try { commentStream.close(); } catch (_) {} commentStream = null; }
     if (attachmentStream) { try { attachmentStream.close(); } catch (_) {} attachmentStream = null; }
+    if (userPrefStream) { try { userPrefStream.close(); } catch (_) {} userPrefStream = null; }
+    if (templateStream) { try { templateStream.close(); } catch (_) {} templateStream = null; }
+    if (deletionEventStream) { try { deletionEventStream.close(); } catch (_) {} deletionEventStream = null; }
+    if (taskReorderEventStream) { try { taskReorderEventStream.close(); } catch (_) {} taskReorderEventStream = null; }
 });
 
 app.on('window-all-closed', () => {

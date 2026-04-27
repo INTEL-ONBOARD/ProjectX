@@ -30,9 +30,11 @@ interface TaskCardProps {
   onMoveTask: (taskId: string, newStatus: TaskStatus) => void;
   onDeleteTask?: (taskId: string) => void;
   todayMode?: boolean;
+  dragging?: boolean;
+  disableIntroAnimation?: boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, onDeleteTask, todayMode }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, onDeleteTask, todayMode, dragging = false, disableIntroAnimation = false }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -62,10 +64,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
   return (
     <motion.div
       className={`bg-surface-50 rounded-2xl p-4 border cursor-pointer group relative transition-all ${isToday ? 'border-primary-400' : isOverdue ? 'border-red-400' : 'border-surface-200'}`}
-      initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: index * 0.08, ease: [0.4, 0, 0.2, 1] }}
-      whileHover={{ y: -3, transition: { duration: 0.2 } }}
-      layout
+      initial={disableIntroAnimation ? false : { opacity: 0, y: 15 }}
+      animate={disableIntroAnimation ? undefined : { opacity: 1, y: 0 }}
+      transition={disableIntroAnimation ? undefined : { duration: 0.35, delay: index * 0.08, ease: [0.4, 0, 0.2, 1] }}
+      whileHover={dragging ? undefined : { y: -3, transition: { duration: 0.2 } }}
       onClick={onClick}
     >
       {/* Priority badge, type tag & menu */}
@@ -197,4 +199,4 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onMoveTask, o
   );
 };
 
-export default TaskCard;
+export default React.memo(TaskCard);

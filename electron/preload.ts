@@ -124,6 +124,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('data:attachment:changed', cb);
         return () => ipcRenderer.removeListener('data:attachment:changed', cb);
     },
+    onUserPrefChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:userpref:changed', cb);
+        return () => ipcRenderer.removeListener('data:userpref:changed', cb);
+    },
+    onTemplateChanged: (cb: (_: unknown, payload: { op: string; doc?: unknown; id?: string }) => void) => {
+        ipcRenderer.on('data:template:changed', cb);
+        return () => ipcRenderer.removeListener('data:template:changed', cb);
+    },
+    onTaskReordered: (cb: (_: unknown, payload: { projectId: string; columns: Array<{ status: string; taskIds: string[] }>; createdAt?: string }) => void) => {
+        ipcRenderer.on('data:task:reordered', cb);
+        return () => ipcRenderer.removeListener('data:task:reordered', cb);
+    },
+    onRecordDeleted: (cb: (_: unknown, payload: { entity: string; id: string; createdAt?: string }) => void) => {
+        ipcRenderer.on('data:deleted', cb);
+        return () => ipcRenderer.removeListener('data:deleted', cb);
+    },
     // Update event listeners
     onUpdateChecking: (cb: () => void) => {
         ipcRenderer.on('update:checking', cb);
@@ -203,6 +219,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         updateTask:    (id: string, changes: object): Promise<unknown>         => ipcRenderer.invoke('db:tasks:update', id, changes),
         deleteTask:    (id: string): Promise<boolean>                          => ipcRenderer.invoke('db:tasks:delete', id),
         moveTask:      (id: string, newStatus: string, actorId?: string, actorName?: string): Promise<unknown> => ipcRenderer.invoke('db:tasks:move', id, newStatus, actorId, actorName),
+        reorderTasks:  (payload: { projectId: string; columns: Array<{ status: string; taskIds: string[] }>; actorId?: string; actorName?: string }): Promise<boolean> => ipcRenderer.invoke('db:tasks:reorder', payload),
         scrubAssignee: (memberId: string): Promise<boolean>                    => ipcRenderer.invoke('db:tasks:scrubAssignee', memberId),
 
         // Members

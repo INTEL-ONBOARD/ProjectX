@@ -68,7 +68,34 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => { dbApi().getTemplates().then((data: any) => setTemplates(data as TaskTemplate[])); }, []);
+  useEffect(() => {
+    const electronAPI = (window as any).electronAPI;
+    let cancelled = false;
+
+    dbApi().getTemplates().then((data: any) => {
+      if (!cancelled) setTemplates(data as TaskTemplate[]);
+    });
+
+    const unsub = electronAPI?.onTemplateChanged?.((_: unknown, payload: { op: string; doc?: TaskTemplate; id?: string }) => {
+      if (cancelled) return;
+      const { op, doc, id } = payload;
+      if (op === 'insert' || op === 'update' || op === 'replace') {
+        if (!doc) return;
+        setTemplates(prev => {
+          const exists = prev.some(t => t.id === doc.id);
+          return exists ? prev.map(t => t.id === doc.id ? doc : t) : [...prev, doc];
+        });
+      } else if (op === 'delete') {
+        if (id) setTemplates(prev => prev.filter(t => t.id !== id));
+      }
+    });
+    const unsubDeleted = electronAPI?.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+      if (cancelled || payload.entity !== 'template') return;
+      setTemplates(prev => prev.filter(t => t.id !== payload.id));
+    });
+
+    return () => { cancelled = true; unsub?.(); unsubDeleted?.(); };
+  }, []);
 
   const toggleAssignee = (id: string) =>
     setAssignees(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);

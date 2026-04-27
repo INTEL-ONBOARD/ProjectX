@@ -194,7 +194,6 @@ const TasksPage: React.FC = () => {
   }, []);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
   const detailFileRef = useRef<HTMLInputElement>(null);
-  const patchingRef = useRef(false);
   const selectedTaskRef = useRef<typeof selectedTask>(null);
   const uploadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | 'saved' | null>(null);
@@ -330,16 +329,16 @@ const TasksPage: React.FC = () => {
       const current = selectedTaskRef.current;
       if (!current) return;
       const newImages = [...(current.images ?? []), dataUrl];
-      patchingRef.current = true;
-      updateTask(current.id, { images: newImages })
-        .finally(() => { patchingRef.current = false; })
-        .catch(console.error);
-      setTimeout(() => setUploadProgress('saved'), 400);
+      setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
+      updateTask(current.id, { images: newImages }).catch(error => {
+        console.error(error);
+        setSelectedTask(current);
+      });
+      setUploadProgress('saved');
       setTimeout(() => {
         setUploadProgress(null);
         setUploadPreviewUrl(null);
-        setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
-      }, 1800);
+      }, 400);
     };
     reader.readAsDataURL(file);
   };
@@ -378,22 +377,23 @@ const TasksPage: React.FC = () => {
   // Keep selectedTaskRef in sync so async callbacks (image upload/delete) don't capture stale closures
   useEffect(() => { selectedTaskRef.current = selectedTask; }, [selectedTask]);
 
-  // Keep selectedTask in sync when allTasks updates (real-time changes from other clients)
-  // Skip sync while a local patch is in-flight to prevent the change stream from
-  // briefly restoring the old value before the DB confirms the write.
+  // Keep selectedTask in sync when allTasks updates, including local optimistic edits
+  // and real-time changes from other clients.
   useEffect(() => {
-    if (!selectedTask || patchingRef.current) return;
+    if (!selectedTask) return;
     const fresh = allTasks.find(t => t.id === selectedTask.id);
     if (fresh) setSelectedTask(fresh);
   }, [allTasks, selectedTask?.id]);
 
   const patchTask = (patch: Partial<Task>) => {
     if (!selectedTask) return;
-    patchingRef.current = true;
+    const previous = selectedTask;
     setSelectedTask(prev => prev ? { ...prev, ...patch } : prev);
     updateTask(selectedTask.id, patch)
-      .finally(() => { patchingRef.current = false; })
-      .catch(console.error);
+      .catch(error => {
+        console.error(error);
+        setSelectedTask(previous);
+      });
   };
 
   const handleOpenTask = (task: Task) => {
@@ -1052,11 +1052,12 @@ const TasksPage: React.FC = () => {
                                       const current = selectedTaskRef.current;
                                       if (!current) { setDeletingIndex(null); return; }
                                       const updated = (current.images ?? []).filter((_, idx) => idx !== i);
-                                      patchingRef.current = true;
                                       setSelectedTask(prev => prev ? { ...prev, images: updated } : prev);
-                                      await updateTask(current.id, { images: updated }).catch(console.error);
+                                      await updateTask(current.id, { images: updated }).catch(error => {
+                                        console.error(error);
+                                        setSelectedTask(current);
+                                      });
                                       setDeletingIndex(null);
-                                      setTimeout(() => { patchingRef.current = false; }, 1500);
                                     }}
                                     className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center"
                                     style={{ background: 'rgba(0,0,0,0.6)', opacity: 0 }}

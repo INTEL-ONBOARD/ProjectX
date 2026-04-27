@@ -103,6 +103,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    const electronAPI = win().electronAPI;
+    if (!electronAPI?.onAuthUserChanged) return;
+
+    const unsub = electronAPI.onAuthUserChanged((_: unknown, payload: { op: string; doc?: AuthUser; id?: string }) => {
+      if (payload.op === 'delete' && payload.id === user.id) {
+        localStorage.removeItem(SESSION_KEY);
+        setHasSeenWalkthrough(false);
+        setUser(null);
+        appApi().setActiveUser('').catch(() => {});
+        return;
+      }
+
+      if (!payload.doc || payload.doc.id !== user.id) return;
+      setUser(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev, name: payload.doc!.name, email: payload.doc!.email, role: payload.doc!.role };
+        if (localStorage.getItem(SESSION_KEY)) {
+          localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+        }
+        return updated;
+      });
+    });
+
+    const unsubReconnect = electronAPI.onDbReconnected?.(() => {
+      authApi().validate(user.id)
+        .then(valid => {
+          if (!valid) {
+            localStorage.removeItem(SESSION_KEY);
+            setHasSeenWalkthrough(false);
+            setUser(null);
+            appApi().setActiveUser('').catch(() => {});
+            return;
+          }
+          setUser(prev => prev ? { ...prev, name: valid.name, email: valid.email, role: valid.role } : valid);
+        })
+        .catch(() => {});
+    });
+
+    return () => { unsub?.(); unsubReconnect?.(); };
+  }, [user?.id]);
+
   const login = useCallback(async (email: string, password: string, remember = false) => {
     const authUser = await authApi().login(email, password);
     if (remember) {

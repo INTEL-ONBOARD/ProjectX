@@ -125,6 +125,22 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     import_electron.ipcRenderer.on("data:attachment:changed", cb);
     return () => import_electron.ipcRenderer.removeListener("data:attachment:changed", cb);
   },
+  onUserPrefChanged: (cb) => {
+    import_electron.ipcRenderer.on("data:userpref:changed", cb);
+    return () => import_electron.ipcRenderer.removeListener("data:userpref:changed", cb);
+  },
+  onTemplateChanged: (cb) => {
+    import_electron.ipcRenderer.on("data:template:changed", cb);
+    return () => import_electron.ipcRenderer.removeListener("data:template:changed", cb);
+  },
+  onTaskReordered: (cb) => {
+    import_electron.ipcRenderer.on("data:task:reordered", cb);
+    return () => import_electron.ipcRenderer.removeListener("data:task:reordered", cb);
+  },
+  onRecordDeleted: (cb) => {
+    import_electron.ipcRenderer.on("data:deleted", cb);
+    return () => import_electron.ipcRenderer.removeListener("data:deleted", cb);
+  },
   // Update event listeners
   onUpdateChecking: (cb) => {
     import_electron.ipcRenderer.on("update:checking", cb);
@@ -197,6 +213,7 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     updateTask: (id, changes) => import_electron.ipcRenderer.invoke("db:tasks:update", id, changes),
     deleteTask: (id) => import_electron.ipcRenderer.invoke("db:tasks:delete", id),
     moveTask: (id, newStatus, actorId, actorName) => import_electron.ipcRenderer.invoke("db:tasks:move", id, newStatus, actorId, actorName),
+    reorderTasks: (payload) => import_electron.ipcRenderer.invoke("db:tasks:reorder", payload),
     scrubAssignee: (memberId) => import_electron.ipcRenderer.invoke("db:tasks:scrubAssignee", memberId),
     // Members
     getMembers: () => import_electron.ipcRenderer.invoke("db:members:getAll"),

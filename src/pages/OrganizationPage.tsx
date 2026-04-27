@@ -181,7 +181,11 @@ const OrganizationPage: React.FC = () => {
                 }
             }
         });
-        return () => { cancelled = true; unsub?.(); };
+        const unsubDeleted = electronAPI.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+            if (cancelled || payload.entity !== 'dept') return;
+            setDeptRoster(prev => prev.filter(d => d.id !== payload.id));
+        });
+        return () => { cancelled = true; unsub?.(); unsubDeleted?.(); };
     }, []);
 
     // Real-time sync for auth users list (OrganizationPage users tab)

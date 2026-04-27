@@ -117,7 +117,11 @@ export const RolePermsProvider: React.FC<{ children: ReactNode }> = ({ children 
         const unsubReconnect = electronAPI.onDbReconnected?.(() => {
             dbApi().getRolePerms().then((data: RolePerms[]) => { if (!cancelled && data?.length) setPerms(data.map(mergeDoc)); }).catch(() => {});
         });
-        return () => { cancelled = true; unsub?.(); unsubReconnect?.(); };
+        const unsubDeleted = electronAPI.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+            if (cancelled || payload.entity !== 'roleperms') return;
+            setPerms(prev => prev.filter(p => p.role !== payload.id));
+        });
+        return () => { cancelled = true; unsub?.(); unsubReconnect?.(); unsubDeleted?.(); };
     }, []);
 
     const getAllowedRoutes = useCallback((role: string): string[] => {

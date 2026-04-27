@@ -17,6 +17,7 @@ interface ElectronDB {
   updateTask(id: string, changes: Partial<Omit<Task, 'id'>> & { actorId?: string; actorName?: string }): Promise<Task | null>;
   deleteTask(id: string): Promise<boolean>;
   moveTask(id: string, newStatus: TaskStatus, actorId?: string, actorName?: string): Promise<Task | null>;
+  reorderTasks(payload: { projectId: string; columns: Array<{ status: TaskStatus; taskIds: string[] }>; actorId?: string; actorName?: string }): Promise<boolean>;
   scrubAssignee(memberId: string): Promise<boolean>;
 
   // Members
@@ -110,6 +111,7 @@ interface ElectronAPI {
   onDbDisconnected(cb: () => void): () => void;
   onDbReconnected(cb: () => void): () => void;
   onNewMessage(cb: (_: unknown, msg: { id: string; from: string; to: string; text: string; time: string; read: boolean; reactions: Record<string, unknown>; deleted: boolean }) => void): () => void;
+  onTaskReordered(cb: (_: unknown, payload: { projectId: string; columns: Array<{ status: TaskStatus; taskIds: string[] }>; createdAt?: string }) => void): () => void;
   onUpdateChecking(cb: () => void): () => void;
   onUpdateAvailable(cb: (_: unknown, info: { version: string; releaseDate?: string; releaseNotes?: string | null }) => void): () => void;
   onUpdateNotAvailable(cb: () => void): () => void;

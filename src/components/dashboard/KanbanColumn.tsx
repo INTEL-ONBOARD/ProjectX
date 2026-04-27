@@ -11,7 +11,7 @@ function SortableTaskCard({ task, ...props }: { task: Task } & Omit<React.Compon
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard task={task} {...props} />
+      <TaskCard task={task} dragging={isDragging} disableIntroAnimation {...props} />
     </div>
   );
 }
@@ -37,6 +37,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
   return (
     <motion.div
+      ref={setNodeRef}
       className="flex-1 min-w-[310px] max-w-[380px] flex flex-col h-full"
       initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: index * 0.12, ease: [0.4, 0, 0.2, 1] }}
@@ -67,7 +68,6 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
       {/* Drop zone — registered with dnd-kit */}
       <div
-        ref={setNodeRef}
         className={`flex-1 overflow-y-auto space-y-4 pr-1 rounded-xl transition-all ${isOver ? 'bg-primary-50/50 ring-2 ring-dashed ring-primary-300' : ''}`}
       >
         <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
@@ -92,4 +92,4 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   );
 };
 
-export default KanbanColumn;
+export default React.memo(KanbanColumn);

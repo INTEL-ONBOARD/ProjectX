@@ -89,7 +89,11 @@ export const RolesProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const unsubReconnect = electronAPI.onDbReconnected?.(() => {
             dbApi().getRoles().then((docs: RoleDoc[]) => { if (!cancelled) setRoles(docs); }).catch(() => {});
         });
-        return () => { cancelled = true; unsub?.(); unsubReconnect?.(); };
+        const unsubDeleted = electronAPI.onRecordDeleted?.((_: unknown, payload: { entity: string; id: string }) => {
+            if (cancelled || payload.entity !== 'role') return;
+            setRoles(prev => prev.filter(r => r.appId !== payload.id));
+        });
+        return () => { cancelled = true; unsub?.(); unsubReconnect?.(); unsubDeleted?.(); };
     }, []);
 
     const addRole = useCallback((role: RoleDoc) => {
