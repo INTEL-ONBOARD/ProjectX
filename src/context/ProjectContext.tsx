@@ -5,6 +5,7 @@ import { useAuth } from './AuthContext';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const api = () => (window as any).electronAPI.db;
+const INITIAL_SYNC_RETRY_MAX_MS = 30_000;
 
 export interface ProjectRichData {
   description: string;
@@ -55,57 +56,80 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { user: authUser } = useAuth() ?? { user: null };
   const focusDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchAll = (cancelled: { value: boolean }) => {
+  const fetchAll = async (cancelled: { value: boolean }): Promise<boolean> => {
     setLoading(true);
-    return Promise.all([api().getProjects(), api().getTasks()])
-      .then(([prjs, tasks]) => {
-        if (cancelled.value) return;
-        const typedProjects = prjs as Project[];
-        const typedTasks = tasks as Task[];
-        setProjects(typedProjects);
-        setAllTasks(typedTasks);
-        setActiveProject(typedProjects[0]?.id ?? '');
-        setLoading(false);
-        setSynced(true);
-      })
-      .catch(err => {
-        if (cancelled.value) return;
-        console.error('[ProjectContext] Failed to load projects/tasks:', err);
-        // Keep loading=true so overlay stays visible until retry succeeds
-      });
+    try {
+      const [prjs, tasks] = await Promise.all([api().getProjects(), api().getTasks()]);
+      if (cancelled.value) return false;
+      const typedProjects = prjs as Project[];
+      const typedTasks = tasks as Task[];
+      setProjects(typedProjects);
+      setAllTasks(typedTasks);
+      setActiveProject(prev => typedProjects.some(p => p.id === prev) ? prev : (typedProjects[0]?.id ?? ''));
+      setLoading(false);
+      setSynced(true);
+      return true;
+    } catch (err) {
+      if (cancelled.value) return false;
+      console.error('[ProjectContext] Failed to load projects/tasks:', err);
+      // Keep loading=true so overlay stays visible until retry succeeds.
+      return false;
+    }
   };
 
   useEffect(() => {
     const cancelled = { value: false };
-    fetchAll(cancelled);
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryDelayMs = 1_000;
 
-    // Retry on DB reconnect (covers the case where initial load failed due to network error)
+    const clearRetry = () => {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+    };
+
+    const scheduleFetch = (delayMs = 0) => {
+      clearRetry();
+      retryTimer = setTimeout(async () => {
+        if (cancelled.value) return;
+        const ok = await fetchAll(cancelled);
+        if (ok) {
+          retryDelayMs = 1_000;
+          return;
+        }
+        scheduleFetch(retryDelayMs);
+        retryDelayMs = Math.min(retryDelayMs * 2, INITIAL_SYNC_RETRY_MAX_MS);
+      }, delayMs);
+    };
+
+    const retryNow = () => {
+      retryDelayMs = 1_000;
+      scheduleFetch(0);
+    };
+
+    scheduleFetch(0);
+
+    // Retry on DB connect/reconnect (covers initial load race + network recovery)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const unsubReconnect = (window as any).electronAPI?.onDbReconnected?.(() => {
-      fetchAll(cancelled);
-    });
+    const unsubConnected = (window as any).electronAPI?.onDbConnected?.(() => retryNow());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unsubReconnect = (window as any).electronAPI?.onDbReconnected?.(() => retryNow());
 
     // Refetch whenever the window regains focus (catches changes from other windows)
     // Debounced 1000ms to prevent multiple rapid focus events from triggering redundant refetches
     const onFocus = () => {
       if (focusDebounceRef.current) clearTimeout(focusDebounceRef.current);
-      focusDebounceRef.current = setTimeout(() => {
-        Promise.all([api().getProjects(), api().getTasks()])
-          .then(([prjs, tasks]) => {
-            if (!cancelled.value) {
-              setProjects(prjs as Project[]);
-              setAllTasks(tasks as Task[]);
-            }
-          })
-          .catch(() => {});
-      }, 1000);
+      focusDebounceRef.current = setTimeout(() => { retryNow(); }, 1000);
     };
     window.addEventListener('focus', onFocus);
 
     return () => {
       cancelled.value = true;
+      unsubConnected?.();
       unsubReconnect?.();
       window.removeEventListener('focus', onFocus);
+      clearRetry();
       if (focusDebounceRef.current) clearTimeout(focusDebounceRef.current);
     };
   }, []);
@@ -166,20 +190,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     });
 
-    // Fix 7: refetch after DB reconnect so changes made while offline are reflected
-    const unsubReconnect = electronAPI.onDbReconnected?.(() => {
-      Promise.all([api().getProjects(), api().getTasks()])
-        .then(([prjs, tasks]) => {
-          if (cancelled) return;
-          setProjects(prjs as Project[]);
-          setAllTasks(tasks as Task[]);
-          setLoading(false);
-          setSynced(true);
-        })
-        .catch(() => {});
-    });
-
-    return () => { cancelled = true; unsubProject?.(); unsubTask?.(); unsubReconnect?.(); };
+    return () => { cancelled = true; unsubProject?.(); unsubTask?.(); };
   }, []);
 
   // Load project rich data and keep it live via change stream

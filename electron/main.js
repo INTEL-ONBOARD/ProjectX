@@ -1267,7 +1267,14 @@ async function connectDB() {
   if (!uri) {
     throw new Error("MONGODB_URI environment variable is required");
   }
-  const opts = { serverSelectionTimeoutMS: 8e3, connectTimeoutMS: 1e4, socketTimeoutMS: 45e3 };
+  const opts = {
+    serverSelectionTimeoutMS: 3e4,
+    connectTimeoutMS: 3e4,
+    socketTimeoutMS: 9e4,
+    maxPoolSize: 20,
+    minPoolSize: 1,
+    maxIdleTimeMS: 6e4
+  };
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       await import_mongoose.default.connect(uri, opts);
@@ -1291,12 +1298,25 @@ async function connectDB() {
     }
   }
 }
+var QUIET_TRANSIENT_IPC_CHANNELS = /* @__PURE__ */ new Set(["db:presence:heartbeat", "db:members:getAll"]);
+function isTransientMongoError(err) {
+  const name = String(err?.name ?? "");
+  const msg = String(err?.message ?? err ?? "");
+  const labels = err?.errorLabelSet;
+  if (/Mongo(Network|ServerSelection)Error/.test(name)) return true;
+  if (/secureConnect.*timed out|server monitor timeout|ReplicaSetNoPrimary|connection pool .* was cleared/i.test(msg)) return true;
+  if (labels && typeof labels.has === "function" && (labels.has("RetryableError") || labels.has("SystemOverloadedError") || labels.has("ResetPool"))) return true;
+  return false;
+}
 function handle(channel, fn) {
   import_electron.ipcMain.handle(channel, async (_e, ...args) => {
     try {
       return await fn(_e, ...args);
     } catch (err) {
-      console.error(`[ipc:${channel}] error:`, err?.message ?? err);
+      const shouldSuppress = QUIET_TRANSIENT_IPC_CHANNELS.has(channel) && isTransientMongoError(err);
+      if (!shouldSuppress) {
+        console.error(`[ipc:${channel}] error:`, err?.message ?? err);
+      }
       throw err;
     }
   });
@@ -1603,8 +1623,14 @@ function registerDbHandlers() {
     return true;
   });
   handle("db:presence:heartbeat", async (_e, userId) => {
-    await UserModel.updateOne({ appId: userId }, { lastSeen: /* @__PURE__ */ new Date() });
-    return true;
+    if (import_mongoose.default.connection.readyState !== 1) return false;
+    try {
+      await UserModel.updateOne({ appId: userId }, { lastSeen: /* @__PURE__ */ new Date() });
+      return true;
+    } catch (err) {
+      if (isTransientMongoError(err)) return false;
+      throw err;
+    }
   });
   handle("db:attendance:getAll", async () => safe((await AttendanceModel.find().lean()).map((d) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] }))));
   handle("db:attendance:set", async (_e, record) => {
