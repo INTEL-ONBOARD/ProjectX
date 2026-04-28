@@ -29,7 +29,7 @@ interface ProjectContextValue {
   createProject: (name: string, color: string) => Promise<Project>;
   updateProject: (id: string, changes: Partial<Pick<Project, 'name' | 'color'>>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
-  createTask: (task: Omit<Task, 'id'> & { projectId?: string }) => Promise<void>;
+  createTask: (task: Omit<Task, 'id'> & { projectId?: string }) => Promise<Task>;
   updateTask: (id: string, changes: Partial<Omit<Task, 'id'>>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   moveTask: (id: string, newStatus: TaskStatus) => Promise<void>;
@@ -263,10 +263,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAllTasks(prev => prev.map(t => t.projectId === id ? { ...t, projectId: undefined } : t));
   };
 
-  const createTask = async (taskData: Omit<Task, 'id'> & { projectId?: string }): Promise<void> => {
+  const createTask = async (taskData: Omit<Task, 'id'> & { projectId?: string }): Promise<Task> => {
     const actorMeta = { actorId: authUser?.id ?? '', actorName: authUser?.name ?? '' };
     const newTask = await api().createTask({ ...taskData, ...actorMeta }) as Task;
     setAllTasks(prev => prev.some(t => t.id === newTask.id) ? prev : [...prev, newTask]);
+    return newTask;
   };
 
   const updateTask = async (id: string, changes: Partial<Omit<Task, 'id'>>) => {

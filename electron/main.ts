@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, Notification, Tray, nativeImage } from 'electron';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import dotenv from 'dotenv';
 import mongoose, { Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
@@ -9,6 +11,9 @@ const envPath = app.isPackaged
     ? path.join(process.resourcesPath, '.env')
     : path.join(__dirname, '../.env');
 dotenv.config({ path: envPath });
+if (!app.isPackaged) {
+    dotenv.config({ path: path.join(__dirname, '../.env.local'), override: true });
+}
 
 // ─── Active stream registry (prevents memory leaks on reconnect) ───────────────
 
@@ -241,10 +246,16 @@ const AttachmentSchema = new Schema({
     attachId:   { type: String, required: true, unique: true },
     taskId:     { type: String, required: true },
     name:       { type: String, required: true },
-    filePath:   { type: String, required: true },
+    filePath:   { type: String, default: '' },
+    storageProvider: { type: String, enum: ['local', 'r2'], default: 'local' },
+    storageKey: { type: String, default: '' },
+    mimeType:   { type: String, default: 'application/octet-stream' },
+    kind:       { type: String, enum: ['file', 'image'], default: 'file' },
     size:       { type: Number, default: 0 },
     uploadedAt: { type: String, required: true },
 });
+AttachmentSchema.index({ taskId: 1, uploadedAt: 1 });
+AttachmentSchema.index({ storageProvider: 1, storageKey: 1 });
 const AttachmentModel = mongoose.model('Attachment', AttachmentSchema);
 
 const TaskTemplateSchema = new Schema({
@@ -304,6 +315,19 @@ const toProject     = (d: any) => ({ id: d.appId, name: d.name, color: d.color, 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toTask        = (d: any) => ({ id: d.appId, title: d.title, description: d.description ?? '', priority: d.priority, status: d.status, taskType: d.taskType ?? 'task', taskNumber: d.taskNumber ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? 'none', order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [], subtasks: d.subtasks ?? [], estimatedMinutes: d.estimatedMinutes ?? 0, timeEntries: d.timeEntries ?? [] });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const toAttachment  = (d: any) => ({
+    id: d.attachId,
+    taskId: d.taskId,
+    name: d.name,
+    filePath: d.filePath ?? '',
+    storageProvider: d.storageProvider ?? (d.storageKey ? 'r2' : 'local'),
+    storageKey: d.storageKey ?? '',
+    mimeType: d.mimeType ?? 'application/octet-stream',
+    kind: d.kind ?? (String(d.mimeType ?? '').startsWith('image/') ? 'image' : 'file'),
+    size: d.size ?? 0,
+    uploadedAt: d.uploadedAt,
+});
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toAuthUser    = (d: any) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toDept        = (d: any) => ({ id: d.deptId, name: d.name, color: d.color, memberIds: (d.memberIds ?? []).map(String) });
@@ -348,6 +372,188 @@ const toAppearancePref = (d: any) => ({ userId: d.userId, themeMode: d.themeMode
 const toNotif = (d: any) => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? '', refId: d.refId ?? '', read: d.read ?? false, seenAt: d.seenAt ?? null, createdAt: d.createdAt });
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toRole = (d: any) => ({ appId: d.appId, name: d.name, color: d.color ?? '#9CA3AF' });
+
+type R2Config = {
+    endpoint: string;
+    bucket: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+};
+
+let r2Client: S3Client | null = null;
+let r2ClientKey = '';
+
+function normalizeR2Endpoint(endpoint: string): string {
+    return endpoint.replace(/\/+$/, '');
+}
+
+function getR2Config(): R2Config {
+    const endpoint = process.env.R2_ENDPOINT
+        ? normalizeR2Endpoint(process.env.R2_ENDPOINT)
+        : process.env.CLOUDFLARE_ACCOUNT_ID
+            ? `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`
+            : '';
+    const bucket = process.env.R2_BUCKET_NAME || process.env.R2_BUCKET || '';
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID || '';
+    const secretAccessKeyInput = process.env.R2_SECRET_ACCESS_KEY || '';
+    const secretAccessKey = secretAccessKeyInput.startsWith('cfat_')
+        ? createHash('sha256').update(secretAccessKeyInput).digest('hex')
+        : secretAccessKeyInput;
+    const missing = [
+        ['R2_ENDPOINT or CLOUDFLARE_ACCOUNT_ID', endpoint],
+        ['R2_BUCKET_NAME', bucket],
+        ['R2_ACCESS_KEY_ID', accessKeyId],
+        ['R2_SECRET_ACCESS_KEY', secretAccessKey],
+    ].filter(([, value]) => !value).map(([key]) => key);
+
+    if (missing.length > 0) {
+        throw new Error(`R2 storage is not configured. Missing: ${missing.join(', ')}`);
+    }
+
+    return { endpoint, bucket, accessKeyId, secretAccessKey };
+}
+
+function getR2Client(): { client: S3Client; config: R2Config } {
+    const config = getR2Config();
+    const key = `${config.endpoint}|${config.accessKeyId}`;
+    if (!r2Client || r2ClientKey !== key) {
+        r2Client = new S3Client({
+            region: 'auto',
+            endpoint: config.endpoint,
+            credentials: {
+                accessKeyId: config.accessKeyId,
+                secretAccessKey: config.secretAccessKey,
+            },
+        });
+        r2ClientKey = key;
+    }
+    return { client: r2Client, config };
+}
+
+const MIME_TYPES: Record<string, string> = {
+    '.avif': 'image/avif',
+    '.bmp': 'image/bmp',
+    '.csv': 'text/csv',
+    '.gif': 'image/gif',
+    '.heic': 'image/heic',
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpeg',
+    '.json': 'application/json',
+    '.pdf': 'application/pdf',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.txt': 'text/plain',
+    '.webp': 'image/webp',
+    '.xls': 'application/vnd.ms-excel',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.zip': 'application/zip',
+};
+
+function mimeFromName(name: string): string {
+    return MIME_TYPES[path.extname(name).toLowerCase()] || 'application/octet-stream';
+}
+
+function kindFromMime(mimeType: string): 'file' | 'image' {
+    return mimeType.startsWith('image/') ? 'image' : 'file';
+}
+
+function sanitizeFileName(name: string): string {
+    return path.basename(name).replace(/[^\w.\-() ]+/g, '_').replace(/\s+/g, ' ').trim() || 'attachment';
+}
+
+function buildStorageKey(taskId: string, attachId: string, name: string): string {
+    return `tasks/${taskId}/${attachId}/${sanitizeFileName(name)}`;
+}
+
+async function streamToBuffer(body: any): Promise<Buffer> {
+    if (!body) return Buffer.alloc(0);
+    if (Buffer.isBuffer(body)) return body;
+    if (typeof body.transformToByteArray === 'function') {
+        return Buffer.from(await body.transformToByteArray());
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of body as AsyncIterable<Buffer | Uint8Array | string>) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+}
+
+async function uploadAttachmentToR2(taskId: string, sourcePath: string, forcedKind?: 'file' | 'image', includePreview = false): Promise<any> {
+    const { client, config } = getR2Client();
+    const name = path.basename(sourcePath);
+    const attachId = randomUUID();
+    const mimeType = mimeFromName(name);
+    const kind = forcedKind ?? kindFromMime(mimeType);
+    const storageKey = buildStorageKey(taskId, attachId, name);
+    const [stat, body] = await Promise.all([
+        fs.promises.stat(sourcePath),
+        fs.promises.readFile(sourcePath),
+    ]);
+
+    await client.send(new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: storageKey,
+        Body: body,
+        ContentType: mimeType,
+    }));
+
+    let doc: any;
+    try {
+        doc = await AttachmentModel.create({
+            attachId,
+            taskId,
+            name,
+            filePath: '',
+            storageProvider: 'r2',
+            storageKey,
+            mimeType,
+            kind,
+            size: stat.size,
+            uploadedAt: new Date().toISOString(),
+        });
+        await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
+    } catch (err) {
+        try {
+            await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: storageKey }));
+        } catch (deleteErr: any) {
+            console.error('[attachments:upload] failed to remove orphaned R2 object:', deleteErr?.message ?? deleteErr);
+        }
+        throw err;
+    }
+
+    const result = toAttachment(doc.toObject());
+    if (includePreview && kind === 'image') {
+        return { ...result, previewDataUrl: `data:${mimeType};base64,${body.toString('base64')}` };
+    }
+    return result;
+}
+
+async function readAttachmentBuffer(doc: any): Promise<{ buffer: Buffer; mimeType: string }> {
+    const mimeType = doc.mimeType || mimeFromName(doc.name || doc.filePath || '');
+    if ((doc.storageProvider ?? (doc.storageKey ? 'r2' : 'local')) === 'r2') {
+        const { client, config } = getR2Client();
+        const response = await client.send(new GetObjectCommand({
+            Bucket: config.bucket,
+            Key: doc.storageKey,
+        }));
+        return { buffer: await streamToBuffer(response.Body), mimeType };
+    }
+    if (!doc.filePath) throw new Error('Attachment file path is missing.');
+    return { buffer: await fs.promises.readFile(doc.filePath), mimeType };
+}
+
+async function resolveAttachmentOpenPath(doc: any): Promise<string> {
+    if ((doc.storageProvider ?? (doc.storageKey ? 'r2' : 'local')) !== 'r2') {
+        if (!doc.filePath) throw new Error('Attachment file path is missing.');
+        return doc.filePath;
+    }
+    const { buffer } = await readAttachmentBuffer(doc);
+    const cacheDir = path.join(app.getPath('userData'), 'r2-cache', doc.attachId);
+    await fs.promises.mkdir(cacheDir, { recursive: true });
+    const cachePath = path.join(cacheDir, sanitizeFileName(doc.name || 'attachment'));
+    await fs.promises.writeFile(cachePath, buffer);
+    return cachePath;
+}
 
 // ─── MongoDB connection ────────────────────────────────────────────────────────
 
@@ -928,7 +1134,7 @@ function startAttachmentStream(): void {
             const op = change.operationType;
             if (op === 'insert' || op === 'update' || op === 'replace') {
                 const d = change.fullDocument;
-                if (d) try { win.webContents.send('data:attachment:changed', { op, doc: safe({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt }) }); } catch (sendErr: any) { console.error('[changeStream:attachment] send error:', sendErr.message); }
+                if (d) try { win.webContents.send('data:attachment:changed', { op, doc: safe(toAttachment(d)) }); } catch (sendErr: any) { console.error('[changeStream:attachment] send error:', sendErr.message); }
             } else if (op === 'delete') {
                 const recordId = change.fullDocumentBeforeChange?.attachId ?? change.documentKey?._id?.toString();
                 try { win.webContents.send('data:attachment:changed', { op, id: recordId }); } catch (sendErr: any) { console.error('[changeStream:attachment] send error:', sendErr.message); }
@@ -1313,9 +1519,9 @@ function registerDbHandlers() {
     });
 
     // Tasks
-    handle('db:tasks:getAll', async () => safe((await TaskModel.find().lean()).map(toTask)));
+    handle('db:tasks:getAll', async () => safe((await TaskModel.find({}, { images: 0 }).lean()).map(toTask)));
     handle('db:tasks:create', async (_e, taskData: any) => {
-        const { actorId, actorName, ...rest } = taskData;
+        const { actorId, actorName, images: _ignoredImages, ...rest } = taskData;
         const entry = {
             id: randomUUID(),
             type: 'created',
@@ -1339,7 +1545,7 @@ function registerDbHandlers() {
         return safe(toTask(doc.toObject()));
     });
     handle('db:tasks:update', async (_e, id: string, changes: any) => {
-        const { actorId, actorName, ...rest } = changes;
+        const { actorId, actorName, images: _ignoredImages, ...rest } = changes;
         const actor = { actorId: actorId ?? 'system', actorName: actorName ?? 'System' };
         const current = await TaskModel.findOne({ appId: id }).lean();
         if (!current) return null;
@@ -1365,7 +1571,7 @@ function registerDbHandlers() {
                 if (!newSet.has(a)) entries.push({ id: randomUUID(), type: 'assignee_removed', ...actor, timestamp: ts, from: a });
             }
         }
-        const TASK_ALLOWED_FIELDS = new Set(['title', 'description', 'priority', 'status', 'taskType', 'assignees', 'startDate', 'dueDate', 'projectId', 'blockedBy', 'recurrence', 'order', 'subtasks', 'estimatedMinutes', 'timeEntries', 'images']);
+        const TASK_ALLOWED_FIELDS = new Set(['title', 'description', 'priority', 'status', 'taskType', 'assignees', 'startDate', 'dueDate', 'projectId', 'blockedBy', 'recurrence', 'order', 'subtasks', 'estimatedMinutes', 'timeEntries']);
         // Separate fields to $set (defined values) from fields to $unset (explicitly null/undefined)
         const toSet: any = {};
         const toUnset: any = {};
@@ -1499,48 +1705,65 @@ function registerDbHandlers() {
     // Attachments
     handle('db:attachments:getByTask', async (_e, taskId: string) => {
         const docs = await AttachmentModel.find({ taskId }).sort({ uploadedAt: 1 }).lean();
-        return safe(docs.map((d: any) => ({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt })));
+        return safe(docs.map(toAttachment));
     });
     handle('db:attachments:pick', async (_e, taskId: string) => {
-        const { dialog, app: eApp } = await import('electron');
+        const { dialog } = await import('electron');
         const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
         if (result.canceled || !result.filePaths.length) return [];
-        const fs = await import('fs');
-        const path = await import('path');
-        const destDir = path.join(eApp.getPath('userData'), 'attachments', taskId);
-        await fs.promises.mkdir(destDir, { recursive: true });
         const saved: any[] = [];
         for (const src of result.filePaths) {
-            const name = path.basename(src);
-            const dest = path.join(destDir, `${Date.now()}_${name}`);
-            await fs.promises.copyFile(src, dest);
-            const stat = await fs.promises.stat(dest);
-            const doc = await AttachmentModel.create({ attachId: randomUUID(), taskId, name, filePath: dest, size: stat.size, uploadedAt: new Date().toISOString() });
-            await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
-            saved.push({ id: doc.attachId, taskId, name, filePath: dest, size: stat.size, uploadedAt: doc.uploadedAt });
+            saved.push(await uploadAttachmentToR2(taskId, src));
+        }
+        return safe(saved);
+    });
+    handle('db:attachments:pickImage', async (_e, taskId: string) => {
+        const { dialog } = await import('electron');
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'heic'] }],
+        });
+        if (result.canceled || !result.filePaths.length) return [];
+        const saved: any[] = [];
+        for (const src of result.filePaths) {
+            saved.push(await uploadAttachmentToR2(taskId, src, 'image', true));
         }
         return safe(saved);
     });
     handle('db:attachments:delete', async (_e, attachId: string) => {
-        const doc = await AttachmentModel.findOneAndDelete({ attachId }).lean();
+        const doc = await AttachmentModel.findOne({ attachId }).lean();
         if (doc) {
-            const fs = await import('fs');
-            try { await fs.promises.unlink((doc as any).filePath); } catch (_) {}
+            const storageProvider = (doc as any).storageProvider ?? ((doc as any).storageKey ? 'r2' : 'local');
+            if (storageProvider === 'r2' && (doc as any).storageKey) {
+                const { client, config } = getR2Client();
+                await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: (doc as any).storageKey }));
+            } else if ((doc as any).filePath) {
+                try { await fs.promises.unlink((doc as any).filePath); } catch (_) {}
+            }
+            await AttachmentModel.deleteOne({ attachId });
             await TaskModel.updateOne({ appId: (doc as any).taskId }, { $inc: { files: -1 } });
+            await TaskModel.updateOne({ appId: (doc as any).taskId, files: { $lt: 0 } }, { $set: { files: 0 } });
         }
         await emitDeletionEvent('attachment', attachId);
         return true;
     });
-    handle('db:attachments:open', async (_e, filePath: string) => {
-        await shell.openPath(filePath);
+    handle('db:attachments:open', async (_e, attachIdOrPath: string) => {
+        const doc = await AttachmentModel.findOne({ attachId: attachIdOrPath }).lean();
+        const filePath = doc ? await resolveAttachmentOpenPath(doc) : attachIdOrPath;
+        const result = await shell.openPath(filePath);
+        if (result) throw new Error(result);
         return true;
+    });
+    handle('db:attachments:getDataUrl', async (_e, attachId: string) => {
+        const doc = await AttachmentModel.findOne({ attachId }).lean();
+        if (!doc) return null;
+        const { buffer, mimeType } = await readAttachmentBuffer(doc);
+        return `data:${mimeType};base64,${buffer.toString('base64')}`;
     });
     handle('db:attachments:pickForStaging', async () => {
         const { dialog } = await import('electron');
         const result = await dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] });
         if (result.canceled || !result.filePaths.length) return [];
-        const fs = await import('fs');
-        const path = await import('path');
         const staged: any[] = [];
         for (const src of result.filePaths) {
             try {
@@ -1550,25 +1773,42 @@ function registerDbHandlers() {
         }
         return staged;
     });
-    handle('db:attachments:savePaths', async (_e, taskId: string, filePaths: string[]) => {
-        if (!filePaths || filePaths.length === 0) return [];
-        const { app: eApp } = await import('electron');
-        const fs = await import('fs');
-        const path = await import('path');
-        const destDir = path.join(eApp.getPath('userData'), 'attachments', taskId);
-        await fs.promises.mkdir(destDir, { recursive: true });
-        const saved: any[] = [];
-        let counter = 0;
-        for (const src of filePaths) {
+    handle('db:attachments:pickImagesForStaging', async () => {
+        const { dialog } = await import('electron');
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'bmp', 'heic'] }],
+        });
+        if (result.canceled || !result.filePaths.length) return [];
+        const staged: any[] = [];
+        for (const src of result.filePaths) {
             try {
                 const name = path.basename(src);
-                const dest = path.join(destDir, `${Date.now()}_${counter++}_${name}`);
-                await fs.promises.copyFile(src, dest);
-                const stat = await fs.promises.stat(dest);
-                const doc = await AttachmentModel.create({ attachId: randomUUID(), taskId, name, filePath: dest, size: stat.size, uploadedAt: new Date().toISOString() });
-                await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
-                saved.push({ id: doc.attachId, taskId, name, filePath: dest, size: stat.size, uploadedAt: doc.uploadedAt });
+                const mimeType = mimeFromName(name);
+                if (!mimeType.startsWith('image/')) continue;
+                const [stat, body] = await Promise.all([
+                    fs.promises.stat(src),
+                    fs.promises.readFile(src),
+                ]);
+                staged.push({
+                    name,
+                    path: src,
+                    size: stat.size,
+                    previewDataUrl: `data:${mimeType};base64,${body.toString('base64')}`,
+                });
             } catch (_) {}
+        }
+        return safe(staged);
+    });
+    handle('db:attachments:savePaths', async (_e, taskId: string, filePaths: string[]) => {
+        if (!filePaths || filePaths.length === 0) return [];
+        const saved: any[] = [];
+        for (const src of filePaths) {
+            try {
+                saved.push(await uploadAttachmentToR2(taskId, src));
+            } catch (err: any) {
+                console.error('[attachments:savePaths] failed:', err?.message ?? err);
+            }
         }
         return safe(saved);
     });

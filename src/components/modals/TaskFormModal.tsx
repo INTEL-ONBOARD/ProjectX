@@ -10,10 +10,17 @@ import { Avatar } from '../ui/Avatar';
 
 interface Props {
   onClose: () => void;
-  onSubmit: (task: Omit<Task, 'id'>) => Promise<void> | void;
+  onSubmit: (task: Omit<Task, 'id'>) => Promise<Task | void> | Task | void;
   initial?: Partial<Task>;
   defaultStatus?: TaskStatus;
 }
+
+type StagedImage = {
+  name: string;
+  path: string;
+  size: number;
+  previewDataUrl: string;
+};
 
 const priorityConfig = {
   low:    { label: 'Low',    color: '#D58D49', bg: '#DFA87420', ring: '#D58D49' },
@@ -53,8 +60,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const [showAssigneeDrop, setShowAssigneeDrop] = useState(false);
   const assigneeDropRef = useRef<HTMLDivElement>(null);
-  const [stagedImages, setStagedImages] = useState<string[]>(initial?.images ?? []);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [stagedImages, setStagedImages] = useState<StagedImage[]>([]);
 
   const status: TaskStatus = initial?.status ?? defaultStatus ?? 'todo';
   const isEdit = !!initial?.id;
@@ -106,6 +112,16 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
 
   const [canSubmit, setCanSubmit] = useState(false);
 
+  const handlePickImages = async () => {
+    const picked = await dbApi().pickImagesForStaging() as StagedImage[];
+    if (!picked.length) return;
+    setStagedImages(prev => {
+      const seen = new Set(prev.map(image => image.path));
+      const next = picked.filter(image => !seen.has(image.path));
+      return next.length ? [...prev, ...next] : prev;
+    });
+  };
+
   const goNext = (e?: React.MouseEvent | React.KeyboardEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
@@ -124,7 +140,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
     if (!title.trim()) { setStep(0); setTitleError('Title is required'); return; }
     setLoading(true);
     try {
-      await onSubmit({
+      const savedTask = await onSubmit({
         title: title.trim(),
         description: description.trim(),
         priority,
@@ -138,8 +154,11 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
         blockedBy,
         comments: initial?.comments ?? 0,
         files: initial?.files ?? 0,
-        images: stagedImages,
       });
+      const taskId = savedTask?.id ?? initial?.id;
+      if (taskId && stagedImages.length > 0) {
+        await dbApi().saveAttachments(taskId, stagedImages.map(image => image.path));
+      }
       setLoading(false);
       onClose();
     } catch (err) {
@@ -506,30 +525,11 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                     <label className="text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
                       <ImagePlus size={10} /> Images
                     </label>
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={e => {
-                        const files = Array.from(e.target.files ?? []);
-                        e.target.value = '';
-                        files.forEach(file => {
-                          const reader = new FileReader();
-                          reader.onload = ev => {
-                            const dataUrl = ev.target?.result as string;
-                            if (dataUrl) setStagedImages(prev => [...prev, dataUrl]);
-                          };
-                          reader.readAsDataURL(file);
-                        });
-                      }}
-                    />
                     {stagedImages.length > 0 && (
                       <div className="grid grid-cols-3 gap-1.5 mb-2">
-                        {stagedImages.map((src, i) => (
-                          <div key={i} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '1' }}>
-                            <img src={src} alt="" className="w-full h-full object-cover" />
+                        {stagedImages.map((image, i) => (
+                          <div key={image.path} className="relative rounded-lg overflow-hidden" style={{ aspectRatio: '1' }}>
+                            <img src={image.previewDataUrl} alt="" className="w-full h-full object-cover" />
                             <button
                               type="button"
                               onClick={() => setStagedImages(prev => prev.filter((_, idx) => idx !== i))}
@@ -544,7 +544,7 @@ const TaskFormModal: React.FC<Props> = ({ onClose, onSubmit, initial, defaultSta
                     )}
                     <button
                       type="button"
-                      onClick={() => imageInputRef.current?.click()}
+                      onClick={handlePickImages}
                       className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-colors"
                       style={{ background: 'var(--bg-muted)', color: 'var(--text-subtle)', border: '1.5px dashed var(--border-strong)' }}
                     >

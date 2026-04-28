@@ -1,0 +1,2614 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// electron/main.ts
+var import_electron = require("electron");
+var import_path = __toESM(require("path"));
+var import_crypto = require("crypto");
+var import_dotenv = __toESM(require("dotenv"));
+var import_mongoose = __toESM(require("mongoose"));
+var import_bcryptjs = __toESM(require("bcryptjs"));
+var envPath = import_electron.app.isPackaged ? import_path.default.join(process.resourcesPath, ".env") : import_path.default.join(__dirname, "../.env");
+import_dotenv.default.config({ path: envPath });
+var activeStreams = /* @__PURE__ */ new Map();
+function registerStream(name, stream) {
+  if (activeStreams.has(name)) {
+    try {
+      activeStreams.get(name).close();
+    } catch {
+    }
+  }
+  activeStreams.set(name, stream);
+}
+var UserSchema = new import_mongoose.Schema({
+  appId: { type: String, required: true, unique: true },
+  name: String,
+  avatar: { type: String, default: "" },
+  email: String,
+  location: String,
+  role: { type: String, default: "member" },
+  designation: String,
+  status: { type: String, enum: ["active", "inactive"], default: "active" },
+  lastSeen: { type: Date, default: null }
+});
+var TaskSchema = new import_mongoose.Schema({
+  appId: { type: String, required: true, unique: true },
+  title: { type: String, required: true },
+  description: { type: String, default: "" },
+  priority: { type: String, enum: ["low", "medium", "high", "completed"], default: "low" },
+  status: { type: String, enum: ["todo", "in-progress", "ready-for-qa", "deployment-pending", "blocker", "on-hold", "done"], default: "todo" },
+  taskType: { type: String, enum: ["task", "issue"], default: "task" },
+  assignees: [String],
+  comments: { type: Number, default: 0 },
+  files: { type: Number, default: 0 },
+  images: [String],
+  startDate: String,
+  dueDate: String,
+  projectId: String,
+  taskNumber: { type: Number, default: null },
+  blockedBy: { type: [String], default: [] },
+  recurrence: { type: String, enum: ["none", "daily", "weekly", "monthly"], default: "none" },
+  order: { type: Number, default: 0 },
+  activity: { type: Array, default: [] },
+  subtasks: [{
+    id: String,
+    title: String,
+    completed: { type: Boolean, default: false }
+  }],
+  estimatedMinutes: { type: Number, default: 0 },
+  timeEntries: [{
+    id: String,
+    userId: String,
+    startedAt: String,
+    endedAt: String,
+    note: String
+  }]
+});
+var ProjectSchema = new import_mongoose.Schema({
+  appId: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  color: { type: String, default: "#7AC555" }
+});
+var AttendanceSchema = new import_mongoose.Schema({
+  recordId: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  date: { type: String, required: true },
+  checkIn: String,
+  checkOut: String,
+  status: { type: String, enum: ["present", "absent", "half-day", "on-leave", "holiday", "wfh"], default: "present" },
+  notes: String,
+  breakSessions: [{
+    start: { type: String, required: true },
+    end: { type: String, default: null }
+  }]
+});
+var MessageSchema = new import_mongoose.Schema({
+  msgId: { type: String, required: true, unique: true },
+  fromId: { type: String, required: true },
+  toId: { type: String, required: true },
+  text: { type: String, required: true },
+  timestamp: { type: String, required: true },
+  reactions: { type: Map, of: [String], default: {} },
+  deleted: { type: Boolean, default: false },
+  read: { type: Boolean, default: false },
+  edited: { type: Boolean, default: false }
+});
+var ConvMetaSchema = new import_mongoose.Schema({
+  convId: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  peerId: { type: String, required: true },
+  pinned: { type: Boolean, default: false },
+  starred: { type: Boolean, default: false },
+  archived: { type: Boolean, default: false }
+});
+var DeptSchema = new import_mongoose.Schema({
+  deptId: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  color: { type: String, default: "#5030E5" },
+  memberIds: [String]
+});
+var ProjectRichSchema = new import_mongoose.Schema({
+  projectId: { type: String, required: true, unique: true },
+  description: { type: String, default: "" },
+  status: { type: String, enum: ["active", "on-hold", "completed"], default: "active" },
+  priority: { type: String, enum: ["low", "medium", "high"], default: "medium" },
+  memberIds: [String],
+  startDate: { type: String, default: "" },
+  dueDate: { type: String, default: "" },
+  starred: { type: Boolean, default: false },
+  category: { type: String, default: "General" },
+  milestones: [{
+    id: String,
+    name: String,
+    dueDate: String,
+    completed: { type: Boolean, default: false }
+  }]
+});
+var AuthUserSchema = new import_mongoose.Schema({
+  appId: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, default: "member" }
+});
+var UserPrefSchema = new import_mongoose.Schema({
+  userId: { type: String, required: true, unique: true },
+  theme: { type: String, enum: ["light", "dark", "coffee"], default: "light" },
+  sidebarCollapsed: { type: Boolean, default: false },
+  selectedWeekStart: { type: String, default: null },
+  hasSeenWalkthrough: { type: Boolean, default: false },
+  projectsView: { type: String, enum: ["grid", "list"], default: "grid" },
+  taskBreakdownSnapshot: { type: import_mongoose.Schema.Types.Mixed, default: {} },
+  navOrder: { type: [String], default: [] },
+  backgroundMode: { type: Boolean, default: false }
+});
+var NotifPrefSchema = new import_mongoose.Schema({
+  userId: { type: String, required: true, unique: true },
+  taskUpdates: { type: Boolean, default: true },
+  teamMentions: { type: Boolean, default: true },
+  weeklyDigest: { type: Boolean, default: false },
+  emailNotifs: { type: Boolean, default: true },
+  pushNotifs: { type: Boolean, default: true },
+  smsNotifs: { type: Boolean, default: false },
+  projectUpdates: { type: Boolean, default: true },
+  securityAlerts: { type: Boolean, default: true },
+  quietHours: { type: Boolean, default: true },
+  systemNotifs: { type: Boolean, default: true }
+});
+var NotificationSchema = new import_mongoose.Schema({
+  notifId: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  type: { type: String, enum: ["task_overdue", "task_assigned", "new_message", "permission_request"], required: true },
+  title: { type: String, required: true },
+  body: { type: String, default: "" },
+  refId: { type: String, default: "" },
+  read: { type: Boolean, default: false },
+  seenAt: { type: String, default: null },
+  createdAt: { type: String, required: true }
+});
+var AppearancePrefSchema = new import_mongoose.Schema({
+  userId: { type: String, required: true, unique: true },
+  themeMode: { type: String, enum: ["light", "dark", "coffee", "system"], default: "light" },
+  accentColor: { type: String, default: "#5030E5" },
+  fontSize: { type: String, enum: ["sm", "md", "lg"], default: "md" },
+  compactMode: { type: Boolean, default: false }
+});
+var OrgSchema = new import_mongoose.Schema({
+  orgId: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  logo: { type: String, default: "" },
+  address: { type: String, default: "" },
+  workStart: { type: String, default: "09:00" },
+  workEnd: { type: String, default: "18:00" },
+  createdAt: { type: String, default: () => (/* @__PURE__ */ new Date()).toISOString() }
+});
+var RolePermsSchema = new import_mongoose.Schema({
+  role: { type: String, required: true, unique: true },
+  allowedRoutes: { type: [String], default: [] }
+});
+var CounterSchema = new import_mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  value: { type: Number, default: 0 }
+});
+var CounterModel = import_mongoose.default.model("Counter", CounterSchema);
+var CommentSchema = new import_mongoose.Schema({
+  commentId: { type: String, required: true, unique: true },
+  taskId: { type: String, required: true },
+  authorId: { type: String, required: true },
+  authorName: { type: String, required: true },
+  text: { type: String, required: true },
+  createdAt: { type: String, required: true }
+});
+CommentSchema.index({ taskId: 1, createdAt: -1 });
+var CommentModel = import_mongoose.default.model("Comment", CommentSchema);
+var TaskReorderEventSchema = new import_mongoose.Schema({
+  eventId: { type: String, required: true, unique: true },
+  projectId: { type: String, required: true },
+  columns: { type: import_mongoose.Schema.Types.Mixed, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 }
+});
+var TaskReorderEventModel = import_mongoose.default.model("TaskReorderEvent", TaskReorderEventSchema);
+var DeletionEventSchema = new import_mongoose.Schema({
+  eventId: { type: String, required: true, unique: true },
+  entity: { type: String, required: true },
+  recordId: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 * 7 }
+});
+var DeletionEventModel = import_mongoose.default.model("DeletionEvent", DeletionEventSchema);
+var AttachmentSchema = new import_mongoose.Schema({
+  attachId: { type: String, required: true, unique: true },
+  taskId: { type: String, required: true },
+  name: { type: String, required: true },
+  filePath: { type: String, required: true },
+  size: { type: Number, default: 0 },
+  uploadedAt: { type: String, required: true }
+});
+var AttachmentModel = import_mongoose.default.model("Attachment", AttachmentSchema);
+var TaskTemplateSchema = new import_mongoose.Schema({
+  templateId: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  priority: { type: String, enum: ["low", "medium", "high"], default: "low" },
+  taskType: { type: String, enum: ["task", "issue"], default: "task" },
+  description: { type: String, default: "" },
+  assignees: [String],
+  projectId: { type: String, default: "" }
+});
+var TaskTemplateModel = import_mongoose.default.model("TaskTemplate", TaskTemplateSchema);
+TaskSchema.index({ projectId: 1, status: 1 });
+TaskSchema.index({ assignees: 1 });
+TaskSchema.index({ dueDate: 1, status: 1 });
+MessageSchema.index({ fromId: 1, toId: 1, read: 1 });
+AttendanceSchema.index({ userId: 1, date: 1 });
+NotificationSchema.index({ userId: 1, createdAt: -1 });
+NotificationSchema.index({ userId: 1, read: 1 });
+var UserModel = import_mongoose.default.model("User", UserSchema);
+var TaskModel = import_mongoose.default.model("Task", TaskSchema);
+var ProjectModel = import_mongoose.default.model("Project", ProjectSchema);
+var AttendanceModel = import_mongoose.default.model("Attendance", AttendanceSchema);
+var MessageModel = import_mongoose.default.model("Message", MessageSchema);
+var ConvMetaModel = import_mongoose.default.model("ConvMeta", ConvMetaSchema);
+var DeptModel = import_mongoose.default.model("Dept", DeptSchema);
+var ProjectRichModel = import_mongoose.default.model("ProjectRich", ProjectRichSchema);
+var AuthUserModel = import_mongoose.default.model("AuthUser", AuthUserSchema);
+var UserPrefModel = import_mongoose.default.model("UserPref", UserPrefSchema);
+var NotifPrefModel = import_mongoose.default.model("NotifPref", NotifPrefSchema);
+var NotificationModel = import_mongoose.default.model("Notification", NotificationSchema);
+var AppearancePrefModel = import_mongoose.default.model("AppearancePref", AppearancePrefSchema);
+var OrgModel = import_mongoose.default.model("Org", OrgSchema);
+var RolePermsModel = import_mongoose.default.model("RolePerms", RolePermsSchema);
+var RoleSchema = new import_mongoose.Schema({
+  appId: { type: String, required: true, unique: true },
+  name: { type: String, required: true, unique: true },
+  color: { type: String, default: "#9CA3AF" }
+});
+var RoleModel = import_mongoose.default.model("Role", RoleSchema);
+var safe = (v) => JSON.parse(JSON.stringify(v));
+var toUser = (d) => ({ id: d.appId, name: d.name, avatar: d.avatar ?? "", email: d.email ?? "", location: d.location ?? "", role: d.role, designation: d.designation ?? "", status: d.status, lastSeen: d.lastSeen?.toISOString() ?? null });
+var toProject = (d) => ({ id: d.appId, name: d.name, color: d.color, tasks: [] });
+var toTask = (d) => ({ id: d.appId, title: d.title, description: d.description ?? "", priority: d.priority, status: d.status, taskType: d.taskType ?? "task", taskNumber: d.taskNumber ?? null, blockedBy: (d.blockedBy ?? []).map(String), recurrence: d.recurrence ?? "none", order: d.order ?? 0, assignees: (d.assignees ?? []).map(String), comments: d.comments ?? 0, files: d.files ?? 0, images: (d.images ?? []).map(String), startDate: d.startDate ?? null, dueDate: d.dueDate ?? null, projectId: d.projectId ?? null, activity: d.activity ?? [], subtasks: d.subtasks ?? [], estimatedMinutes: d.estimatedMinutes ?? 0, timeEntries: d.timeEntries ?? [] });
+var toAuthUser = (d) => ({ id: d.appId, name: d.name, email: d.email, role: d.role });
+var toDept = (d) => ({ id: d.deptId, name: d.name, color: d.color, memberIds: (d.memberIds ?? []).map(String) });
+var toProjectRich = (d) => ({ projectId: d.projectId, description: d.description ?? "", status: d.status, priority: d.priority, memberIds: Array.from(d.memberIds ?? []), startDate: d.startDate ?? "", dueDate: d.dueDate ?? "", starred: d.starred ?? false, category: d.category ?? "General", milestones: d.milestones ?? [] });
+var toMsgFrontend = (d) => ({
+  id: d.msgId,
+  from: d.fromId,
+  to: d.toId,
+  text: d.text,
+  time: d.timestamp,
+  read: d.read ?? false,
+  reactions: d.reactions ? Object.fromEntries(Object.entries(d.reactions)) : {},
+  deleted: d.deleted ?? false,
+  edited: d.edited ?? false
+});
+var toConvMeta = (d) => ({ convId: d.convId, userId: d.userId, peerId: d.peerId, pinned: d.pinned ?? false, starred: d.starred ?? false, archived: d.archived ?? false });
+var toOrg = (d) => ({ id: d.orgId, name: d.name, logo: d.logo ?? "", address: d.address ?? "", workStart: d.workStart ?? "09:00", workEnd: d.workEnd ?? "18:00", createdAt: d.createdAt ?? "" });
+var toUserPref = (d) => ({
+  userId: d.userId,
+  theme: d.theme,
+  sidebarCollapsed: d.sidebarCollapsed ?? false,
+  selectedWeekStart: d.selectedWeekStart ?? null,
+  hasSeenWalkthrough: d.hasSeenWalkthrough ?? false,
+  projectsView: d.projectsView ?? "grid",
+  taskBreakdownSnapshot: d.taskBreakdownSnapshot ?? {},
+  navOrder: d.navOrder ?? [],
+  backgroundMode: d.backgroundMode ?? false
+});
+var toNotifPref = (d) => ({ userId: d.userId, taskUpdates: d.taskUpdates, teamMentions: d.teamMentions, weeklyDigest: d.weeklyDigest, emailNotifs: d.emailNotifs, pushNotifs: d.pushNotifs, smsNotifs: d.smsNotifs, projectUpdates: d.projectUpdates, securityAlerts: d.securityAlerts, quietHours: d.quietHours, systemNotifs: d.systemNotifs ?? true });
+var toAppearancePref = (d) => ({ userId: d.userId, themeMode: d.themeMode, accentColor: d.accentColor, fontSize: d.fontSize, compactMode: d.compactMode ?? false });
+var toNotif = (d) => ({ id: d.notifId, userId: d.userId, type: d.type, title: d.title, body: d.body ?? "", refId: d.refId ?? "", read: d.read ?? false, seenAt: d.seenAt ?? null, createdAt: d.createdAt });
+var toRole = (d) => ({ appId: d.appId, name: d.name, color: d.color ?? "#9CA3AF" });
+var mainWindow = null;
+var tray = null;
+var backgroundModeEnabled = false;
+var windowReady = false;
+var activeUserId = "";
+var messageStream = null;
+var projectStream = null;
+var taskStream = null;
+var memberStream = null;
+var attendanceStream = null;
+var projectRichStream = null;
+var rolePermsStream = null;
+var rolesStream = null;
+var orgStream = null;
+var notifPrefStream = null;
+var appearancePrefStream = null;
+var convMetaStream = null;
+var deptStream = null;
+var authUserStream = null;
+var notificationStream = null;
+var commentStream = null;
+var attachmentStream = null;
+var userPrefStream = null;
+var templateStream = null;
+var deletionEventStream = null;
+var taskReorderEventStream = null;
+var systemNotifsEnabled = /* @__PURE__ */ new Map();
+function fireSystemNotif(title, body) {
+  if (!import_electron.Notification.isSupported()) return;
+  try {
+    new import_electron.Notification({ title, body, silent: false, icon: import_path.default.join(__dirname, "../build/icon.png") }).show();
+  } catch (_) {
+  }
+}
+function startMessageStream() {
+  if (!windowReady) return;
+  if (messageStream) {
+    try {
+      messageStream.close();
+    } catch (_) {
+    }
+    messageStream = null;
+  }
+  try {
+    messageStream = MessageModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("message", messageStream);
+    messageStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      const d = change.fullDocument;
+      if (op === "insert") {
+        if (!d) return;
+        try {
+          win.webContents.send("msg:new", toMsgFrontend(d));
+        } catch (sendErr) {
+          console.error("[changeStream:message] send error:", sendErr.message);
+        }
+        const recipientId = d.toId;
+        if (activeUserId && recipientId === activeUserId && systemNotifsEnabled.get(recipientId) !== false) {
+          UserModel.findOne({ appId: d.fromId }).lean().then((sender) => {
+            const name = sender?.name ?? "New message";
+            const text = String(d.text ?? "").slice(0, 80);
+            fireSystemNotif(name, text || "\u{1F4CE} Attachment");
+          }).catch(() => {
+          });
+        }
+      } else if (op === "update" || op === "replace") {
+        if (!d) return;
+        try {
+          win.webContents.send("msg:updated", toMsgFrontend(d));
+        } catch (sendErr) {
+          console.error("[changeStream:message] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.msgId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:message:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:message] send error:", sendErr.message);
+        }
+      }
+    });
+    messageStream.on("error", (err) => {
+      console.error("[changeStream:message] error:", err.message);
+      try {
+        messageStream.close();
+      } catch (_) {
+      }
+      messageStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startMessageStream();
+      }, jitter);
+    });
+    console.log("[changeStream] message stream started");
+  } catch (err) {
+    console.error("[changeStream:message] failed to start:", err.message);
+  }
+}
+function startProjectStream() {
+  if (!windowReady) return;
+  if (projectStream) {
+    try {
+      projectStream.close();
+    } catch (_) {
+    }
+    projectStream = null;
+  }
+  try {
+    projectStream = ProjectModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("project", projectStream);
+    projectStream.on("change", (change) => {
+      console.log("[changeStream:project] RAW CHANGE:", change.operationType, JSON.stringify(change.documentKey));
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:project:changed", { op, doc: safe(toProject(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:project] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:project:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:project] send error:", sendErr.message);
+        }
+      }
+    });
+    projectStream.on("error", (err) => {
+      console.error("[changeStream:project] error:", err.message);
+      try {
+        projectStream.close();
+      } catch (_) {
+      }
+      projectStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startProjectStream();
+      }, jitter);
+    });
+    console.log("[changeStream] project stream started");
+  } catch (err) {
+    console.error("[changeStream:project] failed to start:", err.message);
+  }
+}
+function startTaskStream() {
+  if (!windowReady) return;
+  if (taskStream) {
+    try {
+      taskStream.close();
+    } catch (_) {
+    }
+    taskStream = null;
+  }
+  try {
+    taskStream = TaskModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("task", taskStream);
+    taskStream.on("change", (change) => {
+      console.log("[changeStream:task] RAW CHANGE:", change.operationType, JSON.stringify(change.documentKey));
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:task:changed", { op, doc: safe(toTask(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:task] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:task:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:task] send error:", sendErr.message);
+        }
+      }
+    });
+    taskStream.on("error", (err) => {
+      console.error("[changeStream:task] error:", err.message);
+      try {
+        taskStream.close();
+      } catch (_) {
+      }
+      taskStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startTaskStream();
+      }, jitter);
+    });
+    console.log("[changeStream] task stream started");
+  } catch (err) {
+    console.error("[changeStream:task] failed to start:", err.message);
+  }
+}
+function startMemberStream() {
+  if (!windowReady) return;
+  if (memberStream) {
+    try {
+      memberStream.close();
+    } catch (_) {
+    }
+    memberStream = null;
+  }
+  try {
+    memberStream = UserModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("member", memberStream);
+    memberStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:member:changed", { op, doc: safe(toUser(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:member] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:member:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:member] send error:", sendErr.message);
+        }
+      }
+    });
+    memberStream.on("error", (err) => {
+      console.error("[changeStream:member] error:", err.message);
+      try {
+        memberStream.close();
+      } catch (_) {
+      }
+      memberStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startMemberStream();
+      }, jitter);
+    });
+    console.log("[changeStream] member stream started");
+  } catch (err) {
+    console.error("[changeStream:member] failed to start:", err.message);
+  }
+}
+function startAttendanceStream() {
+  if (!windowReady) return;
+  if (attendanceStream) {
+    try {
+      attendanceStream.close();
+    } catch (_) {
+    }
+    attendanceStream = null;
+  }
+  try {
+    attendanceStream = AttendanceModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("attendance", attendanceStream);
+    attendanceStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) {
+          try {
+            win.webContents.send("data:attendance:changed", { op, doc: safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] }) });
+          } catch (sendErr) {
+            console.error("[changeStream:attendance] send error:", sendErr.message);
+          }
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.recordId ?? change.documentKey?._id?.toString();
+        console.log("[changeStream:attendance] delete op, recordId:", recordId);
+        try {
+          win.webContents.send("data:attendance:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:attendance] send error on delete:", sendErr.message);
+        }
+      }
+    });
+    attendanceStream.on("error", (err) => {
+      console.error("[changeStream:attendance] error:", err.message);
+      try {
+        attendanceStream.close();
+      } catch (_) {
+      }
+      attendanceStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startAttendanceStream();
+      }, jitter);
+    });
+    console.log("[changeStream] attendance stream started");
+  } catch (err) {
+    console.error("[changeStream:attendance] failed to start:", err.message);
+  }
+}
+function startProjectRichStream() {
+  if (!windowReady) return;
+  if (projectRichStream) {
+    try {
+      projectRichStream.close();
+    } catch (_) {
+    }
+    projectRichStream = null;
+  }
+  try {
+    projectRichStream = ProjectRichModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("projectRich", projectRichStream);
+    projectRichStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:projectrich:changed", { op, doc: safe(toProjectRich(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:projectrich] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.projectId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:projectrich:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:projectrich] send error:", sendErr.message);
+        }
+      }
+    });
+    projectRichStream.on("error", (err) => {
+      console.error("[changeStream:projectrich] error:", err.message);
+      try {
+        projectRichStream.close();
+      } catch (_) {
+      }
+      projectRichStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startProjectRichStream();
+      }, jitter);
+    });
+    console.log("[changeStream] projectRich stream started");
+  } catch (err) {
+    console.error("[changeStream:projectrich] failed to start:", err.message);
+  }
+}
+function startRolePermsStream() {
+  if (!windowReady) return;
+  if (rolePermsStream) {
+    try {
+      rolePermsStream.close();
+    } catch (_) {
+    }
+    rolePermsStream = null;
+  }
+  try {
+    rolePermsStream = RolePermsModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("rolePerms", rolePermsStream);
+    rolePermsStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:roleperms:changed", { op, doc: safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] }) });
+        } catch (sendErr) {
+          console.error("[changeStream:roleperms] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.role ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:roleperms:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:roleperms] send error:", sendErr.message);
+        }
+      }
+    });
+    rolePermsStream.on("error", (err) => {
+      console.error("[changeStream:roleperms] error:", err.message);
+      try {
+        rolePermsStream.close();
+      } catch (_) {
+      }
+      rolePermsStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startRolePermsStream();
+      }, jitter);
+    });
+    console.log("[changeStream] rolePerms stream started");
+  } catch (err) {
+    console.error("[changeStream:roleperms] failed to start:", err.message);
+  }
+}
+function startRolesStream() {
+  if (!windowReady) return;
+  if (rolesStream) {
+    try {
+      rolesStream.close();
+    } catch (_) {
+    }
+    rolesStream = null;
+  }
+  try {
+    rolesStream = RoleModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("roles", rolesStream);
+    rolesStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:role:changed", { op, doc: safe(toRole(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:roles] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:role:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:roles] send error:", sendErr.message);
+        }
+      }
+    });
+    rolesStream.on("error", (err) => {
+      console.error("[changeStream:roles] error:", err.message);
+      try {
+        rolesStream.close();
+      } catch (_) {
+      }
+      rolesStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startRolesStream();
+      }, jitter);
+    });
+    console.log("[changeStream] roles stream started");
+  } catch (err) {
+    console.error("[changeStream:roles] failed to start:", err.message);
+  }
+}
+function startOrgStream() {
+  if (!windowReady) return;
+  if (orgStream) {
+    try {
+      orgStream.close();
+    } catch (_) {
+    }
+    orgStream = null;
+  }
+  try {
+    orgStream = OrgModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("org", orgStream);
+    orgStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:org:changed", { op, doc: safe(toOrg(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:org] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.orgId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:org:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:org] send error:", sendErr.message);
+        }
+      }
+    });
+    orgStream.on("error", (err) => {
+      console.error("[changeStream:org] error:", err.message);
+      try {
+        orgStream.close();
+      } catch (_) {
+      }
+      orgStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startOrgStream();
+      }, jitter);
+    });
+    console.log("[changeStream] org stream started");
+  } catch (err) {
+    console.error("[changeStream:org] failed to start:", err.message);
+  }
+}
+function startNotifPrefStream() {
+  if (!windowReady) return;
+  if (notifPrefStream) {
+    try {
+      notifPrefStream.close();
+    } catch (_) {
+    }
+    notifPrefStream = null;
+  }
+  try {
+    notifPrefStream = NotifPrefModel.watch([], { fullDocument: "updateLookup" });
+    registerStream("notifPref", notifPrefStream);
+    notifPrefStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:notifpref:changed", { op, doc: safe(toNotifPref(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:notifpref] send error:", sendErr.message);
+        }
+      }
+    });
+    notifPrefStream.on("error", (err) => {
+      console.error("[changeStream:notifpref] error:", err.message);
+      try {
+        notifPrefStream.close();
+      } catch (_) {
+      }
+      notifPrefStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startNotifPrefStream();
+      }, jitter);
+    });
+    console.log("[changeStream] notifPref stream started");
+  } catch (err) {
+    console.error("[changeStream:notifpref] failed to start:", err.message);
+  }
+}
+function startAppearancePrefStream() {
+  if (!windowReady) return;
+  if (appearancePrefStream) {
+    try {
+      appearancePrefStream.close();
+    } catch (_) {
+    }
+    appearancePrefStream = null;
+  }
+  try {
+    appearancePrefStream = AppearancePrefModel.watch([], { fullDocument: "updateLookup" });
+    registerStream("appearancePref", appearancePrefStream);
+    appearancePrefStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:appearancepref:changed", { op, doc: safe(toAppearancePref(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:appearancepref] send error:", sendErr.message);
+        }
+      }
+    });
+    appearancePrefStream.on("error", (err) => {
+      console.error("[changeStream:appearancepref] error:", err.message);
+      try {
+        appearancePrefStream.close();
+      } catch (_) {
+      }
+      appearancePrefStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startAppearancePrefStream();
+      }, jitter);
+    });
+    console.log("[changeStream] appearancePref stream started");
+  } catch (err) {
+    console.error("[changeStream:appearancepref] failed to start:", err.message);
+  }
+}
+function startConvMetaStream() {
+  if (!windowReady) return;
+  if (convMetaStream) {
+    try {
+      convMetaStream.close();
+    } catch (_) {
+    }
+    convMetaStream = null;
+  }
+  try {
+    convMetaStream = ConvMetaModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("convMeta", convMetaStream);
+    convMetaStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:convmeta:changed", { op, doc: safe(toConvMeta(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:convmeta] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.convId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:convmeta:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:convmeta] send error:", sendErr.message);
+        }
+      }
+    });
+    convMetaStream.on("error", (err) => {
+      console.error("[changeStream:convmeta] error:", err.message);
+      try {
+        convMetaStream.close();
+      } catch (_) {
+      }
+      convMetaStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startConvMetaStream();
+      }, jitter);
+    });
+    console.log("[changeStream] convMeta stream started");
+  } catch (err) {
+    console.error("[changeStream:convmeta] failed to start:", err.message);
+  }
+}
+function startDeptStream() {
+  if (!windowReady) return;
+  if (deptStream) {
+    try {
+      deptStream.close();
+    } catch (_) {
+    }
+    deptStream = null;
+  }
+  try {
+    deptStream = DeptModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("dept", deptStream);
+    deptStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:dept:changed", { op, doc: safe(toDept(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:dept] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.deptId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:dept:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:dept] send error:", sendErr.message);
+        }
+      }
+    });
+    deptStream.on("error", (err) => {
+      console.error("[changeStream:dept] error:", err.message);
+      try {
+        deptStream.close();
+      } catch (_) {
+      }
+      deptStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startDeptStream();
+      }, jitter);
+    });
+    console.log("[changeStream] dept stream started");
+  } catch (err) {
+    console.error("[changeStream:dept] failed to start:", err.message);
+  }
+}
+function startAuthUserStream() {
+  if (!windowReady) return;
+  if (authUserStream) {
+    try {
+      authUserStream.close();
+    } catch (_) {
+    }
+    authUserStream = null;
+  }
+  try {
+    authUserStream = AuthUserModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("authUser", authUserStream);
+    authUserStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:authuser:changed", { op, doc: safe(toAuthUser(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:authuser] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.appId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:authuser:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:authuser] send error:", sendErr.message);
+        }
+      }
+    });
+    authUserStream.on("error", (err) => {
+      console.error("[changeStream:authuser] error:", err.message);
+      try {
+        authUserStream.close();
+      } catch (_) {
+      }
+      authUserStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startAuthUserStream();
+      }, jitter);
+    });
+    console.log("[changeStream] authUser stream started");
+  } catch (err) {
+    console.error("[changeStream:authuser] failed to start:", err.message);
+  }
+}
+function startNotificationStream() {
+  if (!windowReady) return;
+  if (notificationStream) {
+    try {
+      notificationStream.close();
+    } catch (_) {
+    }
+    notificationStream = null;
+  }
+  try {
+    notificationStream = NotificationModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("notification", notificationStream);
+    notificationStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:notification:changed", { op, doc: safe(toNotif(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:notification] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.notifId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:notification:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:notification] send error:", sendErr.message);
+        }
+      }
+    });
+    notificationStream.on("error", (err) => {
+      console.error("[changeStream:notification] error:", err.message);
+      try {
+        notificationStream.close();
+      } catch (_) {
+      }
+      notificationStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startNotificationStream();
+      }, jitter);
+    });
+    console.log("[changeStream] notification stream started");
+  } catch (err) {
+    console.error("[changeStream:notification] failed to start:", err.message);
+  }
+}
+function startCommentStream() {
+  if (!windowReady) return;
+  if (commentStream) {
+    try {
+      commentStream.close();
+    } catch (_) {
+    }
+    commentStream = null;
+  }
+  try {
+    commentStream = CommentModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("comment", commentStream);
+    commentStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:comment:changed", { op, doc: safe({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt }) });
+        } catch (sendErr) {
+          console.error("[changeStream:comment] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.commentId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:comment:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:comment] send error:", sendErr.message);
+        }
+      }
+    });
+    commentStream.on("error", (err) => {
+      console.error("[changeStream:comment] error:", err.message);
+      try {
+        commentStream.close();
+      } catch (_) {
+      }
+      commentStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startCommentStream();
+      }, jitter);
+    });
+    console.log("[changeStream] comment stream started");
+  } catch (err) {
+    console.error("[changeStream:comment] failed to start:", err.message);
+  }
+}
+function startAttachmentStream() {
+  if (!windowReady) return;
+  if (attachmentStream) {
+    try {
+      attachmentStream.close();
+    } catch (_) {
+    }
+    attachmentStream = null;
+  }
+  try {
+    attachmentStream = AttachmentModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("attachment", attachmentStream);
+    attachmentStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:attachment:changed", { op, doc: safe({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt }) });
+        } catch (sendErr) {
+          console.error("[changeStream:attachment] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.attachId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:attachment:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:attachment] send error:", sendErr.message);
+        }
+      }
+    });
+    attachmentStream.on("error", (err) => {
+      console.error("[changeStream:attachment] error:", err.message);
+      try {
+        attachmentStream.close();
+      } catch (_) {
+      }
+      attachmentStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startAttachmentStream();
+      }, jitter);
+    });
+    console.log("[changeStream] attachment stream started");
+  } catch (err) {
+    console.error("[changeStream:attachment] failed to start:", err.message);
+  }
+}
+function startUserPrefStream() {
+  if (!windowReady) return;
+  if (userPrefStream) {
+    try {
+      userPrefStream.close();
+    } catch (_) {
+    }
+    userPrefStream = null;
+  }
+  try {
+    userPrefStream = UserPrefModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("userPref", userPrefStream);
+    userPrefStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) try {
+          win.webContents.send("data:userpref:changed", { op, doc: safe(toUserPref(d)) });
+        } catch (sendErr) {
+          console.error("[changeStream:userpref] send error:", sendErr.message);
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.userId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:userpref:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:userpref] send error:", sendErr.message);
+        }
+      }
+    });
+    userPrefStream.on("error", (err) => {
+      console.error("[changeStream:userpref] error:", err.message);
+      try {
+        userPrefStream.close();
+      } catch (_) {
+      }
+      userPrefStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startUserPrefStream();
+      }, jitter);
+    });
+    console.log("[changeStream] userPref stream started");
+  } catch (err) {
+    console.error("[changeStream:userpref] failed to start:", err.message);
+  }
+}
+function startTemplateStream() {
+  if (!windowReady) return;
+  if (templateStream) {
+    try {
+      templateStream.close();
+    } catch (_) {
+    }
+    templateStream = null;
+  }
+  try {
+    templateStream = TaskTemplateModel.watch([], { fullDocument: "updateLookup", fullDocumentBeforeChange: "whenAvailable" });
+    registerStream("template", templateStream);
+    templateStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const op = change.operationType;
+      if (op === "insert" || op === "update" || op === "replace") {
+        const d = change.fullDocument;
+        if (d) {
+          try {
+            win.webContents.send("data:template:changed", { op, doc: safe({ id: d.templateId, name: d.name, priority: d.priority, taskType: d.taskType, description: d.description, assignees: d.assignees, projectId: d.projectId }) });
+          } catch (sendErr) {
+            console.error("[changeStream:template] send error:", sendErr.message);
+          }
+        }
+      } else if (op === "delete") {
+        const recordId = change.fullDocumentBeforeChange?.templateId ?? change.documentKey?._id?.toString();
+        try {
+          win.webContents.send("data:template:changed", { op, id: recordId });
+        } catch (sendErr) {
+          console.error("[changeStream:template] send error:", sendErr.message);
+        }
+      }
+    });
+    templateStream.on("error", (err) => {
+      console.error("[changeStream:template] error:", err.message);
+      try {
+        templateStream.close();
+      } catch (_) {
+      }
+      templateStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startTemplateStream();
+      }, jitter);
+    });
+    console.log("[changeStream] template stream started");
+  } catch (err) {
+    console.error("[changeStream:template] failed to start:", err.message);
+  }
+}
+function startDeletionEventStream() {
+  if (!windowReady) return;
+  if (deletionEventStream) {
+    try {
+      deletionEventStream.close();
+    } catch (_) {
+    }
+    deletionEventStream = null;
+  }
+  try {
+    deletionEventStream = DeletionEventModel.watch([], { fullDocument: "updateLookup" });
+    registerStream("deletionEvent", deletionEventStream);
+    deletionEventStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      if (change.operationType !== "insert") return;
+      const d = change.fullDocument;
+      if (!d) return;
+      try {
+        win.webContents.send("data:deleted", { entity: d.entity, id: d.recordId, createdAt: d.createdAt });
+      } catch (sendErr) {
+        console.error("[changeStream:deleted] send error:", sendErr.message);
+      }
+    });
+    deletionEventStream.on("error", (err) => {
+      console.error("[changeStream:deleted] error:", err.message);
+      try {
+        deletionEventStream.close();
+      } catch (_) {
+      }
+      deletionEventStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startDeletionEventStream();
+      }, jitter);
+    });
+    console.log("[changeStream] deletionEvent stream started");
+  } catch (err) {
+    console.error("[changeStream:deleted] failed to start:", err.message);
+  }
+}
+function startTaskReorderEventStream() {
+  if (!windowReady) return;
+  if (taskReorderEventStream) {
+    try {
+      taskReorderEventStream.close();
+    } catch (_) {
+    }
+    taskReorderEventStream = null;
+  }
+  try {
+    taskReorderEventStream = TaskReorderEventModel.watch([], { fullDocument: "updateLookup" });
+    registerStream("taskReorderEvent", taskReorderEventStream);
+    taskReorderEventStream.on("change", (change) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      if (change.operationType !== "insert") return;
+      const d = change.fullDocument;
+      if (!d) return;
+      try {
+        win.webContents.send("data:task:reordered", {
+          projectId: d.projectId,
+          columns: d.columns,
+          createdAt: d.createdAt
+        });
+      } catch (sendErr) {
+        console.error("[changeStream:taskReordered] send error:", sendErr.message);
+      }
+    });
+    taskReorderEventStream.on("error", (err) => {
+      console.error("[changeStream:taskReordered] error:", err.message);
+      try {
+        taskReorderEventStream.close();
+      } catch (_) {
+      }
+      taskReorderEventStream = null;
+      const jitter = 4e3 + Math.floor(Math.random() * 3e3);
+      setTimeout(() => {
+        if (import_mongoose.default.connection.readyState === 1) startTaskReorderEventStream();
+      }, jitter);
+    });
+    console.log("[changeStream] taskReorderEvent stream started");
+  } catch (err) {
+    console.error("[changeStream:taskReordered] failed to start:", err.message);
+  }
+}
+function startDataStreams() {
+  for (const [, stream] of activeStreams) {
+    try {
+      stream.close();
+    } catch {
+    }
+  }
+  activeStreams.clear();
+  startMessageStream();
+  startProjectStream();
+  startTaskStream();
+  startMemberStream();
+  startAttendanceStream();
+  startProjectRichStream();
+  startRolePermsStream();
+  startRolesStream();
+  startOrgStream();
+  startNotifPrefStream();
+  startAppearancePrefStream();
+  startConvMetaStream();
+  startDeptStream();
+  startAuthUserStream();
+  startNotificationStream();
+  startCommentStream();
+  startAttachmentStream();
+  startUserPrefStream();
+  startTemplateStream();
+  startDeletionEventStream();
+  startTaskReorderEventStream();
+}
+async function ensureDefaultData() {
+  const orgExists = await OrgModel.findOne({ orgId: "org-toursurv" }).lean();
+  if (!orgExists) {
+    await OrgModel.create({ orgId: "org-toursurv", name: "Toursurv", workStart: "09:00", workEnd: "18:00", createdAt: (/* @__PURE__ */ new Date()).toISOString() });
+    console.log("Seeded default org: Toursurv");
+  }
+  await AuthUserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: "org-toursurv" } });
+  await UserModel.updateMany({ orgId: { $exists: false } }, { $set: { orgId: "org-toursurv" } });
+  const unnumbered = await TaskModel.find({ $or: [{ taskNumber: null }, { taskNumber: { $exists: false } }] }).sort({ _id: 1 }).lean();
+  if (unnumbered.length > 0) {
+    const counter = await CounterModel.findOneAndUpdate(
+      { name: "tasks" },
+      { $inc: { value: unnumbered.length } },
+      { new: false, upsert: true }
+    );
+    const firstNumber = (counter?.value ?? 0) + 1;
+    for (let i = 0; i < unnumbered.length; i++) {
+      await TaskModel.updateOne({ _id: unnumbered[i]._id }, { $set: { taskNumber: firstNumber + i } });
+    }
+    console.log(`[migration] Assigned taskNumbers ${firstNumber}\u2013${firstNumber + unnumbered.length - 1} to ${unnumbered.length} existing tasks`);
+  }
+}
+function setupDbListeners() {
+  import_mongoose.default.connection.on("disconnected", () => {
+    console.log("MongoDB disconnected");
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("db:disconnected");
+  });
+  import_mongoose.default.connection.on("reconnected", () => {
+    console.log("MongoDB reconnected");
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("db:reconnected");
+    startDataStreams();
+  });
+  import_mongoose.default.connection.on("error", (err) => {
+    console.error("[MongoDB] Connection error:", err.message);
+  });
+}
+async function healOpenSessions() {
+  try {
+    const now = /* @__PURE__ */ new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const stale = await AttendanceModel.find({
+      checkIn: { $exists: true, $ne: null },
+      checkOut: null,
+      date: { $lt: today }
+    }).lean();
+    for (const record of stale) {
+      const closeTime = `${record.date}T23:59:59.000Z`;
+      const healedBreaks = (record.breakSessions ?? []).filter((b) => !!b.start).map((b) => b.end ? b : { ...b, end: closeTime });
+      await AttendanceModel.findOneAndUpdate(
+        { recordId: record.recordId },
+        { checkOut: closeTime, breakSessions: healedBreaks },
+        { upsert: false }
+      );
+    }
+    if (stale.length > 0) {
+      console.log(`[healOpenSessions] Closed ${stale.length} stale open session(s)`);
+    }
+  } catch (err) {
+    console.error("[healOpenSessions] Failed to heal stale sessions:", err?.message ?? err);
+  }
+}
+async function connectDB() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error("MONGODB_URI environment variable is required");
+  }
+  const opts = {
+    serverSelectionTimeoutMS: 3e4,
+    connectTimeoutMS: 3e4,
+    socketTimeoutMS: 9e4,
+    maxPoolSize: 20,
+    minPoolSize: 1,
+    maxIdleTimeMS: 6e4
+  };
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      await import_mongoose.default.connect(uri, opts);
+      console.log("MongoDB connected");
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("db:connected");
+      await healOpenSessions();
+      await ensureDefaultData();
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`MongoDB connection attempt ${attempt} failed:`, msg);
+      if (attempt < 5) {
+        const delay = attempt * 2e3;
+        console.log(`Retrying in ${delay / 1e3}s...`);
+        await new Promise((r) => setTimeout(r, delay));
+      } else {
+        console.error("MongoDB connection failed after 5 attempts. Will retry in 10s...");
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("db:connection-failed", msg);
+        setTimeout(() => connectDB(), 1e4);
+      }
+    }
+  }
+}
+var QUIET_TRANSIENT_IPC_CHANNELS = /* @__PURE__ */ new Set(["db:presence:heartbeat", "db:members:getAll"]);
+function isTransientMongoError(err) {
+  const name = String(err?.name ?? "");
+  const msg = String(err?.message ?? err ?? "");
+  const labels = err?.errorLabelSet;
+  if (/Mongo(Network|ServerSelection)Error/.test(name)) return true;
+  if (/secureConnect.*timed out|server monitor timeout|ReplicaSetNoPrimary|connection pool .* was cleared/i.test(msg)) return true;
+  if (labels && typeof labels.has === "function" && (labels.has("RetryableError") || labels.has("SystemOverloadedError") || labels.has("ResetPool"))) return true;
+  return false;
+}
+function handle(channel, fn) {
+  import_electron.ipcMain.handle(channel, async (_e, ...args) => {
+    try {
+      return await Promise.resolve(fn(_e, ...args));
+    } catch (err) {
+      const shouldSuppress = QUIET_TRANSIENT_IPC_CHANNELS.has(channel) && isTransientMongoError(err);
+      if (!shouldSuppress) {
+        console.error(`[ipc:${channel}] error:`, err?.message ?? err);
+      }
+      throw err;
+    }
+  });
+}
+async function emitDeletionEvent(entity, recordId) {
+  await DeletionEventModel.create({
+    eventId: (0, import_crypto.randomUUID)(),
+    entity,
+    recordId,
+    createdAt: /* @__PURE__ */ new Date()
+  });
+}
+async function emitTaskReorderEvent(projectId, columns) {
+  await TaskReorderEventModel.create({
+    eventId: (0, import_crypto.randomUUID)(),
+    projectId,
+    columns,
+    createdAt: /* @__PURE__ */ new Date()
+  });
+}
+async function requireAdmin() {
+  if (!activeUserId) throw new Error("Not authenticated.");
+  const user = await AuthUserModel.findOne({ appId: activeUserId }).lean();
+  if (!user || user.role !== "admin") throw new Error("Permission denied: admin role required.");
+}
+function registerDbHandlers() {
+  handle("db:projects:getAll", async () => safe((await ProjectModel.find().lean()).map(toProject)));
+  handle("db:projects:create", async (_e, name, color) => {
+    const d = await ProjectModel.create({ appId: `p${(0, import_crypto.randomUUID)()}`, name, color });
+    return safe(toProject(d.toObject()));
+  });
+  handle("db:projects:update", async (_e, id, changes) => {
+    const PROJECT_ALLOWED_FIELDS = /* @__PURE__ */ new Set(["name", "color"]);
+    const safeChanges = Object.fromEntries(Object.entries(changes).filter(([k]) => PROJECT_ALLOWED_FIELDS.has(k)));
+    const d = await ProjectModel.findOneAndUpdate({ appId: id }, { $set: safeChanges }, { returnDocument: "after" }).lean();
+    return d ? safe(toProject(d)) : null;
+  });
+  handle("db:projects:delete", async (_e, id) => {
+    await requireAdmin();
+    await ProjectModel.deleteOne({ appId: id });
+    await TaskModel.updateMany({ projectId: id }, { $unset: { projectId: "" } });
+    await ProjectRichModel.deleteOne({ projectId: id });
+    await Promise.all([
+      emitDeletionEvent("project", id),
+      emitDeletionEvent("projectrich", id)
+    ]);
+    return true;
+  });
+  handle("db:tasks:getAll", async () => safe((await TaskModel.find().lean()).map(toTask)));
+  handle("db:tasks:create", async (_e, taskData) => {
+    const { actorId, actorName, ...rest } = taskData;
+    const entry = {
+      id: (0, import_crypto.randomUUID)(),
+      type: "created",
+      actorId: actorId ?? "system",
+      actorName: actorName ?? "System",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const counter = await CounterModel.findOneAndUpdate(
+      { name: "tasks" },
+      { $inc: { value: 1 } },
+      { new: true, upsert: true }
+    );
+    const taskNumber = counter.value;
+    const doc = await TaskModel.create({
+      appId: "t" + (0, import_crypto.randomUUID)(),
+      ...rest,
+      taskNumber,
+      activity: [entry]
+    });
+    return safe(toTask(doc.toObject()));
+  });
+  handle("db:tasks:update", async (_e, id, changes) => {
+    const { actorId, actorName, ...rest } = changes;
+    const actor = { actorId: actorId ?? "system", actorName: actorName ?? "System" };
+    const current = await TaskModel.findOne({ appId: id }).lean();
+    if (!current) return null;
+    const entries = [];
+    const ts = (/* @__PURE__ */ new Date()).toISOString();
+    const scalarFields = [
+      ["status", "status_changed"],
+      ["priority", "priority_changed"],
+      ["dueDate", "due_date_changed"],
+      ["title", "title_changed"],
+      ["description", "description_changed"]
+    ];
+    for (const [field, type] of scalarFields) {
+      if (rest[field] !== void 0 && String(rest[field]) !== String(current[field] ?? "")) {
+        entries.push({ id: (0, import_crypto.randomUUID)(), type, ...actor, timestamp: ts, from: String(current[field] ?? ""), to: String(rest[field]) });
+      }
+    }
+    if (rest.assignees !== void 0) {
+      const oldSet = new Set(current.assignees ?? []);
+      const newSet = new Set(rest.assignees);
+      for (const a of newSet) {
+        if (!oldSet.has(a)) entries.push({ id: (0, import_crypto.randomUUID)(), type: "assignee_added", ...actor, timestamp: ts, to: a });
+      }
+      for (const a of oldSet) {
+        if (!newSet.has(a)) entries.push({ id: (0, import_crypto.randomUUID)(), type: "assignee_removed", ...actor, timestamp: ts, from: a });
+      }
+    }
+    const TASK_ALLOWED_FIELDS = /* @__PURE__ */ new Set(["title", "description", "priority", "status", "taskType", "assignees", "startDate", "dueDate", "projectId", "blockedBy", "recurrence", "order", "subtasks", "estimatedMinutes", "timeEntries", "images"]);
+    const toSet = {};
+    const toUnset = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (!TASK_ALLOWED_FIELDS.has(k)) continue;
+      if (v === null || v === void 0 || v === "") toUnset[k] = "";
+      else toSet[k] = v;
+    }
+    const updateDoc = {};
+    if (Object.keys(toSet).length > 0) updateDoc.$set = toSet;
+    if (Object.keys(toUnset).length > 0) updateDoc.$unset = toUnset;
+    if (entries.length > 0) updateDoc.$push = { activity: { $each: entries } };
+    const updated = await TaskModel.findOneAndUpdate({ appId: id }, updateDoc, { returnDocument: "after" });
+    if (!updated) return null;
+    const updatedObj = updated.toObject();
+    if (updatedObj.recurrence && updatedObj.recurrence !== "none" && updatedObj.status === "done" && rest.status === "done") {
+      const oldDue = updatedObj.dueDate ? new Date(updatedObj.dueDate) : /* @__PURE__ */ new Date();
+      let nextDue;
+      if (updatedObj.recurrence === "daily") {
+        nextDue = new Date(oldDue);
+        nextDue.setDate(nextDue.getDate() + 1);
+      } else if (updatedObj.recurrence === "weekly") {
+        nextDue = new Date(oldDue);
+        nextDue.setDate(nextDue.getDate() + 7);
+      } else {
+        nextDue = new Date(oldDue);
+        nextDue.setMonth(nextDue.getMonth() + 1);
+      }
+      const nextCounter = await CounterModel.findOneAndUpdate({ name: "tasks" }, { $inc: { value: 1 } }, { new: true, upsert: true });
+      await TaskModel.create({
+        appId: "t" + Date.now() + "_r",
+        title: updatedObj.title,
+        description: updatedObj.description ?? "",
+        priority: updatedObj.priority,
+        taskType: updatedObj.taskType ?? "task",
+        status: "todo",
+        assignees: updatedObj.assignees ?? [],
+        projectId: updatedObj.projectId ?? null,
+        recurrence: updatedObj.recurrence,
+        dueDate: nextDue.toISOString().split("T")[0],
+        taskNumber: nextCounter.value,
+        order: 0,
+        activity: [{ id: (0, import_crypto.randomUUID)(), type: "created", actorId: "system", actorName: "System", timestamp: (/* @__PURE__ */ new Date()).toISOString() }]
+      });
+    }
+    return safe(toTask(updatedObj));
+  });
+  handle("db:tasks:delete", async (_e, id) => {
+    await TaskModel.deleteOne({ appId: id });
+    await emitDeletionEvent("task", id);
+    return true;
+  });
+  handle("db:tasks:move", async (_e, id, newStatus, actorId, actorName) => {
+    const current = await TaskModel.findOne({ appId: id }).lean();
+    if (!current) return null;
+    const entry = {
+      id: (0, import_crypto.randomUUID)(),
+      type: "status_changed",
+      actorId: actorId ?? "system",
+      actorName: actorName ?? "System",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      from: current.status,
+      to: newStatus
+    };
+    const updated = await TaskModel.findOneAndUpdate(
+      { appId: id },
+      { $set: { status: newStatus }, $push: { activity: entry } },
+      { returnDocument: "after" }
+    );
+    return updated ? safe(toTask(updated.toObject())) : null;
+  });
+  handle("db:tasks:reorder", async (_e, payload) => {
+    const actor = {
+      actorId: payload.actorId ?? "system",
+      actorName: payload.actorName ?? "System"
+    };
+    const ts = (/* @__PURE__ */ new Date()).toISOString();
+    const bulkOps = [];
+    const allTaskIds = Array.from(new Set((payload.columns ?? []).flatMap((column) => column.taskIds)));
+    const currentDocs = allTaskIds.length > 0 ? await TaskModel.find({ appId: { $in: allTaskIds } }).lean() : [];
+    const currentById = new Map(currentDocs.map((doc) => [doc.appId, doc]));
+    for (const column of payload.columns ?? []) {
+      for (let index = 0; index < column.taskIds.length; index++) {
+        const taskId = column.taskIds[index];
+        const current = currentById.get(taskId);
+        if (!current) continue;
+        const updateDoc = { $set: { order: index } };
+        if (current.status !== column.status) {
+          updateDoc.$set.status = column.status;
+          updateDoc.$push = {
+            activity: {
+              id: (0, import_crypto.randomUUID)(),
+              type: "status_changed",
+              ...actor,
+              timestamp: ts,
+              from: current.status,
+              to: column.status
+            }
+          };
+        }
+        bulkOps.push({
+          updateOne: {
+            filter: { appId: taskId },
+            update: updateDoc
+          }
+        });
+      }
+    }
+    if (bulkOps.length > 0) {
+      await TaskModel.bulkWrite(bulkOps, { ordered: false });
+    }
+    await emitTaskReorderEvent(payload.projectId, payload.columns ?? []);
+    return true;
+  });
+  handle("db:tasks:scrubAssignee", async (_e, memberId) => {
+    await TaskModel.updateMany({ assignees: memberId }, { $pull: { assignees: memberId } });
+    return true;
+  });
+  handle("db:comments:getByTask", async (_e, taskId) => {
+    const docs = await CommentModel.find({ taskId }).sort({ createdAt: 1 }).lean();
+    return safe(docs.map((d) => ({ id: d.commentId, taskId: d.taskId, authorId: d.authorId, authorName: d.authorName, text: d.text, createdAt: d.createdAt })));
+  });
+  handle("db:comments:add", async (_e, data) => {
+    const doc = await CommentModel.create({ commentId: (0, import_crypto.randomUUID)(), ...data, createdAt: (/* @__PURE__ */ new Date()).toISOString() });
+    await TaskModel.updateOne({ appId: data.taskId }, { $inc: { comments: 1 } });
+    return safe({ id: doc.commentId, taskId: doc.taskId, authorId: doc.authorId, authorName: doc.authorName, text: doc.text, createdAt: doc.createdAt });
+  });
+  handle("db:comments:delete", async (_e, commentId) => {
+    const doc = await CommentModel.findOneAndDelete({ commentId }).lean();
+    if (doc) await TaskModel.updateOne({ appId: doc.taskId }, { $inc: { comments: -1 } });
+    await emitDeletionEvent("comment", commentId);
+    return true;
+  });
+  handle("db:attachments:getByTask", async (_e, taskId) => {
+    const docs = await AttachmentModel.find({ taskId }).sort({ uploadedAt: 1 }).lean();
+    return safe(docs.map((d) => ({ id: d.attachId, taskId: d.taskId, name: d.name, filePath: d.filePath, size: d.size, uploadedAt: d.uploadedAt })));
+  });
+  handle("db:attachments:pick", async (_e, taskId) => {
+    const { dialog, app: eApp } = await import("electron");
+    const result = await dialog.showOpenDialog({ properties: ["openFile", "multiSelections"] });
+    if (result.canceled || !result.filePaths.length) return [];
+    const fs = await import("fs");
+    const path2 = await import("path");
+    const destDir = path2.join(eApp.getPath("userData"), "attachments", taskId);
+    await fs.promises.mkdir(destDir, { recursive: true });
+    const saved = [];
+    for (const src of result.filePaths) {
+      const name = path2.basename(src);
+      const dest = path2.join(destDir, `${Date.now()}_${name}`);
+      await fs.promises.copyFile(src, dest);
+      const stat = await fs.promises.stat(dest);
+      const doc = await AttachmentModel.create({ attachId: (0, import_crypto.randomUUID)(), taskId, name, filePath: dest, size: stat.size, uploadedAt: (/* @__PURE__ */ new Date()).toISOString() });
+      await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
+      saved.push({ id: doc.attachId, taskId, name, filePath: dest, size: stat.size, uploadedAt: doc.uploadedAt });
+    }
+    return safe(saved);
+  });
+  handle("db:attachments:delete", async (_e, attachId) => {
+    const doc = await AttachmentModel.findOneAndDelete({ attachId }).lean();
+    if (doc) {
+      const fs = await import("fs");
+      try {
+        await fs.promises.unlink(doc.filePath);
+      } catch (_) {
+      }
+      await TaskModel.updateOne({ appId: doc.taskId }, { $inc: { files: -1 } });
+    }
+    await emitDeletionEvent("attachment", attachId);
+    return true;
+  });
+  handle("db:attachments:open", async (_e, filePath) => {
+    await import_electron.shell.openPath(filePath);
+    return true;
+  });
+  handle("db:attachments:pickForStaging", async () => {
+    const { dialog } = await import("electron");
+    const result = await dialog.showOpenDialog({ properties: ["openFile", "multiSelections"] });
+    if (result.canceled || !result.filePaths.length) return [];
+    const fs = await import("fs");
+    const path2 = await import("path");
+    const staged = [];
+    for (const src of result.filePaths) {
+      try {
+        const stat = await fs.promises.stat(src);
+        staged.push({ name: path2.basename(src), path: src, size: stat.size });
+      } catch (_) {
+      }
+    }
+    return staged;
+  });
+  handle("db:attachments:savePaths", async (_e, taskId, filePaths) => {
+    if (!filePaths || filePaths.length === 0) return [];
+    const { app: eApp } = await import("electron");
+    const fs = await import("fs");
+    const path2 = await import("path");
+    const destDir = path2.join(eApp.getPath("userData"), "attachments", taskId);
+    await fs.promises.mkdir(destDir, { recursive: true });
+    const saved = [];
+    let counter = 0;
+    for (const src of filePaths) {
+      try {
+        const name = path2.basename(src);
+        const dest = path2.join(destDir, `${Date.now()}_${counter++}_${name}`);
+        await fs.promises.copyFile(src, dest);
+        const stat = await fs.promises.stat(dest);
+        const doc = await AttachmentModel.create({ attachId: (0, import_crypto.randomUUID)(), taskId, name, filePath: dest, size: stat.size, uploadedAt: (/* @__PURE__ */ new Date()).toISOString() });
+        await TaskModel.updateOne({ appId: taskId }, { $inc: { files: 1 } });
+        saved.push({ id: doc.attachId, taskId, name, filePath: dest, size: stat.size, uploadedAt: doc.uploadedAt });
+      } catch (_) {
+      }
+    }
+    return safe(saved);
+  });
+  handle("db:templates:getAll", async () => {
+    const docs = await TaskTemplateModel.find().lean();
+    return safe(docs.map((d) => ({ id: d.templateId, name: d.name, priority: d.priority, taskType: d.taskType, description: d.description, assignees: d.assignees, projectId: d.projectId })));
+  });
+  handle("db:templates:create", async (_e, data) => {
+    const doc = await TaskTemplateModel.create({ templateId: `tmpl${Date.now()}`, ...data });
+    return safe({ id: doc.templateId, name: doc.name, priority: doc.priority, taskType: doc.taskType, description: doc.description, assignees: doc.assignees, projectId: doc.projectId });
+  });
+  handle("db:templates:delete", async (_e, id) => {
+    await TaskTemplateModel.deleteOne({ templateId: id });
+    await emitDeletionEvent("template", id);
+    return true;
+  });
+  handle("db:members:pickAvatar", async () => {
+    const { dialog } = await import("electron");
+    const result = await dialog.showOpenDialog({ properties: ["openFile"], filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }] });
+    if (result.canceled || !result.filePaths.length) return null;
+    const fs = await import("fs");
+    const data = await fs.promises.readFile(result.filePaths[0]);
+    const ext = result.filePaths[0].split(".").pop()?.toLowerCase() ?? "png";
+    const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/png";
+    return `data:${mime};base64,${data.toString("base64")}`;
+  });
+  handle("app:printToPDF", async () => {
+    const { dialog } = await import("electron");
+    if (!mainWindow) return false;
+    const save = await dialog.showSaveDialog(mainWindow, { defaultPath: "report.pdf", filters: [{ name: "PDF", extensions: ["pdf"] }] });
+    if (save.canceled || !save.filePath) return false;
+    const fs = await import("fs");
+    const data = await mainWindow.webContents.printToPDF({ printBackground: true });
+    await fs.promises.writeFile(save.filePath, data);
+    await import_electron.shell.openPath(save.filePath);
+    return true;
+  });
+  handle("db:members:getAll", async () => safe((await UserModel.find().lean()).map(toUser)));
+  handle("db:members:add", async (_e, member) => {
+    const d = await UserModel.create({ appId: `u${Date.now()}`, ...member });
+    return safe(toUser(d.toObject()));
+  });
+  handle("db:members:update", async (_e, id, changes) => {
+    const MEMBER_ALLOWED_FIELDS = /* @__PURE__ */ new Set(["name", "avatar", "email", "location", "role", "designation", "status"]);
+    const safeChanges = Object.fromEntries(Object.entries(changes).filter(([k]) => MEMBER_ALLOWED_FIELDS.has(k)));
+    const d = await UserModel.findOneAndUpdate({ appId: id }, { $set: safeChanges }, { returnDocument: "after" }).lean();
+    return d ? safe(toUser(d)) : null;
+  });
+  handle("db:members:updateRole", async (_e, id, role) => {
+    await requireAdmin();
+    const d = await UserModel.findOneAndUpdate({ appId: id }, { role }, { returnDocument: "after" }).lean();
+    if (!d) throw new Error(`Member not found: ${id}`);
+    await AuthUserModel.findOneAndUpdate({ appId: id }, { role });
+    return safe(toUser(d));
+  });
+  handle("db:members:remove", async (_e, id) => {
+    await requireAdmin();
+    await UserModel.deleteOne({ appId: id });
+    await TaskModel.updateMany({ assignees: id }, { $pull: { assignees: id } });
+    await emitDeletionEvent("member", id);
+    return true;
+  });
+  handle("db:presence:heartbeat", async (_e, userId) => {
+    if (import_mongoose.default.connection.readyState !== 1) return false;
+    try {
+      await UserModel.updateOne({ appId: userId }, { lastSeen: /* @__PURE__ */ new Date() });
+      return true;
+    } catch (err) {
+      if (isTransientMongoError(err)) return false;
+      throw err;
+    }
+  });
+  handle("db:attendance:getAll", async () => safe((await AttendanceModel.find().lean()).map((d) => ({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] }))));
+  handle("db:attendance:set", async (_e, record) => {
+    const recordId = `${record.userId}-${record.date}`;
+    const d = await AttendanceModel.findOneAndUpdate({ recordId }, { $set: { recordId, ...record } }, { upsert: true, returnDocument: "after" }).lean();
+    return safe({ id: d.recordId, userId: d.userId, date: d.date ?? null, checkIn: d.checkIn ?? null, checkOut: d.checkOut ?? null, status: d.status, notes: d.notes ?? null, breakSessions: d.breakSessions ?? [] });
+  });
+  handle("db:attendance:delete", async (_e, userId, date) => {
+    const recordId = `${userId}-${date}`;
+    await AttendanceModel.deleteOne({ recordId });
+    await emitDeletionEvent("attendance", recordId);
+    return true;
+  });
+  handle("db:messages:getBetween", async (_e, userId, peerId) => {
+    const msgs = await MessageModel.find({ $or: [{ fromId: userId, toId: peerId }, { fromId: peerId, toId: userId }] }).sort({ timestamp: 1 }).lean();
+    return safe(msgs.map(toMsgFrontend));
+  });
+  handle("db:messages:send", async (_e, msg) => {
+    const d = await MessageModel.create({ msgId: `m${Date.now()}`, ...msg });
+    return safe(toMsgFrontend(d.toObject()));
+  });
+  handle("db:messages:react", async (_e, msgId, userId, emoji) => {
+    const msg = await MessageModel.findOne({ msgId }).lean();
+    if (!msg) return null;
+    const reactions = msg.reactions ? Object.fromEntries(Object.entries(msg.reactions)) : {};
+    const users = reactions[emoji] ?? [];
+    if (users.includes(userId)) reactions[emoji] = users.filter((u) => u !== userId);
+    else reactions[emoji] = [...users, userId];
+    const d = await MessageModel.findOneAndUpdate({ msgId }, { reactions }, { returnDocument: "after" }).lean();
+    return d ? safe(toMsgFrontend(d)) : null;
+  });
+  handle("db:messages:delete", async (_e, msgId) => {
+    await MessageModel.findOneAndUpdate({ msgId }, { deleted: true });
+    return true;
+  });
+  handle("msg:edit", async (_, msgId, newText) => {
+    if (!newText.trim()) return { ok: false };
+    await MessageModel.updateOne({ msgId }, { $set: { text: newText.trim(), edited: true } });
+    return { ok: true };
+  });
+  handle("db:messages:markRead", async (_e, userId, peerId) => {
+    await MessageModel.updateMany({ fromId: peerId, toId: userId, read: { $ne: true } }, { read: true });
+    return true;
+  });
+  handle("db:messages:unread-counts", async (_, userId) => {
+    const counts = {};
+    const [convMetas, unreadSenders] = await Promise.all([
+      ConvMetaModel.find({ userId }).lean(),
+      MessageModel.distinct("fromId", { toId: userId, read: false, deleted: { $ne: true } })
+    ]);
+    const peerIds = /* @__PURE__ */ new Set([
+      ...convMetas.map((c) => String(c.peerId)),
+      ...unreadSenders.map((id) => String(id))
+    ]);
+    await Promise.all(Array.from(peerIds).map(async (peerId) => {
+      counts[peerId] = await MessageModel.countDocuments({
+        fromId: peerId,
+        toId: userId,
+        read: false,
+        deleted: { $ne: true }
+      });
+    }));
+    return counts;
+  });
+  handle("db:convmeta:getAll", async (_e, userId) => {
+    const docs = await ConvMetaModel.find({ userId }).lean();
+    return safe(docs.map(toConvMeta));
+  });
+  handle("db:convmeta:set", async (_e, meta) => {
+    const convId = `${meta.userId}-${meta.peerId}`;
+    const d = await ConvMetaModel.findOneAndUpdate({ convId }, { convId, ...meta }, { upsert: true, returnDocument: "after" }).lean();
+    return safe(toConvMeta(d));
+  });
+  handle("db:depts:getAll", async () => safe((await DeptModel.find().lean()).map(toDept)));
+  handle("db:depts:create", async (_e, dept) => {
+    const d = await DeptModel.create({ deptId: `dept${Date.now()}`, ...dept });
+    return safe(toDept(d.toObject()));
+  });
+  handle("db:depts:update", async (_e, id, changes) => {
+    const d = await DeptModel.findOneAndUpdate({ deptId: id }, changes, { returnDocument: "after" }).lean();
+    return d ? safe(toDept(d)) : null;
+  });
+  handle("db:depts:delete", async (_e, id) => {
+    await DeptModel.deleteOne({ deptId: id });
+    await emitDeletionEvent("dept", id);
+    return true;
+  });
+  handle("db:projectrich:getAll", async () => safe((await ProjectRichModel.find().lean()).map(toProjectRich)));
+  handle("db:projectrich:set", async (_e, data) => {
+    const { projectId, ...rest } = data;
+    const d = await ProjectRichModel.findOneAndUpdate({ projectId }, { $set: rest }, { upsert: true, returnDocument: "after" }).lean();
+    return safe(toProjectRich(d));
+  });
+  handle("db:projectrich:delete", async (_e, projectId) => {
+    await ProjectRichModel.deleteOne({ projectId });
+    await emitDeletionEvent("projectrich", projectId);
+    return true;
+  });
+  handle("db:auth:login", async (_e, email, password) => {
+    const found = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
+    if (!found) throw new Error("Invalid email or password.");
+    const valid = await import_bcryptjs.default.compare(password, found.password);
+    if (!valid) throw new Error("Invalid email or password.");
+    return safe(toAuthUser(found));
+  });
+  handle("db:auth:register", async (_e, name, email, password, _role, orgId) => {
+    const existing = await AuthUserModel.findOne({ email: email.toLowerCase() }).lean();
+    if (existing) throw new Error("An account with this email already exists.");
+    const appId = `auth-${Date.now()}`;
+    const hashed = await import_bcryptjs.default.hash(password, 10);
+    const d = await AuthUserModel.create({ appId, name, email: email.toLowerCase(), password: hashed, role: "guest", ...orgId ? { orgId } : {} });
+    await UserModel.create({ appId, name, email: email.toLowerCase(), role: "guest", status: "active", ...orgId ? { orgId } : {} });
+    return safe(toAuthUser(d.toObject()));
+  });
+  handle("db:auth:updatePassword", async (_e, userId, currentPassword, newPassword) => {
+    const found = await AuthUserModel.findOne({ appId: userId }).lean();
+    if (!found) throw new Error("Current password is incorrect.");
+    const valid = await import_bcryptjs.default.compare(currentPassword, found.password);
+    if (!valid) throw new Error("Current password is incorrect.");
+    const hashed = await import_bcryptjs.default.hash(newPassword, 10);
+    await AuthUserModel.findOneAndUpdate({ appId: userId }, { password: hashed });
+    return true;
+  });
+  handle("db:auth:updateName", async (_e, userId, newName) => {
+    await AuthUserModel.findOneAndUpdate({ appId: userId }, { name: newName });
+    return true;
+  });
+  handle("db:auth:getAll", async () => {
+    const docs = await AuthUserModel.find().lean();
+    return safe(docs.map((d) => ({ id: d.appId, name: d.name, email: d.email, role: d.role })));
+  });
+  handle("db:auth:validate", async (_e, userId) => {
+    const found = await AuthUserModel.findOne({ appId: userId }).lean();
+    return found ? safe(toAuthUser(found)) : null;
+  });
+  handle("db:auth:updateRole", async (_e, userId, role) => {
+    await requireAdmin();
+    await AuthUserModel.findOneAndUpdate({ appId: userId }, { role });
+    return true;
+  });
+  handle("db:auth:seedDefault", async () => {
+    if (import_electron.app.isPackaged) return false;
+    const count = await AuthUserModel.countDocuments();
+    if (count > 0) return false;
+    const existing = await AuthUserModel.findOne({ email: "admin@projectm.com" }).lean();
+    if (!existing) {
+      const hashed = await import_bcryptjs.default.hash("password123", 10);
+      await AuthUserModel.create({ appId: "auth-default", name: "Admin User", email: "admin@projectm.com", password: hashed, role: "admin" });
+    }
+    const adminExists = await AuthUserModel.findOne({ email: "admin@gmail.com" }).lean();
+    if (!adminExists) {
+      const hashed2 = await import_bcryptjs.default.hash("Admin@123", 10);
+      await AuthUserModel.create({ appId: "auth-toursurv-admin", name: "Admin", email: "admin@gmail.com", password: hashed2, role: "admin" });
+    }
+    const adminMemberExists = await UserModel.findOne({ appId: "auth-toursurv-admin" }).lean();
+    if (!adminMemberExists) {
+      await UserModel.create({ appId: "auth-toursurv-admin", name: "Admin", email: "admin@gmail.com", role: "admin", status: "active" });
+    }
+    const allAuthDocs = await AuthUserModel.find().lean();
+    for (const doc of allAuthDocs) {
+      if (doc.password && !doc.password.startsWith("$2")) {
+        const rehashed = await import_bcryptjs.default.hash(doc.password, 10);
+        await AuthUserModel.updateOne({ appId: doc.appId }, { password: rehashed });
+      }
+    }
+    const orgExists = await OrgModel.findOne({ orgId: "org-toursurv" }).lean();
+    if (!orgExists) {
+      await OrgModel.create({ orgId: "org-toursurv", name: "Toursurv", workStart: "09:00", workEnd: "18:00", createdAt: (/* @__PURE__ */ new Date()).toISOString() });
+    }
+    await RolePermsModel.findOneAndUpdate(
+      { role: "admin" },
+      { allowedRoutes: ["/", "/dashboard", "/messages", "/tasks", "/teams", "/members", "/attendance", "/reports", "/users", "/settings"] },
+      { upsert: true }
+    );
+    await RolePermsModel.findOneAndUpdate(
+      { role: "guest" },
+      { allowedRoutes: ["/settings"] },
+      { upsert: true }
+    );
+    const adminRole = await RoleModel.findOne({ name: "admin" }).lean();
+    if (!adminRole) {
+      await RoleModel.create({ appId: "role_admin", name: "admin", color: "#5030E5" });
+    }
+    const guestRole = await RoleModel.findOne({ name: "guest" }).lean();
+    if (!guestRole) {
+      await RoleModel.create({ appId: "role_guest", name: "guest", color: "#9CA3AF" });
+    }
+  });
+  handle("db:org:get", async () => {
+    const d = await OrgModel.findOne().lean();
+    return d ? safe(toOrg(d)) : null;
+  });
+  handle("db:org:list", async () => {
+    const docs = await OrgModel.find().lean();
+    return safe(docs.map(toOrg));
+  });
+  handle("db:org:set", async (_e, data) => {
+    await requireAdmin();
+    const d = await OrgModel.findOneAndUpdate({ orgId: data.id ?? "org-toursurv" }, { ...data, orgId: data.id ?? "org-toursurv" }, { upsert: true, returnDocument: "after" }).lean();
+    return safe(toOrg(d));
+  });
+  handle("db:roleperms:getAll", async () => {
+    const docs = await RolePermsModel.find().lean();
+    return safe(docs.map((d) => ({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] })));
+  });
+  handle("db:roleperms:set", async (_e, data) => {
+    await requireAdmin();
+    const d = await RolePermsModel.findOneAndUpdate({ role: data.role }, { allowedRoutes: data.allowedRoutes }, { upsert: true, returnDocument: "after" }).lean();
+    return safe({ role: d.role, allowedRoutes: d.allowedRoutes ?? [] });
+  });
+  handle("db:roles:getAll", async () => {
+    const docs = await RoleModel.find().lean();
+    return safe(docs.map(toRole));
+  });
+  handle("db:roles:create", async (_e, data) => {
+    await requireAdmin();
+    if (data.name === "admin") throw new Error("Cannot create a role named admin.");
+    const existing = await RoleModel.findOne({ name: data.name }).lean();
+    if (existing) throw new Error(`Role "${data.name}" already exists.`);
+    const d = await RoleModel.create({ appId: `role_${Date.now()}`, name: data.name, color: data.color });
+    return safe(toRole(d.toObject()));
+  });
+  handle("db:roles:updateColor", async (_e, data) => {
+    const d = await RoleModel.findOneAndUpdate({ appId: data.appId }, { color: data.color }, { returnDocument: "after" }).lean();
+    if (!d) throw new Error("Role not found.");
+    return safe(toRole(d));
+  });
+  handle("db:roles:rename", async (_e, data) => {
+    await requireAdmin();
+    const role = await RoleModel.findOne({ appId: data.appId }).lean();
+    if (!role) throw new Error("Role not found.");
+    if (role.name === "admin") throw new Error("Cannot rename the admin role.");
+    const conflict = await RoleModel.findOne({ name: data.newName }).lean();
+    if (conflict) throw new Error(`Role "${data.newName}" already exists.`);
+    const oldName = role.name;
+    await RoleModel.findOneAndUpdate({ appId: data.appId }, { name: data.newName });
+    const oldPerms = await RolePermsModel.findOne({ role: oldName }).lean();
+    const allowedRoutes = oldPerms?.allowedRoutes ?? ["/settings"];
+    await RolePermsModel.deleteOne({ role: oldName });
+    await RolePermsModel.create({ role: data.newName, allowedRoutes });
+    await UserModel.updateMany({ role: oldName }, { role: data.newName });
+    await AuthUserModel.updateMany({ role: oldName }, { role: data.newName });
+    return safe({ ok: true, oldName });
+  });
+  handle("db:roles:delete", async (_e, data) => {
+    await requireAdmin();
+    const role = await RoleModel.findOne({ appId: data.appId }).lean();
+    if (!role) throw new Error("Role not found.");
+    if (role.name === "admin") throw new Error("Cannot delete the admin role.");
+    await RoleModel.deleteOne({ appId: data.appId });
+    await emitDeletionEvent("role", data.appId);
+    return safe({ ok: true });
+  });
+  handle("db:roleperms:delete", async (_e, data) => {
+    await requireAdmin();
+    await RolePermsModel.deleteOne({ role: data.roleName });
+    await emitDeletionEvent("roleperms", data.roleName);
+    return safe({ ok: true });
+  });
+  handle("db:userpref:get", async (_e, userId) => {
+    const d = await UserPrefModel.findOne({ userId }).lean();
+    return d ? safe(toUserPref(d)) : null;
+  });
+  handle("db:userpref:set", async (_e, prefs) => {
+    const d = await UserPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: "after" }).lean();
+    return safe(toUserPref(d));
+  });
+  handle("db:notifpref:get", async (_e, userId) => {
+    const d = await NotifPrefModel.findOne({ userId }).lean();
+    return d ? safe(toNotifPref(d)) : null;
+  });
+  handle("db:notifpref:set", async (_e, prefs) => {
+    const d = await NotifPrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: "after" }).lean();
+    return safe(toNotifPref(d));
+  });
+  handle("db:appearancepref:get", async (_e, userId) => {
+    const d = await AppearancePrefModel.findOne({ userId }).lean();
+    return d ? safe(toAppearancePref(d)) : null;
+  });
+  handle("db:appearancepref:set", async (_e, prefs) => {
+    const d = await AppearancePrefModel.findOneAndUpdate({ userId: prefs.userId }, prefs, { upsert: true, returnDocument: "after" }).lean();
+    return safe(toAppearancePref(d));
+  });
+  handle("db:notifs:getAll", async (_e, userId) => {
+    const docs = await NotificationModel.find({ userId }).sort({ createdAt: -1 }).limit(100).lean();
+    return safe(docs.map(toNotif));
+  });
+  handle("db:notifs:create", async (_e, notif) => {
+    if (notif.refId) {
+      const existing = await NotificationModel.findOne({ userId: notif.userId, refId: notif.refId }).lean();
+      if (existing) return safe(toNotif(existing));
+    }
+    const notifId = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const d = await NotificationModel.create({ notifId, ...notif, createdAt: (/* @__PURE__ */ new Date()).toISOString() });
+    if (activeUserId && notif.type !== "new_message" && notif.userId === activeUserId && systemNotifsEnabled.get(notif.userId) !== false) {
+      fireSystemNotif(notif.title, notif.body ?? "");
+    }
+    return safe(toNotif(d.toObject()));
+  });
+  handle("db:notifs:markRead", async (_e, notifId) => {
+    await NotificationModel.updateOne({ notifId }, { read: true, seenAt: (/* @__PURE__ */ new Date()).toISOString() });
+    return true;
+  });
+  handle("db:notifs:markAllRead", async (_e, userId) => {
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    await NotificationModel.updateMany({ userId, read: false }, { read: true, seenAt: now });
+    return true;
+  });
+  handle("db:notifs:deleteOld", async (_e, userId) => {
+    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1e3).toISOString();
+    await NotificationModel.deleteMany({ userId, read: true, seenAt: { $ne: null, $lt: cutoff } });
+    return true;
+  });
+}
+var autoUpdater = null;
+if (!process.env.VITE_DEV_SERVER_URL) {
+  try {
+    autoUpdater = require("electron-updater").autoUpdater;
+  } catch {
+  }
+}
+function checkForUpdates(userTriggered = false) {
+  if (!mainWindow) return;
+  if (!autoUpdater) {
+    if (userTriggered) {
+      mainWindow.webContents.send("update:error", "Automatic updates are not configured for this build. Please download the latest version manually.");
+    }
+    return;
+  }
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.error("Update check failed:", err);
+    if (userTriggered) {
+      mainWindow?.webContents.send("update:error", err.message);
+    }
+  });
+}
+function setupAutoUpdater() {
+  if (!autoUpdater) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.verifyUpdateCodeSignature = false;
+  autoUpdater.on("checking-for-update", () => mainWindow?.webContents.send("update:checking"));
+  autoUpdater.on("update-available", (info) => mainWindow?.webContents.send("update:available", { version: info.version, releaseDate: info.releaseDate, releaseNotes: info.releaseNotes }));
+  autoUpdater.on("update-not-available", () => mainWindow?.webContents.send("update:not-available"));
+  autoUpdater.on("download-progress", (p) => mainWindow?.webContents.send("update:download-progress", { percent: Math.round(p.percent), transferred: p.transferred, total: p.total, bytesPerSecond: p.bytesPerSecond }));
+  autoUpdater.on("update-downloaded", (info) => mainWindow?.webContents.send("update:downloaded", { version: info.version }));
+  autoUpdater.on("error", (err) => mainWindow?.webContents.send("update:error", err.message));
+}
+function buildTrayMenu() {
+  return import_electron.Menu.buildFromTemplate([
+    {
+      label: mainWindow?.isVisible() ? "Hide Window" : "Show Window",
+      click: () => {
+        if (!mainWindow) return;
+        if (mainWindow.isVisible()) {
+          mainWindow.hide();
+        } else {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+        tray?.setContextMenu(buildTrayMenu());
+      }
+    },
+    { type: "separator" },
+    {
+      label: "Quit Project M",
+      click: () => {
+        backgroundModeEnabled = false;
+        import_electron.app.quit();
+      }
+    }
+  ]);
+}
+function createTray() {
+  if (tray) return;
+  const iconPath = import_path.default.join(__dirname, "../build/tray-icon.png");
+  const icon = import_electron.nativeImage.createFromPath(iconPath);
+  if (process.platform === "darwin") icon.setTemplateImage(true);
+  tray = new import_electron.Tray(icon);
+  tray.setToolTip("Project M");
+  tray.setContextMenu(buildTrayMenu());
+  tray.on("click", () => {
+    if (process.platform === "darwin") {
+      tray?.popUpContextMenu();
+      return;
+    }
+    if (!mainWindow) return;
+    if (mainWindow.isVisible()) {
+      mainWindow.focus();
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    tray?.setContextMenu(buildTrayMenu());
+  });
+}
+function destroyTray() {
+  if (!tray) return;
+  tray.destroy();
+  tray = null;
+}
+function applyBackgroundMode(enabled) {
+  backgroundModeEnabled = enabled;
+  if (!mainWindow) return;
+  mainWindow.removeAllListeners("close");
+  mainWindow.removeAllListeners("closed");
+  if (enabled) {
+    createTray();
+    mainWindow.on("close", (e) => {
+      if (!backgroundModeEnabled) return;
+      e.preventDefault();
+      mainWindow?.hide();
+      tray?.setContextMenu(buildTrayMenu());
+    });
+  } else {
+    destroyTray();
+    mainWindow.on("closed", () => {
+      mainWindow = null;
+    });
+  }
+}
+function createWindow() {
+  mainWindow = new import_electron.BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 1100,
+    minHeight: 700,
+    // macOS gets its icon from the app bundle automatically — setting it here causes white-edge artifacts
+    icon: process.platform !== "darwin" ? import_path.default.join(__dirname, "../build/icon.png") : void 0,
+    webPreferences: {
+      preload: import_path.default.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      devTools: false
+    },
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
+    trafficLightPosition: { x: 15, y: 15 },
+    // Windows uses default native title bar — no overlay needed
+    titleBarOverlay: false,
+    backgroundColor: "#1A1F35",
+    autoHideMenuBar: true,
+    show: false
+  });
+  import_electron.Menu.setApplicationMenu(null);
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else {
+    mainWindow.loadFile(import_path.default.join(__dirname, "../dist/index.html"));
+  }
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
+    if (autoUpdater) setTimeout(() => checkForUpdates(), 3e3);
+    windowReady = true;
+    startDataStreams();
+  });
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
+  if (!process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+      const isReload = input.key === "r" && (input.control || input.meta) || input.key === "F5";
+      if (isReload) event.preventDefault();
+    });
+  }
+}
+import_electron.app.setName("Project M");
+if (process.platform === "win32") {
+  import_electron.app.setAppUserModelId("com.intel-onboard.projectm");
+}
+import_electron.app.whenReady().then(async () => {
+  registerDbHandlers();
+  handle("update:check", () => checkForUpdates(true));
+  handle("update:install", () => {
+    if (autoUpdater) autoUpdater.quitAndInstall(false, true);
+  });
+  handle("app:version", () => import_electron.app.getVersion());
+  handle("app:openExternal", (_e, url) => import_electron.shell.openExternal(url));
+  handle("app:setTitleBarColor", (_e, color, symbolColor) => {
+    if (process.platform === "win32" && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setTitleBarOverlay({ color, symbolColor, height: 40 });
+    }
+    return true;
+  });
+  handle("app:getLoginItemSettings", () => import_electron.app.getLoginItemSettings());
+  handle("app:setOpenAtLogin", (_e, value) => {
+    import_electron.app.setLoginItemSettings({ openAtLogin: value });
+    return true;
+  });
+  handle("app:getBackgroundMode", () => backgroundModeEnabled);
+  handle("app:setBackgroundMode", async (_e, value) => {
+    applyBackgroundMode(value);
+    if (activeUserId) {
+      await UserPrefModel.findOneAndUpdate(
+        { userId: activeUserId },
+        { backgroundMode: value },
+        { upsert: true }
+      ).catch(() => {
+      });
+    }
+    return true;
+  });
+  handle("app:setActiveUser", async (_e, userId) => {
+    activeUserId = userId ?? "";
+    if (activeUserId) {
+      try {
+        const pref = await UserPrefModel.findOne({ userId: activeUserId }).lean();
+        if (pref && typeof pref.backgroundMode === "boolean") {
+          applyBackgroundMode(pref.backgroundMode);
+        }
+      } catch (_) {
+      }
+    }
+  });
+  handle("app:getSystemNotifsEnabled", async (_e, userId) => {
+    if (!systemNotifsEnabled.has(userId)) {
+      try {
+        const pref = await NotifPrefModel.findOne({ userId }).lean();
+        systemNotifsEnabled.set(userId, pref?.systemNotifs ?? true);
+      } catch (_) {
+        systemNotifsEnabled.set(userId, true);
+      }
+    }
+    return systemNotifsEnabled.get(userId) ?? true;
+  });
+  handle("app:setSystemNotifsEnabled", async (_e, userId, value) => {
+    systemNotifsEnabled.set(userId, value);
+    await NotifPrefModel.findOneAndUpdate({ userId }, { systemNotifs: value }, { upsert: true });
+    return true;
+  });
+  handle("db:force-reconnect", async () => {
+    if (import_mongoose.default.connection.readyState !== 1) {
+      try {
+        await import_mongoose.default.disconnect();
+      } catch (_) {
+      }
+      connectDB();
+    }
+  });
+  setupAutoUpdater();
+  setupDbListeners();
+  await connectDB();
+  createWindow();
+});
+import_electron.app.on("before-quit", () => {
+  backgroundModeEnabled = false;
+  destroyTray();
+  if (messageStream) {
+    try {
+      messageStream.close();
+    } catch (_) {
+    }
+    messageStream = null;
+  }
+  if (projectStream) {
+    try {
+      projectStream.close();
+    } catch (_) {
+    }
+    projectStream = null;
+  }
+  if (taskStream) {
+    try {
+      taskStream.close();
+    } catch (_) {
+    }
+    taskStream = null;
+  }
+  if (memberStream) {
+    try {
+      memberStream.close();
+    } catch (_) {
+    }
+    memberStream = null;
+  }
+  if (attendanceStream) {
+    try {
+      attendanceStream.close();
+    } catch (_) {
+    }
+    attendanceStream = null;
+  }
+  if (projectRichStream) {
+    try {
+      projectRichStream.close();
+    } catch (_) {
+    }
+    projectRichStream = null;
+  }
+  if (rolePermsStream) {
+    try {
+      rolePermsStream.close();
+    } catch (_) {
+    }
+    rolePermsStream = null;
+  }
+  if (rolesStream) {
+    try {
+      rolesStream.close();
+    } catch (_) {
+    }
+    rolesStream = null;
+  }
+  if (orgStream) {
+    try {
+      orgStream.close();
+    } catch (_) {
+    }
+    orgStream = null;
+  }
+  if (notifPrefStream) {
+    try {
+      notifPrefStream.close();
+    } catch (_) {
+    }
+    notifPrefStream = null;
+  }
+  if (appearancePrefStream) {
+    try {
+      appearancePrefStream.close();
+    } catch (_) {
+    }
+    appearancePrefStream = null;
+  }
+  if (convMetaStream) {
+    try {
+      convMetaStream.close();
+    } catch (_) {
+    }
+    convMetaStream = null;
+  }
+  if (deptStream) {
+    try {
+      deptStream.close();
+    } catch (_) {
+    }
+    deptStream = null;
+  }
+  if (authUserStream) {
+    try {
+      authUserStream.close();
+    } catch (_) {
+    }
+    authUserStream = null;
+  }
+  if (notificationStream) {
+    try {
+      notificationStream.close();
+    } catch (_) {
+    }
+    notificationStream = null;
+  }
+  if (commentStream) {
+    try {
+      commentStream.close();
+    } catch (_) {
+    }
+    commentStream = null;
+  }
+  if (attachmentStream) {
+    try {
+      attachmentStream.close();
+    } catch (_) {
+    }
+    attachmentStream = null;
+  }
+  if (userPrefStream) {
+    try {
+      userPrefStream.close();
+    } catch (_) {
+    }
+    userPrefStream = null;
+  }
+  if (templateStream) {
+    try {
+      templateStream.close();
+    } catch (_) {
+    }
+    templateStream = null;
+  }
+  if (deletionEventStream) {
+    try {
+      deletionEventStream.close();
+    } catch (_) {
+    }
+    deletionEventStream = null;
+  }
+  if (taskReorderEventStream) {
+    try {
+      taskReorderEventStream.close();
+    } catch (_) {
+    }
+    taskReorderEventStream = null;
+  }
+});
+import_electron.app.on("window-all-closed", () => {
+  if (!backgroundModeEnabled && process.platform !== "darwin") import_electron.app.quit();
+});
+import_electron.app.on("activate", () => {
+  if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    createWindow();
+  }
+});

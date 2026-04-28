@@ -108,24 +108,52 @@ jobs:
         if: runner.os != 'Windows'
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          if [ -z "$MONGODB_URI" ]; then
-            echo "::error::GitHub secret MONGODB_URI is required for packaged app builds"
-            exit 1
-          fi
-          printf 'MONGODB_URI=%s\n' "$MONGODB_URI" > .env
+          for key in MONGODB_URI CLOUDFLARE_ACCOUNT_ID R2_ENDPOINT R2_BUCKET_NAME R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            if [ -z "${!key}" ]; then
+              echo "::error::GitHub secret $key is required for packaged app builds"
+              exit 1
+            fi
+          done
+          cat > .env <<EOF
+          MONGODB_URI=$MONGODB_URI
+          CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID
+          R2_ENDPOINT=$R2_ENDPOINT
+          R2_BUCKET_NAME=$R2_BUCKET_NAME
+          R2_ACCESS_KEY_ID=$R2_ACCESS_KEY_ID
+          R2_SECRET_ACCESS_KEY=$R2_SECRET_ACCESS_KEY
+          EOF
 
       - name: Inject .env for packaged app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:MONGODB_URI)) {
-            Write-Error 'GitHub secret MONGODB_URI is required for packaged app builds'
-            exit 1
+          foreach ($key in @('MONGODB_URI', 'CLOUDFLARE_ACCOUNT_ID', 'R2_ENDPOINT', 'R2_BUCKET_NAME', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY')) {
+            if ([string]::IsNullOrWhiteSpace((Get-Item "env:$key").Value)) {
+              Write-Error "GitHub secret $key is required for packaged app builds"
+              exit 1
+            }
           }
-          Set-Content -Path .env -Value "MONGODB_URI=$env:MONGODB_URI" -NoNewline
+          @(
+            "MONGODB_URI=$env:MONGODB_URI"
+            "CLOUDFLARE_ACCOUNT_ID=$env:CLOUDFLARE_ACCOUNT_ID"
+            "R2_ENDPOINT=$env:R2_ENDPOINT"
+            "R2_BUCKET_NAME=$env:R2_BUCKET_NAME"
+            "R2_ACCESS_KEY_ID=$env:R2_ACCESS_KEY_ID"
+            "R2_SECRET_ACCESS_KEY=$env:R2_SECRET_ACCESS_KEY"
+          ) | Set-Content -Path .env -NoNewline:$false
 
       - name: Compile Electron main/preload
         run: npm run electron:compile

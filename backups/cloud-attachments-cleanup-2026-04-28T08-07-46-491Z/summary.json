@@ -1,0 +1,12 @@
+{
+  "createdAt": "2026-04-28T08:11:10.494Z",
+  "backupDir": "/Users/kkwenuja/Desktop/ProjectX/backups/cloud-attachments-cleanup-2026-04-28T08-07-46-491Z",
+  "attachmentMetadataRecords": 3,
+  "copiedLocalAttachmentFiles": 1,
+  "missingLocalAttachmentFiles": 2,
+  "tasksWithEmbeddedImagesFound": 33,
+  "tasksWithEmbeddedImagesExported": 33,
+  "failedTaskImageExports": 0,
+  "embeddedImagesExported": 43,
+  "embeddedImageBytes": 13000606
+}

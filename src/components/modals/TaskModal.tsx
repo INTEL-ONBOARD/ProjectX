@@ -226,11 +226,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                     </h3>
                                     <button
                                         onClick={async () => {
-                                            const added = await dbApi().pickAttachments(task!.id) as Attachment[];
-                                            setAttachments(prev => {
-                                                const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
-                                                return newOnes.length ? [...prev, ...newOnes] : prev;
-                                            });
+                                            try {
+                                                const added = await dbApi().pickAttachments(task!.id) as Attachment[];
+                                                setAttachments(prev => {
+                                                    const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
+                                                    return newOnes.length ? [...prev, ...newOnes] : prev;
+                                                });
+                                            } catch (error) {
+                                                console.error(error);
+                                            }
                                         }}
                                         className="text-xs font-semibold text-primary-500 hover:text-primary-600 transition-colors"
                                     >
@@ -243,7 +247,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose }) => {
                                             <Paperclip size={13} className="text-gray-400 shrink-0" />
                                             <span className="flex-1 text-xs text-gray-700 truncate font-medium">{a.name}</span>
                                             <span className="text-[10px] text-gray-400">{fmtSize(a.size)}</span>
-                                            <button onClick={() => dbApi().openAttachment(a.filePath)} className="text-gray-400 hover:text-primary-500 transition-colors">
+                                            <button onClick={() => dbApi().openAttachment(a.id)} className="text-gray-400 hover:text-primary-500 transition-colors">
                                                 <Download size={13} />
                                             </button>
                                             <button onClick={async () => { await dbApi().deleteAttachment(a.id); setAttachments(prev => prev.filter(x => x.id !== a.id)); }} className="text-gray-400 hover:text-red-500 transition-colors">

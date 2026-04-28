@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { Project, Task, TaskStatus, User } from './types';
+import type { Attachment, Project, Task, TaskStatus, User } from './types';
 import type { Organization, AttendanceRecord } from './context/AppContext';
 import type { RolePerms } from './context/RolePermsContext';
 
@@ -62,6 +62,17 @@ interface ElectronDB {
   // Role permissions
   getRolePerms(): Promise<RolePerms[]>;
   setRolePerms(data: { role: string; allowedRoutes: string[] }): Promise<RolePerms>;
+
+  // Attachments
+  getAttachments(taskId: string): Promise<Attachment[]>;
+  pickAttachments(taskId: string): Promise<Attachment[]>;
+  pickImageAttachment(taskId: string): Promise<Attachment[]>;
+  pickForStaging(): Promise<Array<{ name: string; path: string; size: number }>>;
+  pickImagesForStaging(): Promise<Array<{ name: string; path: string; size: number; previewDataUrl: string }>>;
+  saveAttachments(taskId: string, filePaths: string[]): Promise<Attachment[]>;
+  deleteAttachment(attachId: string): Promise<boolean>;
+  openAttachment(attachIdOrPath: string): Promise<boolean>;
+  getAttachmentDataUrl(attachId: string): Promise<string | null>;
 
   // Roles
   getRoles(): Promise<unknown[]>;

@@ -1,0 +1,600 @@
+[
+  {
+    "taskId": "t1773687783385",
+    "taskNumber": 9,
+    "title": "This yellow button cannot be enabled.",
+    "projectId": "p1773686598385",
+    "status": "on-hold",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 243005,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/9_t1773687783385/01.png"
+      },
+      {
+        "index": 1,
+        "mime": "image/png",
+        "bytes": 237485,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/9_t1773687783385/02.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t1773687814219",
+    "taskNumber": 11,
+    "title": "Even after changing the branch and saving it, when I log out and come back, the main location is shown in the branch.",
+    "projectId": "p1773686598385",
+    "status": "ready-for-qa",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 380182,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/11_t1773687814219/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t1773687826040",
+    "taskNumber": 12,
+    "title": "It doesn't come up when I search by its ID. It comes up when I search by the other ones.",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 249367,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/12_t1773687826040/01.png"
+      },
+      {
+        "index": 1,
+        "mime": "image/png",
+        "bytes": 239928,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/12_t1773687826040/02.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t1773728732213",
+    "taskNumber": 149,
+    "title": "Readability issues in the light theme",
+    "projectId": "p1773724538797",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 22247,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/149_t1773728732213/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t1773812735469",
+    "taskNumber": 162,
+    "title": "Notifications are not up-to date",
+    "projectId": "p1773724538797",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/jpeg",
+        "bytes": 1326544,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/162_t1773812735469/01.jpg"
+      }
+    ]
+  },
+  {
+    "taskId": "t1773812774990",
+    "taskNumber": 163,
+    "title": "Image not loading",
+    "projectId": "p1773724538797",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/jpeg",
+        "bytes": 336535,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/163_t1773812774990/01.jpg"
+      }
+    ]
+  },
+  {
+    "taskId": "t60af27ce-1ff3-48de-8ffc-8ac8071b0d77",
+    "taskNumber": 234,
+    "title": "change add to cart to add items",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 10225,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/234_t60af27ce-1ff3-48de-8ffc-8ac8071b0d77/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "tedaee2d1-bd1e-4864-8c23-c2dafcef50d0",
+    "taskNumber": 235,
+    "title": "in price change section item names were not showing",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 109775,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/235_tedaee2d1-bd1e-4864-8c23-c2dafcef50d0/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "tf0f5d5a6-c064-459a-902e-71c8ac5cfc11",
+    "taskNumber": 241,
+    "title": "sales configuration - Printer setting / it says printer is connected even its not connected",
+    "projectId": "p1773686598385",
+    "status": "todo",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 14155,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/241_tf0f5d5a6-c064-459a-902e-71c8ac5cfc11/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "tbd8a6ac2-106b-4ca9-a610-a7eeeaeff34e",
+    "taskNumber": 242,
+    "title": "can only pay with cash and cant confirm the transaction",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 378334,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/242_tbd8a6ac2-106b-4ca9-a610-a7eeeaeff34e/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t2276de6e-450a-4651-9d3a-d59ff25227d9",
+    "taskNumber": 245,
+    "title": "product code is not changing with the item",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 93987,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/245_t2276de6e-450a-4651-9d3a-d59ff25227d9/01.png"
+      },
+      {
+        "index": 1,
+        "mime": "image/png",
+        "bytes": 134420,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/245_t2276de6e-450a-4651-9d3a-d59ff25227d9/02.png"
+      },
+      {
+        "index": 2,
+        "mime": "image/png",
+        "bytes": 84650,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/245_t2276de6e-450a-4651-9d3a-d59ff25227d9/03.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t333e01a2-1ed5-40ab-a23d-87e4445693b3",
+    "taskNumber": 240,
+    "title": "Cant add a discount",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 126021,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/240_t333e01a2-1ed5-40ab-a23d-87e4445693b3/01.png"
+      },
+      {
+        "index": 1,
+        "mime": "image/png",
+        "bytes": 84526,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/240_t333e01a2-1ed5-40ab-a23d-87e4445693b3/02.png"
+      }
+    ]
+  },
+  {
+    "taskId": "tab122ba3-5e25-4b4e-a857-cc9ef5a5bef6",
+    "taskNumber": 255,
+    "title": "Price wont change even tho it says change succses",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 109775,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/255_tab122ba3-5e25-4b4e-a857-cc9ef5a5bef6/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t388dda7b-ff14-4ceb-bf4d-988639226013",
+    "taskNumber": 258,
+    "title": "In sales checkout process hold option is not working",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 244160,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/258_t388dda7b-ff14-4ceb-bf4d-988639226013/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "td7953e56-190f-4c9a-ac1e-a7f6d9d03438",
+    "taskNumber": 272,
+    "title": "If I put a payment on hold, even if I release it and complete the payment, it will still be on hold when I create a new bill. It should be removed when the held payment is completed.",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/jpeg",
+        "bytes": 91897,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/272_td7953e56-190f-4c9a-ac1e-a7f6d9d03438/01.jpg"
+      },
+      {
+        "index": 1,
+        "mime": "image/jpeg",
+        "bytes": 71268,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/272_td7953e56-190f-4c9a-ac1e-a7f6d9d03438/02.jpg"
+      },
+      {
+        "index": 2,
+        "mime": "image/jpeg",
+        "bytes": 116619,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/272_td7953e56-190f-4c9a-ac1e-a7f6d9d03438/03.jpg"
+      }
+    ]
+  },
+  {
+    "taskId": "t9f5f8dbe-814a-47c7-ba4c-12d179b76bb4",
+    "taskNumber": 260,
+    "title": "Payment informations not changing with the selected suplier",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 117885,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/260_t9f5f8dbe-814a-47c7-ba4c-12d179b76bb4/01.png"
+      },
+      {
+        "index": 1,
+        "mime": "image/png",
+        "bytes": 115523,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/260_t9f5f8dbe-814a-47c7-ba4c-12d179b76bb4/02.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t2d382591-d974-44e9-b9df-58ee643b4db6",
+    "taskNumber": 273,
+    "title": "I don't know if it's because the product was added in Sinhala, but when I try to make a payment for the products in Sinhala, it fails.",
+    "projectId": "p1773686598385",
+    "status": "blocker",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/jpeg",
+        "bytes": 94520,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/273_t2d382591-d974-44e9-b9df-58ee643b4db6/01.jpg"
+      },
+      {
+        "index": 1,
+        "mime": "image/jpeg",
+        "bytes": 151555,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/273_t2d382591-d974-44e9-b9df-58ee643b4db6/02.jpg"
+      }
+    ]
+  },
+  {
+    "taskId": "t2ac9d425-baca-487d-8937-29e2fa634e21",
+    "taskNumber": 253,
+    "title": "Unable to restock",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 232656,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/253_t2ac9d425-baca-487d-8937-29e2fa634e21/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t7eda5584-a257-4346-be8f-fe63c4ea0ca7",
+    "taskNumber": 257,
+    "title": "cant proceed the checkout",
+    "projectId": "p1773686598385",
+    "status": "ready-for-qa",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 430928,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/257_t7eda5584-a257-4346-be8f-fe63c4ea0ca7/01.png"
+      },
+      {
+        "index": 1,
+        "mime": "image/png",
+        "bytes": 362023,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/257_t7eda5584-a257-4346-be8f-fe63c4ea0ca7/02.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t8e4246ef-dd61-443a-a815-207a4ebd8231",
+    "taskNumber": 271,
+    "title": "If there is a quantity weighing here, it cannot be put. It needs to be in kilograms and grams. This is fine for things like pack bottles.",
+    "projectId": "p1773686598385",
+    "status": "todo",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/jpeg",
+        "bytes": 49280,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/271_t8e4246ef-dd61-443a-a815-207a4ebd8231/01.jpg"
+      }
+    ]
+  },
+  {
+    "taskId": "t964cce67-00db-430c-936f-6a75d0157bbd",
+    "taskNumber": 247,
+    "title": "remove dispose items in the inventory restock screen",
+    "projectId": "p1773686598385",
+    "status": "on-hold",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 161481,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/247_t964cce67-00db-430c-936f-6a75d0157bbd/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t90c02c12-2024-4605-9a89-b98b5889b0a4",
+    "taskNumber": 440,
+    "title": "cant hold a sale",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 246462,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/440_t90c02c12-2024-4605-9a89-b98b5889b0a4/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t86730011-1ac0-40e8-a51a-8354e8c0d518",
+    "taskNumber": 275,
+    "title": "When logged in with a cashier account, no items(products) are displayed. However, they are displayed in the admin account.",
+    "projectId": "p1773686598385",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 95215,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/275_t86730011-1ac0-40e8-a51a-8354e8c0d518/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "tf1795d30-0215-462e-8ed6-f0a3997acbd0",
+    "taskNumber": 439,
+    "title": "cant proceed a sale",
+    "projectId": "p1773686598385",
+    "status": "ready-for-qa",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 191159,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/439_tf1795d30-0215-462e-8ed6-f0a3997acbd0/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t1c7cfc5c-439a-4ec0-ad55-2d24877ae204",
+    "taskNumber": 441,
+    "title": "Ui issue",
+    "projectId": "p1773686598385",
+    "status": "ready-for-qa",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 292061,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/441_t1c7cfc5c-439a-4ec0-ad55-2d24877ae204/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t82a56396-2488-44e9-9526-46cd79cd56ba",
+    "taskNumber": 452,
+    "title": "Advertisement remains in “Pending Approval” after admin approval",
+    "projectId": "p1773686987208",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 2265739,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/452_t82a56396-2488-44e9-9526-46cd79cd56ba/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t3a728c39-e708-4e50-88d4-3d3fd8d42296",
+    "taskNumber": 462,
+    "title": "release button always showing without putting anything to hold",
+    "projectId": "p1773686598385",
+    "status": "ready-for-qa",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/jpeg",
+        "bytes": 42005,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/462_t3a728c39-e708-4e50-88d4-3d3fd8d42296/01.jpg"
+      }
+    ]
+  },
+  {
+    "taskId": "t96567f71-3c80-4098-9f44-be170a60725b",
+    "taskNumber": 454,
+    "title": "There is a problem with the google map",
+    "projectId": "p1773686987208",
+    "status": "done",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 1700579,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/454_t96567f71-3c80-4098-9f44-be170a60725b/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t05624b64-6d0a-4434-a1da-bf0c2d6abd6d",
+    "taskNumber": 480,
+    "title": "design issue",
+    "projectId": "p94e20537-d03a-456b-93a9-73c9b87c6e30",
+    "status": "in-progress",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 76229,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/480_t05624b64-6d0a-4434-a1da-bf0c2d6abd6d/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t2c82ac56-9d48-4e39-b783-1040ba7c376d",
+    "taskNumber": 481,
+    "title": "Add the calendar",
+    "projectId": "p94e20537-d03a-456b-93a9-73c9b87c6e30",
+    "status": "todo",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 76229,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/481_t2c82ac56-9d48-4e39-b783-1040ba7c376d/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "tfe3c6f3d-5702-44da-a4b4-3da44d1f31d9",
+    "taskNumber": 482,
+    "title": "Mobile Layout issues",
+    "projectId": "p94e20537-d03a-456b-93a9-73c9b87c6e30",
+    "status": "in-progress",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 762062,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/482_tfe3c6f3d-5702-44da-a4b4-3da44d1f31d9/01.png"
+      }
+    ]
+  },
+  {
+    "taskId": "t1536b62f-dd99-482c-b7ce-46623ac8343b",
+    "taskNumber": 485,
+    "title": "photos are not showing",
+    "projectId": "p94e20537-d03a-456b-93a9-73c9b87c6e30",
+    "status": "todo",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/jpeg",
+        "bytes": 55216,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/485_t1536b62f-dd99-482c-b7ce-46623ac8343b/01.jpg"
+      }
+    ]
+  },
+  {
+    "taskId": "t9b068c6e-7fc9-4438-bf56-08a8e6b968bb",
+    "taskNumber": 486,
+    "title": "alignment issues in the mobile layout",
+    "projectId": "p94e20537-d03a-456b-93a9-73c9b87c6e30",
+    "status": "in-progress",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "bytes": 776694,
+        "encodedDataUrl": true,
+        "relativePath": "task-images/486_t9b068c6e-7fc9-4438-bf56-08a8e6b968bb/01.png"
+      }
+    ]
+  }
+]

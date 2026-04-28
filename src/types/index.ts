@@ -109,8 +109,13 @@ export interface Attachment {
     taskId: string;
     name: string;
     filePath: string;
+    storageProvider?: 'local' | 'r2';
+    storageKey?: string;
+    mimeType?: string;
+    kind?: 'file' | 'image';
     size: number;
     uploadedAt: string;
+    previewDataUrl?: string;
 }
 
 export interface TaskTemplate {

@@ -268,10 +268,13 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
     // Attachments
     getAttachments: (taskId) => import_electron.ipcRenderer.invoke("db:attachments:getByTask", taskId),
     pickAttachments: (taskId) => import_electron.ipcRenderer.invoke("db:attachments:pick", taskId),
+    pickImageAttachment: (taskId) => import_electron.ipcRenderer.invoke("db:attachments:pickImage", taskId),
     pickForStaging: () => import_electron.ipcRenderer.invoke("db:attachments:pickForStaging"),
+    pickImagesForStaging: () => import_electron.ipcRenderer.invoke("db:attachments:pickImagesForStaging"),
     saveAttachments: (taskId, filePaths) => import_electron.ipcRenderer.invoke("db:attachments:savePaths", taskId, filePaths),
     deleteAttachment: (attachId) => import_electron.ipcRenderer.invoke("db:attachments:delete", attachId),
-    openAttachment: (filePath) => import_electron.ipcRenderer.invoke("db:attachments:open", filePath),
+    openAttachment: (attachIdOrPath) => import_electron.ipcRenderer.invoke("db:attachments:open", attachIdOrPath),
+    getAttachmentDataUrl: (attachId) => import_electron.ipcRenderer.invoke("db:attachments:getDataUrl", attachId),
     // Task Templates
     getTemplates: () => import_electron.ipcRenderer.invoke("db:templates:getAll"),
     createTemplate: (data) => import_electron.ipcRenderer.invoke("db:templates:create", data),

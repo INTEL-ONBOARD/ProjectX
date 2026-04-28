@@ -5,7 +5,7 @@ import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePl
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AvatarGroup } from '../components/ui/Avatar';
-import { Task, TaskStatus, TaskActivityEntry } from '../types';
+import { Attachment, Task, TaskStatus, TaskActivityEntry } from '../types';
 import { useProjects } from '../context/ProjectContext';
 import { useMembersContext } from '../context/MembersContext';
 import { useAuth } from '../context/AuthContext';
@@ -86,6 +86,11 @@ const statusStyles: Record<string, { bg: string; text: string; label: string; do
 };
 
 const tabs = ['All', 'To Do', 'In Progress', 'Ready for QA', 'Deployment Pending', 'Blocker', 'On Hold', 'Done'];
+const dbApi = () => (window as any).electronAPI.db;
+
+function isImageAttachment(attachment: Attachment) {
+  return attachment.kind === 'image' || (attachment.mimeType ?? '').startsWith('image/');
+}
 
 // ── Dependency Graph ────────────────────────────────────────────────────────
 function DependencyGraph({ tasks, onTaskClick }: { tasks: Task[]; onTaskClick: (t: Task) => void }) {
@@ -193,13 +198,14 @@ const TasksPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
   const [showStatusDrop, setShowStatusDrop] = useState(false);
-  const detailFileRef = useRef<HTMLInputElement>(null);
   const selectedTaskRef = useRef<typeof selectedTask>(null);
   const uploadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | 'saved' | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachmentImageUrls, setAttachmentImageUrls] = useState<Record<string, string>>({});
   const lightboxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (lightboxIndex !== null) lightboxRef.current?.focus();
@@ -207,6 +213,51 @@ const TasksPage: React.FC = () => {
   useEffect(() => {
     setLightboxIndex(null);
   }, [selectedTask?.id]);
+
+  useEffect(() => {
+    if (!selectedTask) {
+      setAttachments([]);
+      setAttachmentImageUrls({});
+      return;
+    }
+    const taskId = selectedTask.id;
+    let cancelled = false;
+    dbApi().getAttachments(taskId).then((data: any) => {
+      if (!cancelled) setAttachments(data as Attachment[]);
+    }).catch(console.error);
+    return () => { cancelled = true; };
+  }, [selectedTask?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const imageAttachments = attachments.filter(isImageAttachment);
+    const validIds = new Set(imageAttachments.map(a => a.id));
+
+    setAttachmentImageUrls(prev => {
+      const next = Object.fromEntries(Object.entries(prev).filter(([id]) => validIds.has(id)));
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+
+    const missing = imageAttachments.filter(a => !attachmentImageUrls[a.id]);
+    if (missing.length === 0) return () => { cancelled = true; };
+
+    Promise.all(missing.map(async attachment => {
+      if (attachment.previewDataUrl) return [attachment.id, attachment.previewDataUrl] as const;
+      const dataUrl = await dbApi().getAttachmentDataUrl(attachment.id) as string | null;
+      return dataUrl ? [attachment.id, dataUrl] as const : null;
+    })).then(entries => {
+      if (cancelled) return;
+      setAttachmentImageUrls(prev => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          if (entry) next[entry[0]] = entry[1];
+        }
+        return next;
+      });
+    }).catch(console.error);
+
+    return () => { cancelled = true; };
+  }, [attachments, attachmentImageUrls]);
 
   // Inline edit state
   const [editingTitle, setEditingTitle] = useState(false);
@@ -312,41 +363,46 @@ const TasksPage: React.FC = () => {
     { label: 'Pending', value: String(todoCount), trend: overdueCount > 0 ? `${overdueCount} overdue` : 'On track', trendUp: overdueCount === 0, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (todoCount / totalTasks) * 100 : 0 },
   ];
 
-  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (detailFileRef.current) detailFileRef.current.value = '';
-    if (!file) return;
-    // Instant blob preview
-    const previewUrl = URL.createObjectURL(file);
-    setUploadPreviewUrl(previewUrl);
+  const handleImagePick = async () => {
+    const current = selectedTaskRef.current;
+    if (!current) return;
+    setUploadPreviewUrl(null);
     setUploadProgress(0);
-    // Simulate progress up to 85%
     let prog = 0;
     uploadTimerRef.current = setInterval(() => {
       prog = Math.min(prog + Math.random() * 12 + 4, 85);
       setUploadProgress(Math.round(prog));
     }, 120);
-    const reader = new FileReader();
-    reader.onload = ev => {
+    try {
+      const added = await dbApi().pickImageAttachment(current.id) as Attachment[];
       if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
+      if (added.length === 0) {
+        setUploadProgress(null);
+        return;
+      }
       setUploadProgress(100);
-      const dataUrl = ev.target?.result as string;
-      URL.revokeObjectURL(previewUrl);
-      const current = selectedTaskRef.current;
-      if (!current) return;
-      const newImages = [...(current.images ?? []), dataUrl];
-      setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
-      updateTask(current.id, { images: newImages }).catch(error => {
-        console.error(error);
-        setSelectedTask(current);
+      setAttachmentImageUrls(prev => {
+        const next = { ...prev };
+        for (const attachment of added) {
+          if (attachment.previewDataUrl) next[attachment.id] = attachment.previewDataUrl;
+        }
+        return next;
+      });
+      setAttachments(prev => {
+        const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
+        return newOnes.length ? [...prev, ...newOnes] : prev;
       });
       setUploadProgress('saved');
       setTimeout(() => {
         setUploadProgress(null);
         setUploadPreviewUrl(null);
       }, 400);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error(error);
+      if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
+      setUploadProgress(null);
+      setUploadPreviewUrl(null);
+    }
   };
 
   const handleExport = () => {
@@ -1010,17 +1066,20 @@ const TasksPage: React.FC = () => {
                     {/* Image gallery */}
                     <div className="mb-4" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }}>
                       {(() => {
-                        const imgs = selectedTask.images ?? [];
-                        const displayImgs: { src: string; isUploading: boolean }[] = [
-                          ...imgs.map(src => ({ src, isUploading: false })),
+                        const imageItems = attachments
+                          .filter(isImageAttachment)
+                          .map(attachment => ({ attachment, src: attachmentImageUrls[attachment.id] }))
+                          .filter((item): item is { attachment: Attachment; src: string } => Boolean(item.src));
+                        const displayImgs: { src: string; isUploading: boolean; attachment?: Attachment }[] = [
+                          ...imageItems.map(item => ({ src: item.src, isUploading: false, attachment: item.attachment })),
                           ...(uploadPreviewUrl && uploadProgress !== null ? [{ src: uploadPreviewUrl, isUploading: true }] : []),
                         ];
                         if (displayImgs.length === 0) return null;
                         return (
                           <div className="grid grid-cols-2 gap-2 mb-3">
-                            {displayImgs.map(({ src, isUploading }, i) => (
+                            {displayImgs.map(({ src, isUploading, attachment }, i) => (
                               <div
-                                key={isUploading ? 'upload-tile' : i}
+                                key={isUploading ? 'upload-tile' : attachment?.id ?? i}
                                 className="relative h-20"
                                 onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn && deletingIndex !== i && !isUploading) btn.style.opacity = '1'; }}
                                 onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
@@ -1066,14 +1125,18 @@ const TasksPage: React.FC = () => {
                                     data-del
                                     onClick={async e => {
                                       e.stopPropagation();
+                                      if (!attachment) return;
                                       setDeletingIndex(i);
-                                      const current = selectedTaskRef.current;
-                                      if (!current) { setDeletingIndex(null); return; }
-                                      const updated = (current.images ?? []).filter((_, idx) => idx !== i);
-                                      setSelectedTask(prev => prev ? { ...prev, images: updated } : prev);
-                                      await updateTask(current.id, { images: updated }).catch(error => {
+                                      setAttachments(prev => prev.filter(item => item.id !== attachment.id));
+                                      setAttachmentImageUrls(prev => {
+                                        const next = { ...prev };
+                                        delete next[attachment.id];
+                                        return next;
+                                      });
+                                      await dbApi().deleteAttachment(attachment.id).catch((error: unknown) => {
                                         console.error(error);
-                                        setSelectedTask(current);
+                                        setAttachments(prev => prev.some(item => item.id === attachment.id) ? prev : [...prev, attachment]);
+                                        setAttachmentImageUrls(prev => ({ ...prev, [attachment.id]: src }));
                                       });
                                       setDeletingIndex(null);
                                     }}
@@ -1089,14 +1152,13 @@ const TasksPage: React.FC = () => {
                           </div>
                         );
                       })()}
-                      <button onClick={() => detailFileRef.current?.click()}
+                      <button onClick={handleImagePick}
                         className="flex items-center gap-3 px-1 py-2.5 text-sm w-full text-left transition-colors"
                         style={{ color: 'var(--text-muted)' }}
                         onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}>
                         <ImagePlus size={14} /> Upload image
                       </button>
-                      <input ref={detailFileRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
                     </div>
 
                     {/* Stats row */}
@@ -1164,8 +1226,12 @@ const TasksPage: React.FC = () => {
 
               {/* Lightbox overlay */}
               <AnimatePresence>
-                {lightboxIndex !== null && (selectedTask.images ?? []).length > 0 && (() => {
-                  const imgs = selectedTask.images ?? [];
+                {lightboxIndex !== null && attachments.some(isImageAttachment) && (() => {
+                  const imgs = attachments
+                    .filter(isImageAttachment)
+                    .map(attachment => attachmentImageUrls[attachment.id])
+                    .filter(Boolean);
+                  if (imgs.length === 0) return null;
                   const total = imgs.length;
                   const prev = () => setLightboxIndex(i => i !== null ? (i - 1 + total) % total : 0);
                   const next = () => setLightboxIndex(i => i !== null ? (i + 1) % total : 0);

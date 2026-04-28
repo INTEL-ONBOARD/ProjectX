@@ -99,6 +99,10 @@ function fmtSize(bytes: number) {
   return (bytes / 1024 / 1024).toFixed(1) + ' MB';
 }
 
+function isImageAttachment(attachment: Attachment) {
+  return attachment.kind === 'image' || (attachment.mimeType ?? '').startsWith('image/');
+}
+
 interface Filters {
   priority: string;
   assignees: string[];
@@ -248,7 +252,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
   const lightboxRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (lightboxIndex !== null) lightboxRef.current?.focus();
   }, [lightboxIndex]);
@@ -256,6 +259,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
     setLightboxIndex(null);
   }, [selectedTask?.id]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachmentImageUrls, setAttachmentImageUrls] = useState<Record<string, string>>({});
 
   const [showNewProject, setShowNewProject] = useState(false);
   const [boardColumns, setBoardColumns] = useState<BoardColumnsState>(createEmptyBoardColumns);
@@ -428,6 +432,37 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
   }, [selectedTask?.id]);
 
   useEffect(() => {
+    let cancelled = false;
+    const imageAttachments = attachments.filter(isImageAttachment);
+    const validIds = new Set(imageAttachments.map(a => a.id));
+
+    setAttachmentImageUrls(prev => {
+      const next = Object.fromEntries(Object.entries(prev).filter(([id]) => validIds.has(id)));
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+
+    const missing = imageAttachments.filter(a => !attachmentImageUrls[a.id]);
+    if (missing.length === 0) return () => { cancelled = true; };
+
+    Promise.all(missing.map(async attachment => {
+      if (attachment.previewDataUrl) return [attachment.id, attachment.previewDataUrl] as const;
+      const dataUrl = await dbApi().getAttachmentDataUrl(attachment.id) as string | null;
+      return dataUrl ? [attachment.id, dataUrl] as const : null;
+    })).then(entries => {
+      if (cancelled) return;
+      setAttachmentImageUrls(prev => {
+        const next = { ...prev };
+        for (const entry of entries) {
+          if (entry) next[entry[0]] = entry[1];
+        }
+        return next;
+      });
+    }).catch(console.error);
+
+    return () => { cancelled = true; };
+  }, [attachments, attachmentImageUrls]);
+
+  useEffect(() => {
     if (!selectedTask) return;
     const eApi = (window as any).electronAPI;
     const unsubComment = eApi.onCommentChanged((_: unknown, payload: { op: string; doc?: any; id?: string }) => {
@@ -571,50 +606,46 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
   const uploadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedTask) return;
-    e.target.value = '';
-    // Show preview immediately using object URL — same look as a real image tile
-    const previewUrl = URL.createObjectURL(file);
-    setUploadPreviewUrl(previewUrl);
+  const handleImageUpload = async () => {
+    const current = selectedTaskRef.current;
+    if (!current) return;
+    setUploadPreviewUrl(null);
     setUploadProgress(0);
-
-    const reader = new FileReader();
     let simulated = 0;
     uploadTimerRef.current = setInterval(() => {
       simulated = Math.min(simulated + Math.random() * 18, 90);
       setUploadProgress(Math.round(simulated));
     }, 80);
-
-    reader.onload = ev => {
+    try {
+      const added = await dbApi().pickImageAttachment(current.id) as Attachment[];
       if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
+      if (added.length === 0) {
+        setUploadProgress(null);
+        return;
+      }
       setUploadProgress(100);
-      const dataUrl = ev.target?.result as string;
-      URL.revokeObjectURL(previewUrl);
-      const current = selectedTaskRef.current;
-      if (!current) return;
-      const newImages = [...(current.images ?? []), dataUrl];
-      setSelectedTask(prev => prev ? { ...prev, images: newImages } : prev);
-      updateTask(current.id, { images: newImages }).catch(error => {
-        console.error(error);
-        setSelectedTask(current);
+      setAttachmentImageUrls(prev => {
+        const next = { ...prev };
+        for (const attachment of added) {
+          if (attachment.previewDataUrl) next[attachment.id] = attachment.previewDataUrl;
+        }
+        return next;
+      });
+      setAttachments(prev => {
+        const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
+        return newOnes.length ? [...prev, ...newOnes] : prev;
       });
       setUploadProgress('saved');
       setTimeout(() => {
         setUploadProgress(null);
         setUploadPreviewUrl(null);
       }, 400);
-    };
-
-    reader.onerror = () => {
+    } catch (error) {
+      console.error(error);
       if (uploadTimerRef.current) { clearInterval(uploadTimerRef.current); uploadTimerRef.current = null; }
-      URL.revokeObjectURL(previewUrl);
       setUploadProgress(null);
       setUploadPreviewUrl(null);
-    };
-
-    reader.readAsDataURL(file);
+    }
   };
 
   const currentStatus = selectedTask ? (selectedTask.status) : 'todo';
@@ -1231,11 +1262,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                     {/* Attach file action */}
                     <button
                       onClick={async () => {
-                        const added = await dbApi().pickAttachments(selectedTask!.id) as Attachment[];
-                        setAttachments(prev => {
-                          const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
-                          return newOnes.length ? [...prev, ...newOnes] : prev;
-                        });
+                        try {
+                          const added = await dbApi().pickAttachments(selectedTask!.id) as Attachment[];
+                          setAttachments(prev => {
+                            const newOnes = added.filter(a => !prev.some(x => x.id === a.id));
+                            return newOnes.length ? [...prev, ...newOnes] : prev;
+                          });
+                        } catch (error) {
+                          console.error(error);
+                        }
                       }}
                       className="flex items-center gap-3 px-1 py-2.5 rounded-lg text-sm transition-colors w-full text-left"
                       style={{ color: 'var(--text-muted)' }}
@@ -1248,7 +1283,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
 
                     {/* Image upload action */}
                     <button
-                      onClick={() => fileRef.current?.click()}
+                      onClick={handleImageUpload}
                       className="flex items-center gap-3 px-1 py-2.5 rounded-lg text-sm transition-colors w-full text-left"
                       style={{ color: 'var(--text-muted)' }}
                       onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
@@ -1257,23 +1292,24 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                       <ImagePlus size={14} />
                       Upload image
                     </button>
-                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   </div>
 
                   {/* Image gallery */}
                   {(() => {
-                    const imgs = selectedTask.images ?? [];
-                    // Merge upload preview into the display list so it appears as the last image tile
-                    const displayImgs: { src: string; isUploading: boolean }[] = [
-                      ...imgs.map(src => ({ src, isUploading: false })),
+                    const imageItems = attachments
+                      .filter(isImageAttachment)
+                      .map(attachment => ({ attachment, src: attachmentImageUrls[attachment.id] }))
+                      .filter((item): item is { attachment: Attachment; src: string } => Boolean(item.src));
+                    const displayImgs: { src: string; isUploading: boolean; attachment?: Attachment }[] = [
+                      ...imageItems.map(item => ({ src: item.src, isUploading: false, attachment: item.attachment })),
                       ...(uploadPreviewUrl && uploadProgress !== null ? [{ src: uploadPreviewUrl, isUploading: true }] : []),
                     ];
                     if (displayImgs.length === 0) return null;
                     return (
                       <div className="grid grid-cols-2 gap-2 mb-4">
-                        {displayImgs.map(({ src, isUploading }, i) => (
+                        {displayImgs.map(({ src, isUploading, attachment }, i) => (
                           <div
-                            key={isUploading ? 'upload-tile' : i}
+                            key={isUploading ? 'upload-tile' : attachment?.id ?? i}
                             className="relative h-20"
                             onMouseEnter={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn && deletingIndex !== i && !isUploading) btn.style.opacity = '1'; }}
                             onMouseLeave={e => { const btn = e.currentTarget.querySelector<HTMLElement>('[data-del]'); if (btn) btn.style.opacity = '0'; }}
@@ -1319,14 +1355,18 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                                 data-del
                                 onClick={async e => {
                                   e.stopPropagation();
+                                  if (!attachment) return;
                                   setDeletingIndex(i);
-                                  const current = selectedTaskRef.current;
-                                  if (!current) { setDeletingIndex(null); return; }
-                                  const updated = (current.images ?? []).filter((_, idx) => idx !== i);
-                                  setSelectedTask(prev => prev ? { ...prev, images: updated } : prev);
-                                  await updateTask(current.id, { images: updated }).catch(error => {
+                                  setAttachments(prev => prev.filter(item => item.id !== attachment.id));
+                                  setAttachmentImageUrls(prev => {
+                                    const next = { ...prev };
+                                    delete next[attachment.id];
+                                    return next;
+                                  });
+                                  await dbApi().deleteAttachment(attachment.id).catch((error: unknown) => {
                                     console.error(error);
-                                    setSelectedTask(current);
+                                    setAttachments(prev => prev.some(item => item.id === attachment.id) ? prev : [...prev, attachment]);
+                                    setAttachmentImageUrls(prev => ({ ...prev, [attachment.id]: src }));
                                   });
                                   setDeletingIndex(null);
                                 }}
@@ -1355,7 +1395,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
                             <Paperclip size={13} style={{ color: 'var(--text-subtle)' }} className="shrink-0" />
                             <span className="flex-1 text-xs truncate font-medium" style={{ color: 'var(--text-secondary)' }}>{a.name}</span>
                             <span className="text-[10px]" style={{ color: 'var(--text-subtle)' }}>{fmtSize(a.size)}</span>
-                            <button onClick={() => dbApi().openAttachment(a.filePath)} style={{ color: 'var(--text-subtle)' }} className="hover:text-primary-500 transition-colors">
+                            <button onClick={() => dbApi().openAttachment(a.id)} style={{ color: 'var(--text-subtle)' }} className="hover:text-primary-500 transition-colors">
                               <Download size={13} />
                             </button>
                             <button
@@ -1484,8 +1524,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ filters, todayMode, viewMode 
               )}
               {/* Lightbox overlay */}
               <AnimatePresence>
-                {lightboxIndex !== null && (selectedTask.images ?? []).length > 0 && (() => {
-                  const imgs = selectedTask.images ?? [];
+                {lightboxIndex !== null && attachments.some(isImageAttachment) && (() => {
+                  const imgs = attachments
+                    .filter(isImageAttachment)
+                    .map(attachment => attachmentImageUrls[attachment.id])
+                    .filter(Boolean);
+                  if (imgs.length === 0) return null;
                   const total = imgs.length;
                   const prev = () => setLightboxIndex(i => i !== null ? (i - 1 + total) % total : 0);
                   const next = () => setLightboxIndex(i => i !== null ? (i + 1) % total : 0);
