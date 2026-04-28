@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, AlignLeft, Check, Circle, Loader2 } from 'lucide-react';
+import { CheckSquare, Clock, TrendingUp, AlertCircle, Plus, Download, X, ImagePlus, Calendar, User, Tag, ChevronDown, ChevronLeft, ChevronRight, Pencil, Trash2, ArrowRight, Flag, UserPlus, UserMinus, FileText, Search, AlignLeft, Check, Circle } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { AvatarGroup } from '../components/ui/Avatar';
@@ -87,6 +87,7 @@ const statusStyles: Record<string, { bg: string; text: string; label: string; do
 
 const tabs = ['All', 'To Do', 'In Progress', 'Ready for QA', 'Deployment Pending', 'Blocker', 'On Hold', 'Done'];
 const dbApi = () => (window as any).electronAPI.db;
+const TASK_TABLE_SKELETON_ROWS = 8;
 
 function isImageAttachment(attachment: Attachment) {
   return attachment.kind === 'image' || (attachment.mimeType ?? '').startsWith('image/');
@@ -314,12 +315,8 @@ const TasksPage: React.FC = () => {
     tableScrollRef.current?.scrollTo({ top: 0 });
   }, [activeTab, viewMode, filterPriority, filterAssignee, searchQuery, sortCol, sortDir, tasksInitialLoading]);
 
-  const totalTasks = allTasks.length;
-
   const tabStatusMap: (TaskStatus | null)[] = [null, 'todo', 'in-progress', 'ready-for-qa', 'deployment-pending', 'blocker', 'on-hold', 'done'];
-  const tabTasks = activeTab === 0 ? allTasks : allTasks.filter(t => t.status === tabStatusMap[activeTab]);
-
-  const filteredTasks = tabTasks.filter(t => {
+  const baseFilteredTasks = allTasks.filter(t => {
     const q = searchQuery.trim().toLowerCase();
     if (q) {
       const assigneeNames = t.assignees.map(id => members.find(m => m.id === id)?.name ?? '').join(' ').toLowerCase();
@@ -334,6 +331,9 @@ const TasksPage: React.FC = () => {
     if (filterAssignee && !t.assignees.includes(filterAssignee)) return false;
     return true;
   });
+  const totalTasks = baseFilteredTasks.length;
+  const tabTasks = activeTab === 0 ? baseFilteredTasks : baseFilteredTasks.filter(t => t.status === tabStatusMap[activeTab]);
+  const filteredTasks = tabTasks;
 
   const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, completed: 3 };
   const STATUS_ORDER: Record<string, number> = { 'in-progress': 0, 'todo': 1, 'ready-for-qa': 2, 'deployment-pending': 3, 'blocker': 4, 'on-hold': 5, 'done': 6 };
@@ -347,17 +347,18 @@ const TasksPage: React.FC = () => {
     return sortDir === 'asc' ? cmp : -cmp;
   }) : filteredTasks;
 
-  const doneCount = allTasks.filter(t => t.status === 'done').length;
-  const todoCount = allTasks.filter(t => t.status === 'todo').length;
-  const inProgCount = allTasks.filter(t => t.status === 'in-progress').length;
+  const doneCount = baseFilteredTasks.filter(t => t.status === 'done').length;
+  const todoCount = baseFilteredTasks.filter(t => t.status === 'todo').length;
+  const inProgCount = baseFilteredTasks.filter(t => t.status === 'in-progress').length;
 
   const TODAY = new Date().toISOString().split('T')[0];
   const TODAY_STR = TODAY;
-  const overdueCount = allTasks.filter(t => t.dueDate && t.dueDate < TODAY_STR && t.status !== 'done').length;
+  const overdueCount = baseFilteredTasks.filter(t => t.dueDate && t.dueDate < TODAY_STR && t.status !== 'done').length;
   const completionPct = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : 0;
+  const filteredProjectCount = new Set(baseFilteredTasks.map(task => task.projectId).filter(Boolean)).size;
 
   const metrics = [
-    { label: 'Total Tasks', value: String(totalTasks), trend: `${contextProjects.length} project${contextProjects.length !== 1 ? 's' : ''}`, trendUp: true, color: '', accent: true, icon: CheckSquare, barPct: 100 },
+    { label: 'Total Tasks', value: String(totalTasks), trend: `${filteredProjectCount} project${filteredProjectCount !== 1 ? 's' : ''}`, trendUp: true, color: '', accent: true, icon: CheckSquare, barPct: 100 },
     { label: 'In Progress', value: String(inProgCount), trend: 'Active now', trendUp: true, color: '#FFA500', accent: false, icon: Clock, barPct: totalTasks > 0 ? (inProgCount / totalTasks) * 100 : 0 },
     { label: 'Completed', value: String(doneCount), trend: `${completionPct}% done`, trendUp: true, color: '#68B266', accent: false, icon: TrendingUp, barPct: totalTasks > 0 ? (doneCount / totalTasks) * 100 : 0 },
     { label: 'Pending', value: String(todoCount), trend: overdueCount > 0 ? `${overdueCount} overdue` : 'On track', trendUp: overdueCount === 0, color: '#D8727D', accent: false, icon: AlertCircle, barPct: totalTasks > 0 ? (todoCount / totalTasks) * 100 : 0 },
@@ -480,7 +481,7 @@ const TasksPage: React.FC = () => {
           <PageHeader
             eyebrow="Home / Tasks"
             title="Tasks"
-            description={tasksInitialLoading ? 'Loading tasks...' : `${totalTasks} tasks across ${contextProjects.length} projects`}
+            description={tasksInitialLoading ? 'Loading tasks...' : `${totalTasks} tasks across ${filteredProjectCount} project${filteredProjectCount !== 1 ? 's' : ''}`}
             actions={
               <>
                 <motion.button
@@ -600,7 +601,7 @@ const TasksPage: React.FC = () => {
                 <div className="flex gap-1 bg-surface-100 rounded-lg p-1 mb-3 w-fit">
                   {tabs.map((t, i) => {
                     const s = tabStatusMap[i];
-                    const count = s === null ? totalTasks : allTasks.filter(task => task.status === s).length;
+                    const count = s === null ? totalTasks : baseFilteredTasks.filter(task => task.status === s).length;
                     return (
                       <button key={t} onClick={() => { setActiveTab(i); setViewMode('list'); }} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === i && viewMode === 'list' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                         {t} ({count})
@@ -616,140 +617,187 @@ const TasksPage: React.FC = () => {
                 </div>
               </div>
             )}
-            {tasksInitialLoading ? (
-              <div className="flex-1 min-h-0 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-primary-500/10 flex items-center justify-center">
-                    <Loader2 size={24} className="text-primary-500 animate-spin" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-semibold text-gray-700">Loading tasks</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Fetching the latest task board data...</p>
-                  </div>
-                </div>
-              </div>
-            ) : viewMode === 'deps' ? (
+            {viewMode === 'deps' ? (
               <div className="flex-1 overflow-y-auto min-h-0">
                 <DependencyGraph tasks={filteredTasks} onTaskClick={handleOpenTask} />
               </div>
-            ) : viewMode === 'list' && <div ref={tableScrollRef} className="flex-1 overflow-y-auto min-h-0">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-surface-100">
-                  <th className="sticky top-0 z-10 px-4 py-3 w-8 bg-surface-50 border-b border-surface-100">
-                    <input type="checkbox"
-                      checked={selectedIds.size === filteredTasks.length && filteredTasks.length > 0}
-                      onChange={e => setSelectedIds(e.target.checked ? new Set(filteredTasks.map(t => t.id)) : new Set())}
-                      className="rounded border-gray-300"
-                    />
-                  </th>
-                  {(['Task', 'Project', 'Priority', 'Assignees', 'Due', 'Status'] as const).map(h => {
-                    const col = h.toLowerCase() as SortCol | 'assignees';
-                    const isSortable = col !== 'assignees';
-                    const isActive = sortCol === col;
-                    return (
-                      <th
-                        key={h}
-                        className={`sticky top-0 z-10 px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider bg-surface-50 border-b border-surface-100 select-none${h === 'Task' ? ' w-[35%]' : ''}${isSortable ? ' cursor-pointer hover:text-gray-600' : ''} ${isActive ? 'text-primary-500' : 'text-gray-400'}`}
-                        onClick={() => isSortable && handleSort(col as SortCol)}
-                      >
-                        <span className="inline-flex items-center gap-1">
-                          {h}
-                          {isSortable && (
-                            <span className="text-[9px] leading-none">
-                              {isActive ? (sortDir === 'asc' ? '▲' : '▼') : '⬍'}
-                            </span>
-                          )}
-                        </span>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedTasks.length === 0 && (
-                  <tr>
-                    <td colSpan={7}>
-                      <EmptyState
-                        icon={<CheckSquare size={48} />}
-                        title="No tasks found"
-                        description="Try adjusting your filters or create a new task."
-                        action={{ label: 'New Task', onClick: () => setShowTaskForm(true) }}
-                      />
-                    </td>
-                  </tr>
+            ) : viewMode === 'list' && (
+              <div ref={tableScrollRef} className="flex-1 overflow-y-auto min-h-0">
+                {tasksInitialLoading ? (
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-surface-100">
+                        <th className="sticky top-0 z-10 px-4 py-3 w-8 bg-surface-50 border-b border-surface-100">
+                          <div className="w-4 h-4 rounded bg-surface-200 animate-pulse" />
+                        </th>
+                        {(['Task', 'Project', 'Priority', 'Assignees', 'Due', 'Status'] as const).map(h => (
+                          <th
+                            key={h}
+                            className={`sticky top-0 z-10 px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider bg-surface-50 border-b border-surface-100 text-gray-400${h === 'Task' ? ' w-[35%]' : ''}`}
+                          >
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: TASK_TABLE_SKELETON_ROWS }).map((_, index) => (
+                        <tr key={`task-skeleton-${index}`} className="border-b border-surface-100">
+                          <td className="px-4 py-3">
+                            <div className="w-4 h-4 rounded bg-surface-200 animate-pulse" />
+                          </td>
+                          <td className="px-4 py-3 w-[35%]">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-10 h-3 rounded bg-surface-200 animate-pulse" />
+                              <div className="h-3 rounded bg-surface-200 animate-pulse w-[68%]" />
+                            </div>
+                            <div className="h-2.5 rounded bg-surface-100 animate-pulse w-[42%]" />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-surface-200 animate-pulse" />
+                              <div className="h-3 rounded bg-surface-200 animate-pulse w-20" />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="h-6 rounded-md bg-surface-200 animate-pulse w-14" />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-7 h-7 rounded-full bg-surface-200 animate-pulse" />
+                              <div className="w-7 h-7 rounded-full bg-surface-100 animate-pulse" />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="h-3 rounded bg-surface-200 animate-pulse w-16" />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="h-6 rounded-full bg-surface-200 animate-pulse w-20" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-surface-100">
+                        <th className="sticky top-0 z-10 px-4 py-3 w-8 bg-surface-50 border-b border-surface-100">
+                          <input type="checkbox"
+                            checked={selectedIds.size === filteredTasks.length && filteredTasks.length > 0}
+                            onChange={e => setSelectedIds(e.target.checked ? new Set(filteredTasks.map(t => t.id)) : new Set())}
+                            className="rounded border-gray-300"
+                          />
+                        </th>
+                        {(['Task', 'Project', 'Priority', 'Assignees', 'Due', 'Status'] as const).map(h => {
+                          const col = h.toLowerCase() as SortCol | 'assignees';
+                          const isSortable = col !== 'assignees';
+                          const isActive = sortCol === col;
+                          return (
+                            <th
+                              key={h}
+                              className={`sticky top-0 z-10 px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider bg-surface-50 border-b border-surface-100 select-none${h === 'Task' ? ' w-[35%]' : ''}${isSortable ? ' cursor-pointer hover:text-gray-600' : ''} ${isActive ? 'text-primary-500' : 'text-gray-400'}`}
+                              onClick={() => isSortable && handleSort(col as SortCol)}
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                {h}
+                                {isSortable && (
+                                  <span className="text-[9px] leading-none">
+                                    {isActive ? (sortDir === 'asc' ? '▲' : '▼') : '⬍'}
+                                  </span>
+                                )}
+                              </span>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedTasks.length === 0 && (
+                        <tr>
+                          <td colSpan={7}>
+                            <EmptyState
+                              icon={<CheckSquare size={48} />}
+                              title="No tasks found"
+                              description="Try adjusting your filters or create a new task."
+                              action={{ label: 'New Task', onClick: () => setShowTaskForm(true) }}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                      {sortedTasks.map(task => {
+                        const priority = priorityStyles[task.priority] ?? priorityStyles.low;
+                        const status = statusStyles[task.status] ?? statusStyles.todo;
+                        const project = contextProjects.find(p => p.id === task.projectId);
+                        const names = task.assignees.map(id => members.find(m => m.id === id)?.name ?? 'Unknown');
+                        const colors = task.assignees.map(id => getMemberColor(id));
+                        return (
+                          <motion.tr
+                            key={task.id}
+                            className="border-b border-surface-100 hover:bg-surface-50 transition-colors cursor-pointer"
+                            initial={{ opacity: 1, y: 0 }} animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0 }}
+                            onClick={() => { setSelectedTask(task); setShowStatusDrop(false); setConfirmDelete(false); }}
+                          >
+                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                              <input type="checkbox"
+                                checked={selectedIds.has(task.id)}
+                                onChange={e => {
+                                  const next = new Set(selectedIds);
+                                  e.target.checked ? next.add(task.id) : next.delete(task.id);
+                                  setSelectedIds(next);
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                            </td>
+                            <td className="px-4 py-3 w-[35%]">
+                              <div className="flex items-center">
+                                <span className="text-[11px] font-semibold text-gray-400 mr-1.5 shrink-0">
+                                  {task.taskNumber != null ? `#${String(task.taskNumber).padStart(3, '0')}` : '—'}
+                                </span>
+                                <div className="font-semibold text-gray-900 text-xs line-clamp-2">{task.title}</div>
+                              </div>
+                              <div className="text-[10px] text-gray-400">{task.comments} comments · {task.files} files</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {project && (
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
+                                  <span className="text-xs text-gray-500 truncate max-w-[80px]">{project.name}</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${priority.bg} ${priority.text}`}>{priority.label}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <AvatarGroup names={names} colors={colors} size="sm" max={3} />
+                            </td>
+                            <td className="px-4 py-3">
+                              {task.dueDate ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <span className={`text-xs ${task.dueDate < TODAY && task.status !== 'done' ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
+                                    {task.dueDate}
+                                  </span>
+                                  {task.dueDate < TODAY && task.status !== 'done' && (
+                                    <span className="text-[10px] font-bold text-red-400">Overdue</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-300">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>{status.label}</span>
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 )}
-                {sortedTasks.map((task, i) => {
-                  const priority = priorityStyles[task.priority] ?? priorityStyles.low;
-                  const status = statusStyles[task.status] ?? statusStyles.todo;
-                  const project = contextProjects.find(p => p.id === task.projectId);
-                  const names = task.assignees.map(id => members.find(m => m.id === id)?.name ?? 'Unknown');
-                  const colors = task.assignees.map(id => getMemberColor(id));
-                  return (
-                    <motion.tr
-                      key={task.id}
-                      className="border-b border-surface-100 hover:bg-surface-50 transition-colors cursor-pointer"
-                      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.35, delay: i * 0.05, ease: [0.4, 0, 0.2, 1] }}
-                      onClick={() => { setSelectedTask(task); setShowStatusDrop(false); setConfirmDelete(false); }}
-                    >
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <input type="checkbox"
-                          checked={selectedIds.has(task.id)}
-                          onChange={e => {
-                            const next = new Set(selectedIds);
-                            e.target.checked ? next.add(task.id) : next.delete(task.id);
-                            setSelectedIds(next);
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                      </td>
-                      <td className="px-4 py-3 w-[35%]">
-                        <div className="flex items-center">
-                          <span className="text-[11px] font-semibold text-gray-400 mr-1.5 shrink-0">
-                            {task.taskNumber != null ? `#${String(task.taskNumber).padStart(3, '0')}` : '—'}
-                          </span>
-                          <div className="font-semibold text-gray-900 text-xs line-clamp-2">{task.title}</div>
-                        </div>
-                        <div className="text-[10px] text-gray-400">{task.comments} comments · {task.files} files</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {project && (
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
-                            <span className="text-xs text-gray-500 truncate max-w-[80px]">{project.name}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${priority.bg} ${priority.text}`}>{priority.label}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <AvatarGroup names={names} colors={colors} size="sm" max={3} />
-                      </td>
-                      <td className="px-4 py-3">
-                        {task.dueDate ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className={`text-xs ${task.dueDate < TODAY && task.status !== 'done' ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
-                              {task.dueDate}
-                            </span>
-                            {task.dueDate < TODAY && task.status !== 'done' && (
-                              <span className="text-[10px] font-bold text-red-400">Overdue</span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>{status.label}</span>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>}
+              </div>
+            )}
           </div>
         </div>
       </div>
